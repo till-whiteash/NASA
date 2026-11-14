@@ -25,7 +25,7 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   if (url.pathname === '/coop/health') { res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' }); return res.end(JSON.stringify({ ok: true, rooms: rooms.size })); }
   let file = path.join(ROOT, decodeURIComponent(url.pathname));
-  if (!file.startsWith(ROOT)) { res.writeHead(403); return res.end(); }
+  if (file !== ROOT && !file.startsWith(ROOT + path.sep)) { res.writeHead(403); return res.end(); }   // never a sibling folder like game-old
   fs.stat(file, (err, st) => {
     if (!err && st.isDirectory()) file = path.join(file, 'index.html');
     fs.readFile(file, (e, data) => {

@@ -284,7 +284,7 @@ async function resume(d) {
   state.phase = 'mars';
   $('#hud').classList.remove('hidden');
   phoneTips();
-  toast(`👋 Welcome back, astronaut! Sol ${outpost.sol} - your mission carries on where you left it.`);
+  if (!guestMission) toast(`👋 Welcome back, astronaut! Sol ${outpost.sol} - your mission carries on where you left it.`);   // co-op guests get their own joined message
 }
 
 $('#reset-progress').onclick = () => modal({ title: 'Reset progress?', html: '<p>This deletes your saved mission and all your badges. It cannot be undone.</p>', choices: [{ label: 'Keep my progress', primary: true }, { label: 'Delete everything', onPick: resetGame }] });

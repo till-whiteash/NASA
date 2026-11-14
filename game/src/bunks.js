@@ -27,7 +27,7 @@ export class Bunks {
       const stand = toScene(.4, 0, -.55), station = toScene(.32, 0, -.75);
       this.list.push({
         id: 'cabin-' + c.person.id, cab, person: c.person,
-        get label() { return c.person.id === 'you' ? 'sleep in your bunk' : c.lived.visible ? `${c.person.first}'s bunk` : 'sleep in the spare bunk'; },
+        get label() { return c.person.id === 'you' ? 'sleep in your bunk' : c.lived.visible ? `check ${c.person.first}'s bunk` : 'sleep in the spare bunk'; },
         eye: toScene(-.5, MATTRESS + .3, -1.82), look: toScene(-.45, 1.45, -.2),
         body: { pos: toScene(-.5, MATTRESS + .2, -.08), quat: q.clone().multiply(lie) },
         stand, station,

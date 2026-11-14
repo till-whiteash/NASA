@@ -96,7 +96,7 @@ export class CrewInterior extends Interior {
     // crewmates are solid too (only blocks moving closer, so you can never get stuck inside someone)
     if(this.crewBodies?.some(p=>{if(!p.f.root.visible)return false;const q=p.f.root.position,d=Math.hypot(q.x-x,q.z-z);return d<.5&&d<Math.hypot(q.x-this.pos.x,q.z-this.pos.z);}))return false;
     if(this.obstacles?.some(b=>x>b.min.x-.18 && x<b.max.x+.18 && z>b.min.z-.18 && z<b.max.z+.18))return false;
-    return (Math.abs(x-SPACING*2)<1.12 && z>=-5 && z<0)|| (x>=0&&x<=SPACING*5&&Math.abs(z)<1.25)||Array.from({length:6},(_,i)=>Math.hypot(x-i*SPACING,z)<3.65).some(Boolean)||!!this.bunks?.walkable(x,z,this.pos);}
+    return (Math.abs(x-SPACING*2)<1.12 && z>=-5 && z<0)|| (x>=0&&x<=SPACING*5&&Math.abs(z)<((x%SPACING)>4.05&&(x%SPACING)<6.15?1.12:1.25))||Array.from({length:6},(_,i)=>Math.hypot(x-i*SPACING,z)<3.65).some(Boolean)||!!this.bunks?.walkable(x,z,this.pos);}
   update(dt,keys,active){
     // lying in a bunk (bunks.js): the camera rests on the pillow until you get up
     if(this.sleepIn){this.vel={x:0,z:0};this.camera.position.copy(this.sleepIn.eye);this.camera.lookAt(this.sleepIn.look);return;}
