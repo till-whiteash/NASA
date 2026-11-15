@@ -14,7 +14,7 @@ export async function createOpenLayout(world, habitat) {
   const dark = new THREE.MeshStandardMaterial({color:'#555657',roughness:.95});
   const orange = new THREE.MeshStandardMaterial({color:'#ad683e',roughness:.9});
   function post(x,z) {
-    const p = new THREE.Group(); p.position.set(x,heightAt(x,z),z);
+    const p = new THREE.Group(); p.userData.surveyPost = true; p.position.set(x,heightAt(x,z),z);
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,1.7,6),grey);pole.position.y=.85;p.add(pole);
     const tab=new THREE.Mesh(new THREE.BoxGeometry(.26,.22,.04),orange);tab.position.y=1.5;p.add(tab);group.add(p);
   }

@@ -26,8 +26,8 @@ export class HabitatBuild {
       const rock = new THREE.Mesh(world.rocks.geometry, world.rocks.material.clone()); rock.scale.set(.7, .5, .6);
       rock.position.set(x, heightAt(x, z) + .22, z); rock.castShadow = rock.receiveShadow = true;
       rock.userData = { kind: 'hab-rock', id: i, label: 'Break site rock (pickaxe)' };
-      const flag = new THREE.Mesh(new THREE.CylinderGeometry(.04, .04, 1.1, 8), new THREE.MeshStandardMaterial({ color: '#ffb347', emissive: '#7a3a00' }));
-      flag.position.set(.55, .7, 0); flag.scale.setScalar(1 / .6); rock.add(flag);
+      rock.material.color?.set('#9b7657'); // standalone rocks have no instance colour
+      world.clearRocksAround?.(x, z, 1.8); // clear incidental rubble beneath the quest rock
       this.group.add(rock); return rock;
     });
     // 2. a footprint per module, then its footing and frame
@@ -66,7 +66,16 @@ export class HabitatBuild {
   apply(initial = false) {
     const b = this.b, built = habitatBuilt(this.state()), s = b?.step ?? HAB_DONE, w = this.world;
     this.group.visible = !built;
-    this.rocks.forEach((r, i) => (r.visible = s === 1 && !b.cleared.includes(i)));
+    this.rocks.forEach((r, i) => {
+      r.visible = s === 1 && !b.cleared.includes(i);
+      const hits = b?.rockHits?.[i] || 0;
+      r.scale.set(.7, .5, .6).multiplyScalar(1 - .1 * Math.min(hits, 2));
+      r.userData.label = `Break site rock (pickaxe) · ${Math.min(hits, 3)}/3 hits`;
+    });
+    // Survey poles are navigation decoration, not mining targets; keep the working area clear.
+    for (const post of this.m.layout.group?.children || []) if (post.userData.surveyPost)
+      post.visible = !this.rocks.some(rock => rock.visible && Math.hypot(post.position.x-rock.position.x, post.position.z-rock.position.z) < 2);
+
     this.pads.forEach((p, i) => (p.visible = s === 2 && !b.frames.includes(i)));
     this.frames.forEach((f, i) => (f.visible = !built && (s <= 3 || !!this.anim) && (s >= 3 || b.frames.includes(i))));
     this.post.visible = s === 3; this.airlock.visible = s === 4; this.valve.visible = s >= 4 && !built;
@@ -99,14 +108,16 @@ export class HabitatBuild {
     const b = this.b, d = mesh.userData; if (!b) return false;
     if (d.kind === 'hab-rock') {
       if (this.colony().tool !== 'pickaxe') { this.guide('Equip the pickaxe from your tool belt (1 or 2) before breaking site rocks.'); return true; }
-      if (this.striking) return true; this.striking = true;
-      this.world.swingTool(() => {
+      if (this.striking || this.world.toolSwing >= 0) return true; this.striking = true;
+      const accepted = this.world.swingTool(() => {
         this.striking = false; b.rockHits[d.id] = (b.rockHits[d.id] || 0) + 1;
-        if (b.rockHits[d.id] < 3) { this.notify(`Rock cracking · ${b.rockHits[d.id]}/3`); return; }
+        this.world.mineImpact?.(mesh.position, '#9b7657');
+        if (b.rockHits[d.id] < 3) { this.apply(); this.notify(`Rock cracking · ${b.rockHits[d.id]}/3`); return; }
         if (!b.cleared.includes(d.id)) b.cleared.push(d.id);
         mesh.visible = false; this.notify(`Site cleared: ${b.cleared.length}/${ROCKS}`);
-        if (b.cleared.length >= ROCKS) this.advance('Site clear. Now lay a foundation and raise a frame on each glowing footprint.'); else this.save();
+        if (b.cleared.length >= ROCKS) this.advance('Site clear. Now lay a foundation and raise a frame on each glowing footprint.'); else this.apply();
       });
+      if (!accepted) this.striking = false; // a rejected swing must never lock the rock permanently
       return true;
     }
     if (d.kind === 'hab-pad') {
@@ -139,7 +150,7 @@ export class HabitatBuild {
       if (k >= 1) { model.scale.copy(s); model.updateMatrix(); model.updateMatrixWorld(true); this.anim = null; this.apply(true); }
     }
     const p = this.world.player.position;
-    if (b.step === 0 && Math.hypot(p.x - this.centre.x, p.z - this.front) < 12) this.advance('This is your habitat site. First clear the four flagged rocks with your pickaxe.');
+    if (b.step === 0 && Math.hypot(p.x - this.centre.x, p.z - this.front) < 12) this.advance('This is your habitat site. First clear the four marked rocks with your pickaxe.');
     if (b.step === 5 && b.pressure > 0) {
       const near = this.valve.position.distanceTo(p) < 6;
       this.wheel.rotation.z += dt * 3;

@@ -451,7 +451,7 @@ async function arrive() {
   state.phase = 'mars';
   await landingFilm?.catch?.(() => {});        // let the landing film finish before the welcome box opens
   placeLander(world);
-  await playCinematic('outpost_26_months', { world });   // the goal: from two pods to a full outpost
+  // The player builds the base through HabitatBuild; the construction movie is optional in Cutscenes.
   $('#hud').classList.remove('hidden');
   phoneTips();
   say('welcome');
