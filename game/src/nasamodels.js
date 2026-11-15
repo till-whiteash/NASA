@@ -58,16 +58,20 @@ export async function replaceLogos(tex, spots) {
 const cache = new Map();
 // Resolves to the loaded glTF, or null if it couldn't load (the game then keeps its simple shapes).
 export function loadModel(file, { required = false } = {}) {
-  if (!cache.has(file)) {
+  // Absolute URLs are used by assets that live beside the game (such as the
+  // cinematic library). Resolve them from the page base only when needed; the
+  // normal game asset paths remain relative to assets/.
+  const url = /^(?:[a-z][a-z\d+.-]*:|\/)/i.test(file) ? file : 'assets/' + file;
+  if (!cache.has(url)) {
     // Known gameplay assets reserve capacity even when prefetched as optional.
     const critical = required || gameplayModels.has(file);
-    const pending = loadAssetWithRetry(critical ? criticalLoader : loader, 'assets/' + file, { critical }).catch(error => {
-      cache.delete(file); // A failed download must not poison later attempts.
+    const pending = loadAssetWithRetry(critical ? criticalLoader : loader, url, { critical }).catch(error => {
+      cache.delete(url); // A failed download must not poison later attempts.
       throw error;
     });
-    cache.set(file, pending);
+    cache.set(url, pending);
   }
-  const pending = cache.get(file);
+  const pending = cache.get(url);
   return required ? pending : pending.catch(error => {
     console.warn('NASA model failed to load:', file, error); return null;
   });

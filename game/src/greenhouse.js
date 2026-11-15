@@ -184,8 +184,69 @@ export class Greenhouse {
     this.buildTomatoes();
     this.buildFrontOfHouse();
     this.buildTunnel();
+    this.buildFitOut();
     this.walkwayReady = Promise.resolve();
     this.enter('hab');
+  }
+
+  // Finish the greenhouse structure and make the grow lights read as a real source of light.
+  // These details stay in the interior scene; the exterior greenhouse copy remains lightweight.
+  buildFitOut() {
+    const steel = M('greenhouseFootSteel', '#c9ced6', { metalness: .55, roughness: .38 });
+    const dark = M('greenhouseFootDark', '#2b2f33', { roughness: .6 });
+    const frame = this.regolithMaterials[1];
+    const inGap = d => { d = ((d % 360) + 360) % 360; return (d > 74 && d < 106) || (d > 166 && d < 194); };
+
+    // The two open arcs leave the tunnel and airlock clear.
+    for (const [start, end] of [[106, 166], [194, 434]]) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(R + .02, .07, 8, 96, (end - start) * Math.PI / 180), frame);
+      ring.rotation.set(Math.PI / 2, 0, start * Math.PI / 180);
+      ring.position.y = .62;
+      this.scene.add(ring);
+    }
+
+    const anchors = new THREE.Group();
+    for (let i = 0; i < 24; i++) {
+      const degrees = i * 15;
+      if (inGap(degrees)) continue;
+      const a = degrees * Math.PI / 180, x = Math.cos(a) * (R + .03), z = Math.sin(a) * (R + .03);
+      const plate = at(box(.3, .12, .3, steel), x, .06, z); plate.rotation.y = -a; anchors.add(plate);
+      const bolt = at(box(.1, .045, .1, dark), x * .985, .62, z * .985); bolt.rotation.y = -a; anchors.add(bolt);
+    }
+    this.scene.add(bake(anchors));
+
+    // A warm, low-output fill balances the pink grow bars without washing out plant colours.
+    const ringLight = new THREE.Mesh(new THREE.TorusGeometry(1.6, .035, 8, 40), new THREE.MeshBasicMaterial({ color: '#fff0d6' }));
+    ringLight.rotation.x = Math.PI / 2; ringLight.position.y = 5.1; this.scene.add(ringLight);
+    const fill = new THREE.PointLight('#ffe9cf', 5, 14, 1.5); fill.position.set(0, 4.6, 0); this.scene.add(fill);
+
+    const washTexture = canvasTex(16, 128, (g, w, h) => {
+      const gradient = g.createLinearGradient(0, 0, 0, h);
+      gradient.addColorStop(0, 'rgba(255,255,255,.72)'); gradient.addColorStop(.55, 'rgba(255,255,255,.2)'); gradient.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gradient; g.fillRect(0, 0, w, h);
+    });
+    for (const bed of this.beds) {
+      bed.wash = new THREE.Group(); bed.group.add(bed.wash);
+      for (const side of [-1, 1]) {
+        const material = new THREE.MeshBasicMaterial({ map: washTexture, color: '#e05cff', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: DS });
+        const plane = new THREE.Mesh(new THREE.PlaneGeometry(BED_LEN - .5, 1.5), material);
+        plane.rotation.order = 'YXZ'; plane.rotation.set(side * .22, Math.PI / 2, 0); plane.position.set(side * .1, 1.68, 0); plane.renderOrder = 3;
+        bed.wash.add(plane);
+      }
+    }
+
+    const shadowTexture = canvasTex(64, 256, (g, w, h) => {
+      const across = g.createLinearGradient(0, 0, w, 0);
+      across.addColorStop(0, 'rgba(0,0,0,0)'); across.addColorStop(.28, 'rgba(0,0,0,.8)'); across.addColorStop(.72, 'rgba(0,0,0,.8)'); across.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = across; g.fillRect(0, 0, w, h);
+      const ends = g.createLinearGradient(0, 0, 0, h);
+      ends.addColorStop(0, 'rgba(0,0,0,.45)'); ends.addColorStop(.08, 'rgba(0,0,0,0)'); ends.addColorStop(.92, 'rgba(0,0,0,0)'); ends.addColorStop(1, 'rgba(0,0,0,.45)');
+      g.globalCompositeOperation = 'destination-out'; g.fillStyle = ends; g.fillRect(0, 0, w, h);
+    });
+    for (const x of BEDS) {
+      const shadow = new THREE.Mesh(new THREE.PlaneGeometry(1.8, BED_LEN + .7), new THREE.MeshBasicMaterial({ map: shadowTexture, transparent: true, opacity: .38, depthWrite: false }));
+      shadow.rotation.x = -Math.PI / 2; shadow.position.set(x, .014, 0); shadow.renderOrder = 1; this.scene.add(shadow);
+    }
   }
 
   // floor: dark epoxy with a drain channel; steel grating walkways between the racks
@@ -462,15 +523,31 @@ export class Greenhouse {
   // by the tunnel: strawberry towers, the climate panel, circulation fans and a note on the post
   buildFrontOfHouse() {
     const F = this.furnishings;
-    for (const x of [-2.75, 2.75]) {   // strawberry towers: stacked pots with plants spilling out
+    for (const x of [-2.75, 2.75]) {   // five-tier drip towers with visible soil, planting pockets and ripe/unripe fruit
       const T = new THREE.Group(); T.position.set(x, 0, 4.7); F.add(T); const S = new THREE.Group(); T.add(S); seed = Math.round(x * 10 + 99);
-      S.add(at(cyl(.3, .32, .06, M('towerBase', '#5b6268', { roughness: .5 }), 20), 0, .03, 0));
+      const potM = M('towerPot2', '#ece8df', { roughness: .45 }), rimM = M('towerRim', '#d6d1c6', { roughness: .5 }), soilM = M('towerSoil', '#3a2c22', { roughness: 1 });
+      S.add(at(cyl(.32, .34, .05, M('towerBase', '#5b6268', { roughness: .5 }), 28), 0, .025, 0));
+      S.add(at(cyl(.025, .025, 1.7, M('towerPipe', '#3b7bd8', { roughness: .4 }), 8), 0, .9, 0));
+      const berryR = M('berry', '#d4261c', { roughness: .35 }), berryW = M('berryW', '#efe9d8', { roughness: .45 }), berryG = M('berryG', '#9ab04a', { roughness: .5 }), calyx = M('calyx', '#3f7a30', { roughness: .7, side: DS }), flower = M('sbFlower', '#fbfaf3', { roughness: .6 });
       for (let k = 0; k < 5; k++) {
-        const y = .1 + k * .3; S.add(at(cyl(.22, .16, .26, M('towerPot', '#e8e5de', { roughness: .5 }), 6).rotateY(k * .5), 0, y + .13, 0));
-        for (let j = 0; j < 3; j++) {
-          const a = j * 2.09 + k * .5, px = Math.cos(a) * .2, pz = Math.sin(a) * .2;
-          for (let l = 0; l < 3; l++) { const L = new THREE.Mesh(leafGeometry(), leafMat('#4f8f3a')); L.scale.setScalar(.08); L.position.set(px, y + .22, pz); L.rotation.set(-.9, -a + Math.PI / 2 + (l - 1) * .6, 0, 'YXZ'); S.add(L); }
-          if (rnd() < .7) S.add(at(new THREE.Mesh(new THREE.ConeGeometry(.025, .05, 8), M(rnd() < .7 ? 'berry' : 'berryW', rnd() < .7 ? '#d4261c' : '#f2f0ea', { roughness: .4 })), px * 1.25, y + .15, pz * 1.25).rotateX(Math.PI));
+        const y = .08 + k * .32, r = .25 - k * .012;
+        S.add(at(cyl(r, r - .05, .26, potM, 28), 0, y + .13, 0)); S.add(at(cyl(r + .02, r + .02, .035, rimM, 28), 0, y + .275, 0));
+        S.add(at(cyl(r - .02, r - .02, .01, soilM, 28), 0, y + .29, 0));
+        for (let j = 0; j < 4; j++) {
+          const a = j * Math.PI / 2 + k * .8, px = Math.cos(a) * (r - .01), pz = Math.sin(a) * (r - .01), py = y + .17;
+          S.add(at(new THREE.Mesh(new THREE.TorusGeometry(.045, .012, 6, 14), rimM), px * 1.01, py, pz * 1.01).rotateY(-a + Math.PI / 2));
+          for (let l = 0; l < 5; l++) {
+            const la = a + (l - 2) * .38, up = .15 + rnd() * .5;
+            for (let q = -1; q <= 1; q++) { const L = new THREE.Mesh(leafGeometry(), M('sbLeaf' + (l % 2), l % 2 ? '#3f8a35' : '#4f9a3c', { roughness: .65, side: DS })); L.scale.set(.075, .095, .075);
+              L.position.set(Math.cos(la) * (r + .05 + rnd() * .03), py + .02 + up * .18, Math.sin(la) * (r + .05 + rnd() * .03)); L.rotation.set(-.5 - up * .3, -la + Math.PI / 2 + q * .6, 0, 'YXZ'); S.add(L); }
+          }
+          for (let f = 0; f < 2; f++) {
+            const ba = a + (f ? .22 : -.2), bx = Math.cos(ba) * (r + .07), bz = Math.sin(ba) * (r + .07), ripe = rnd();
+            const bm = ripe < .55 ? berryR : ripe < .8 ? berryW : berryG, by = py - .05 - rnd() * .06;
+            const body = new THREE.Mesh(new THREE.ConeGeometry(.026, .055, 10), bm); body.rotation.x = Math.PI; body.position.set(bx, by, bz); S.add(body);
+            const cap = new THREE.Mesh(new THREE.ConeGeometry(.02, .015, 5), calyx); cap.position.set(bx, by + .035, bz); S.add(cap);
+          }
+          if (rnd() < .6) { const fl = new THREE.Mesh(new THREE.CylinderGeometry(.018, .018, .004, 8), flower); fl.position.set(Math.cos(a + .1) * (r + .08), py + .1, Math.sin(a + .1) * (r + .08)); S.add(fl); }
         }
       }
       T.add(bake(S)); this.rounds.push([x, 4.7, .45]);
@@ -580,6 +657,7 @@ export class Greenhouse {
       if (key === b.key) return; b.key = key;
       const c = gh.crop && CROPS[gh.crop];
       b.led.material.color.set(c && powered ? '#ff6ae0' : '#5a4a60'); b.light.intensity = c && powered ? 3 : 0;
+      if (b.wash) for (const plane of b.wash.children) plane.material.opacity = c && powered ? .12 : 0;
       b.tube.scale.y = Math.max(0.05, gh.tank / tankMax); b.tube.position.y = 0.3 * b.tube.scale.y + .02;
       const labelKey=`${gh.crop}|${Math.round(gh.grown * 100)}|${gh.ready}`;
       if(labelKey!==b.labelKey){

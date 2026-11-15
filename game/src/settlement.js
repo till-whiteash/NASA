@@ -11,6 +11,7 @@ import { loadModel } from './nasamodels.js';
 import { GREENHOUSE } from './colony.js';
 import { GH, heightAt } from './world.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { dressOutpost } from './outpost-kit.js?v=outpost-visual-anchor-pass-1';
 
 export async function installSettlement(world){
   const gltf=await loadAssetWithRetry(new GLTFLoader(), 'assets/mars-base/scene.gltf', { critical: true }),model=gltf.scene;
@@ -192,6 +193,9 @@ export async function installSettlement(world){
   world.scene.add(chargerCable);charging.visible=chargerCable.visible=false;
   world.colliders.push({x:-30.8,z:26,r:.5,object:charging});
   world.clearRocksAround(-34,26,6);
+  // Keep the procedural surface fit-out optional so a prop fault cannot block mission setup.
+  try { dressOutpost({ world, heightAt, layout, access }); }
+  catch (error) { console.warn('Outpost kit unavailable', error); }
   const shelter=layout.moduleColliders[3],shelterSite={x:shelter.x,z:shelter.z-shelter.r-1.8},soilSite={x:shelter.x-9,z:shelterSite.z-3};
   const soilPile=new THREE.Mesh(new THREE.SphereGeometry(1,48,24),soilMat);soilPile.scale.set(2,.7,1.5);soilPile.position.set(soilSite.x,heightAt(soilSite.x,soilSite.z),soilSite.z);world.scene.add(soilPile);
   const equipmentBlock=equipmentContact(model);
@@ -233,6 +237,32 @@ function makeBaseGreenhouse(world){
   ghLock.add(at(new THREE.Mesh(new THREE.BoxGeometry(1.7, 2.4, 0.1), dark), 0, 1.25, 1.52));
   ghLock.add(at(new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.14, 0.15), new THREE.MeshBasicMaterial({ color: '#7dffb2' })), 0, 2.6, 1.55));
 
+  // revision 10 fit-out: framed hatch with porthole and lever, sloped canopy and lamp, a name plate, a base ring beam,
+  // a foot plate under every rib, an apex hub and a water tank plumbed into the wall
+  const steel=mat('#c9ced6'),glassDark=new THREE.MeshStandardMaterial({color:'#123f4d',roughness:.16,metalness:.6}),lampM=new THREE.MeshBasicMaterial({color:'#fff0d6'});
+  for(const x of[-.95,.95])ghLock.add(at(new THREE.Mesh(new THREE.BoxGeometry(.12,2.6,.14),steel),x,1.3,1.57));
+  ghLock.add(at(new THREE.Mesh(new THREE.BoxGeometry(2.02,.14,.14),steel),0,2.5,1.57));
+  const port=new THREE.Mesh(new THREE.CylinderGeometry(.22,.22,.06,32),glassDark);port.rotation.x=Math.PI/2;ghLock.add(at(port,0,1.9,1.58));
+  const portRing=new THREE.Mesh(new THREE.TorusGeometry(.24,.03,8,32),steel);ghLock.add(at(portRing,0,1.9,1.6));
+  ghLock.add(at(new THREE.Mesh(new THREE.BoxGeometry(.09,.42,.1),steel),.6,1.2,1.62));
+  const canopy=new THREE.Mesh(new THREE.BoxGeometry(2.9,.09,1.1),white);canopy.rotation.x=.18;ghLock.add(at(canopy,0,3.32,2.0));
+  for(const x of[-1.3,1.3]){const strut=new THREE.Mesh(new THREE.BoxGeometry(.06,.06,1.1),steel);strut.rotation.x=-.5;ghLock.add(at(strut,x,2.95,1.88));}
+  ghLock.add(at(new THREE.Mesh(new THREE.SphereGeometry(.09,12,8),lampM),0,3.15,2.4));
+  {const c=document.createElement('canvas');c.width=512;c.height=96;const g=c.getContext('2d');g.fillStyle='#162c34';g.fillRect(0,0,512,96);g.fillStyle='#e9f4ef';g.font='bold 44px system-ui';g.textAlign='center';g.textBaseline='middle';g.fillText('GREENHOUSE AIRLOCK',256,50);
+   const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;ghLock.add(at(new THREE.Mesh(new THREE.PlaneGeometry(1.7,.32),new THREE.MeshBasicMaterial({map:t})),0,2.8,1.505));}
+  const inGap=d=>{d=((d%360)+360)%360;return (d>74&&d<106)||(d>166&&d<194);};   // tunnel (+z) and airlock (-x) openings
+  for(const[d0,d1]of[[106,166],[194,434]]){const ring=new THREE.Mesh(new THREE.TorusGeometry(GH.r+.1,.1,8,96,(d1-d0)*Math.PI/180),frame);ring.rotation.set(Math.PI/2,0,d0*Math.PI/180);ring.position.y=.62;ghG.add(ring);}
+  const feet=[];for(let i=0;i<24;i++){const d=i*15;if(inGap(d))continue;const a=d*Math.PI/180,f=new THREE.BoxGeometry(.38,.24,.38);f.rotateY(-a);f.translate(Math.cos(a)*(GH.r+.08),.12,Math.sin(a)*(GH.r+.08));feet.push(f);}
+  ghG.add(new THREE.Mesh(mergeGeometries(feet),steel));
+  ghG.add(at(new THREE.Mesh(new THREE.CylinderGeometry(.42,.5,.22,24),steel),0,GH.r-.12,0));
+  {const a=300*Math.PI/180,tx=Math.cos(a)*(GH.r+1.3),tz=Math.sin(a)*(GH.r+1.3),ty=heightAt(GH.x+tx,GH.z+tz)-ghG.position.y;
+   const tank=new THREE.Group();tank.position.set(tx,ty,tz);ghG.add(tank);
+   tank.add(at(new THREE.Mesh(new THREE.CylinderGeometry(.7,.7,1.6,28),mat('#cfd5d8')),0,.8,0));
+   for(const y of[.3,.8,1.3]){const band=new THREE.Mesh(new THREE.TorusGeometry(.71,.025,6,28),steel);band.rotation.x=Math.PI/2;tank.add(at(band,0,y,0));}
+   tank.add(at(new THREE.Mesh(new THREE.SphereGeometry(.7,20,8,0,Math.PI*2,0,Math.PI/2),mat('#cfd5d8')),0,1.6,0));
+   tank.add(at(new THREE.Mesh(new THREE.CylinderGeometry(.07,.07,.5,10),mat('#3b7bd8')),0,2.15,0));
+   const pipe=new THREE.Mesh(new THREE.CylinderGeometry(.06,.06,1.3,10),mat('#3b7bd8'));pipe.rotation.order='YXZ';pipe.rotation.set(Math.PI/2,Math.PI/2-a,0);tank.add(at(pipe,-Math.cos(a)*.95,.35,-Math.sin(a)*.95));
+   world.colliders?.push({x:GH.x+tx,z:GH.z+tz,r:.95,object:tank});}
  mergeStatic(ghG);   // dome ribs, rings and airlock: one draw per material (the furnishings copy is added later)
  ghG.name="base-greenhouse";return ghG;
 }

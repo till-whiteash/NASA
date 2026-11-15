@@ -115,3 +115,19 @@ Expanded docking detection to the painted bay rectangle with a parking tolerance
 
 ## Revision 60
 Every mature crop harvest returns two planting units to the locker, allowing replanting and expansion. Seed returns are a simplified game reward; food preparation remains at the locker.
+
+## Revision 61 — research links and greenhouse finish
+- The in-game reference library now links NASA Mars Trek, RadLab and OSDR, plus the Canadian Space Agency's food-production toolkit. The descriptions identify the data context and distinguish instrument readings and research studies from live Mars measurements or mission procedures.
+- The walk-in greenhouse gains a fitted dome base, restrained warm fill light, crop-level grow-light wash and soft contact shadows. These are interior-only details; the exterior greenhouse remains a compact copy.
+- Restored the procedural outpost surface kit on the latest settlement code, including the ISRU yard, comms/weather equipment, dust-control details and survival infrastructure. Kept it separate from mission-built objects and wrapped it so an optional dressing failure does not prevent settlement loading.
+- Restored the habitat wear and repair pass: floor scuffs, doorway dust, wall wear, clipped service runs, replaced panels, emergency hardware and maintenance props. Kept the current overlap checks and wall-panel anchoring.
+- Completed the greenhouse exterior fit-out with a framed airlock, porthole, canopy, footing plates and water tank. Strawberry towers show staged pockets, irrigation and fruit.
+- The surface kit carries a subtle visual dust coat during storms and clears afterward; the fuel tank labels distinguish liquid oxygen and methane temperatures.
+- The local tree is rebased on GitHub `main` at `9f48856`. No GitHub writes were made.
+
+## Revision 62 — grounded surface props and service access
+- Reduced and supported the ISRU yard entry sign, with a collision footprint so the player cannot walk through it. Added proper supports to the landing-zone marker.
+- Moved the oxygen, fuel and ice-drill labels onto their equipment faces. Added the missing ladder to the ice-tank service deck, moved its rails clear of tank end caps, and attached the oxygen-plant ladder with stand-offs.
+- Turned the control-cabin steps outward and aligned their upper tread with the door sill. Added brackets to the pipe-rack flow tags.
+- Bumped the settlement and outpost-kit module URLs so browsers load the corrected geometry.
+- Source scan and JavaScript syntax checks passed. The live visual recheck was stopped before refresh, so the updated render still needs a browser look.

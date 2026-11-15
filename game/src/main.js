@@ -52,7 +52,7 @@ import { Mist } from './mist.js';
 import { Capsule } from './capsule.js';
 import { Greenhouse } from './greenhouse.js';
 import { showMissionPath } from './missionpath.js';
-import { walkBriefingRoom } from './briefing-room.js';
+import { walkBriefingRoom } from './briefing-room.js?v=cutscene-reliability-1';
 import { showArrival } from './arrival.js';
 import { Survival } from './survival.js';
 import { playLanding, playStorm, placeLander } from './cutscenes.js';
@@ -73,7 +73,7 @@ import { Coop, CoopHud, openCoopDialog } from './coop.js';
 import { RemotePlayers } from './remote-players.js';
 import { nightVote, canSleepAt, morningClock } from './night-vote.js';
 import { SCREEN_MODES, screenName, screenMode, setScreenMode, nextScreenMode, onLayout } from './layout.js';
-import { playCinematic } from './cinematic.js?v=moon-launch-1';   // Blender-made sequences in animation/glb/
+import { playCinematic } from './cinematic.js?v=moon-launch-cutscene-1';   // Blender-made sequences in animation/glb/
 loadModel('sls.glb'); loadModel('mobile-launcher.glb');   // NASA's 3D models start downloading on the title screen
 
 // Phones and tablets: draw fewer pixels, and skip shadows on small screens, so the game stays smooth

@@ -41,7 +41,8 @@ export async function fillCrewSlots(root, mixers) {
   }));
 }
 
-export const BASE = '../animation/glb/';                     // loadModel() prefixes 'assets/'
+const ANIMATION_ROOT = new URL('../animation/', import.meta.url);
+export const BASE = new URL('glb/', ANIMATION_ROOT).href;
 export const LOOKS = {                                        // background, hemisphere sky/ground, sun colour
   space: { bg: '#000', sky: '#9fb3ff', ground: '#000', sun: '#fff6ea', hemi: .35, sunI: 3.2 },
   room: { bg: '#05070d', sky: '#8fb4ff', ground: '#201008', hemi: .9, sunI: 1.6, glow: true, bars: true },   // the briefing room
@@ -52,12 +53,12 @@ export const LOOKS = {                                        // background, hem
 const LOOK_OF = { ares_vi_briefing: 'room', ares_vi_briefing_moon: 'room', briefing_mission: 'solar', briefing_moon: 'space', launch_earth: 'earth', cruise_loop: 'space', mars_approach: 'space' };
 // Every film also exists as a pre-rendered MP4 (animation/previews, captions burned in). It plays instead when the
 // device has no WebGL, the 3D version fails or is slow to load, or it runs too slowly - so the film always plays.
-const VIDEO = name => `animation/previews/${name}.mp4`;
+const VIDEO = name => new URL(`previews/${name}.mp4`, ANIMATION_ROOT).href;
 const hasWebGL = () => { try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch { return false; } };
 const reduced = () => matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const captionsCache = new Map();
 function captionsFor(name) {
-  if (!captionsCache.has(name)) captionsCache.set(name, fetch(`animation/glb/${name}.captions.json`).then(r => r.ok ? r.json() : null).catch(() => null));
+  if (!captionsCache.has(name)) captionsCache.set(name, fetch(new URL(`glb/${name}.captions.json`, ANIMATION_ROOT), { signal: AbortSignal.timeout(5000) }).then(r => r.ok ? r.json() : null).catch(() => null));
   return captionsCache.get(name);
 }
 
@@ -70,7 +71,8 @@ async function stage(name, parent, { clip, loop = false } = {}) {
   const canvas = document.createElement('canvas'); canvas.className = 'cine-canvas';
   parent.prepend(canvas);
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  let width = 0, height = 0;
   const scene = new THREE.Scene(); scene.background = new THREE.Color(look.bg);
   if (look.fog) scene.fog = new THREE.Fog(look.bg, ...look.fog);
   scene.add(new THREE.HemisphereLight(look.sky, look.ground, look.hemi));
@@ -96,8 +98,12 @@ async function stage(name, parent, { clip, loop = false } = {}) {
     frame(dt) {
       mixer.update(dt); for (const m of crewMixers) m.update(dt);
       if (sunFactor) sun.intensity = look.sunI * sunFactor.scale.x;
-      const w = parent.clientWidth || innerWidth, h = parent.clientHeight || innerHeight;
-      renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix();
+      const w = Math.max(1, parent.clientWidth || innerWidth), h = Math.max(1, parent.clientHeight || innerHeight);
+      if (w !== width || h !== height) {
+        width = w; height = h;
+        renderer.setSize(width, height, false);
+        cam.aspect = width / height; cam.updateProjectionMatrix();
+      }
       renderer.render(scene, cam);
       return action.time;
     },
@@ -119,21 +125,29 @@ export function playCinematic(name, { clip, world } = {}) {
       if (name === 'launch_moon') { end(false); return; }
       console.warn(`Playing the video version of ${name}: ${why}`);
       clearTimeout(slow); cancelAnimationFrame(raf); st?.dispose(); st = null;
-      const range = clip ? (await captionsFor(name))?.clips?.find(c => c.name === clip) : null;   // one clip of a longer film
+      // Captions are optional for video playback. Bound their wait so a missing
+      // caption file can never prevent the rendered fallback from starting.
+      const range = clip ? (await captionsFor(name))?.clips?.find(c => c.name === clip) : null;
       if (done) return;
       video = document.createElement('video'); video.className = 'cine-video';
       Object.assign(video, { src: VIDEO(name), muted: true, playsInline: true, preload: 'auto' }); video.setAttribute('playsinline', '');
       box.prepend(video); box.classList.add('cine-has-video'); cap.textContent = ''; phase.textContent = '';
-      box.querySelector('.cine-load')?.remove();
+      const loading = box.querySelector('.cine-load');
+      if (loading) loading.textContent = 'Loading rendered cutscene…';
+      video.addEventListener('loadeddata', () => loading?.remove(), { once: true });
       const from = (range?.start || 0) + at, to = range?.end;
       video.addEventListener('loadedmetadata', () => { if (from) video.currentTime = from; }, { once: true });
       if (to) video.addEventListener('timeupdate', () => { if (video.currentTime >= to - .05) end(true); });
       video.onended = () => end(true);
       video.onerror = () => { console.warn('Video unavailable too:', name); end(false); };
-      video.play().catch(() => {                       // a browser that blocks autoplay: one tap starts it
+      const showPlayButton = () => {
+        if (done || !video) return;
+        if (box.querySelector('.cine-play')) return;
         const b = document.createElement('button'); b.type = 'button'; b.className = 'cine-play'; b.textContent = '▶ Play';
-        b.onclick = () => { b.remove(); video.play(); }; box.append(b);
-      });
+        b.onclick = () => { b.disabled = true; video.play().then(() => b.remove()).catch(() => { b.disabled = false; }); };
+        box.append(b);
+      };
+      video.play().catch(showPlayButton);
     };
     if (world) { world.cinematic = true; for (const k of Object.keys(world.keys || {})) world.keys[k] = false; }
     const end = played => {

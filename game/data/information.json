@@ -188,6 +188,16 @@
     "url": "https://api.nasa.gov/"
   },
   {
+    "id": "nasa-donki",
+    "title": "Explore NASA space-weather events",
+    "category": "Data sources",
+    "destination": "Both",
+    "short": "DONKI records solar flares, coronal mass ejections and other space-weather events.",
+    "body": "NASA’s DONKI (Database Of Notifications, Knowledge, Information) lets you explore recorded space-weather events and their links to observations. The outpost’s radiation scenario is a simplified training simulation; archived solar events are not a live radiation reading at this base.",
+    "source": "NASA Community Coordinated Modeling Center — DONKI",
+    "url": "https://ccmc.gsfc.nasa.gov/tools/DONKI/"
+  },
+  {
     "id": "mars-mola-data",
     "title": "How scientists map Mars heights",
     "category": "Data sources",
@@ -196,5 +206,55 @@
     "body": "The terrain now samples NASA MOLA MEGDR product MEGT00N090HB.IMG: 512 × 512 native signed elevation samples around Gusev Crater, at 128 pixels per degree (about 463 metres between north-south samples). This is archived altimetry, including interpolated bins supplied by NASA, not new live observations. A 4-degree region (about 230 × 237 km) is compressed into a 640 × 640 game-metre map. Height differences are multiplied by 0.015, giving roughly 5.5 times vertical exaggeration relative to the horizontal compression. The central 70 game metres are flattened and blend into the measurements by radius 115 metres. Procedural hills have been removed; rocks and sand are decorative. Every landing scenario currently shares this Gusev training terrain. Source product dates to March 2003; downloaded 8 November 2026.",
     "source": "NASA PDS Geosciences Node — MOLA",
     "url": "https://pds-geosciences.wustl.edu/missions/mgs/mola.html"
+  },
+  {
+    "id": "mars-trek",
+    "title": "Explore Mars with Mars Trek",
+    "category": "Data sources",
+    "destination": "Mars",
+    "short": "Compare the game’s training landscape with NASA Mars maps.",
+    "body": "Mars Trek is NASA’s web mapping tool for exploring Mars. Use it to see how real orbital imagery and map layers provide context for a landing site. This game’s walkable Gusev landscape is a compressed training area, not a surveyed reconstruction of the terrain shown in Mars Trek.",
+    "source": "NASA Mars Trek",
+    "url": "https://trek.nasa.gov/mars/"
+  },
+  {
+    "id": "radlab-datasets",
+    "title": "How radiation is measured in space",
+    "category": "Data sources",
+    "destination": "Both",
+    "short": "RadLab lets you inspect readings from real spacecraft instruments.",
+    "body": "NASA RadLab lets you filter radiation records by spacecraft, instrument and time. Some records include absorbed dose rate (μGy/hour), dose equivalent rate (μSv/hour), particle flux and orbit or trajectory details. These are measurements from the listed instrument and location; an ISS reading is not a real-time radiation measurement at this Mars base. The game’s radiation scenario is a simplified simulation.",
+    "source": "NASA OSDR RadLab data API",
+    "url": "https://visualization.osdr.nasa.gov/radlab/gui/data-api/"
+  },
+  {
+    "id": "osdr-space-biology",
+    "title": "Space biology experiments and datasets",
+    "category": "Data sources",
+    "destination": "Both",
+    "short": "NASA OSDR publishes research on plants and life in space.",
+    "body": "NASA’s Open Science Data Repository collects research datasets from spaceflight and ground studies. Search for plant investigations such as VEG-05 or XROOTS to learn how researchers study crop growth, plant-associated microbes and hydroponic or aeroponic systems. These experiments help scientists ask research questions; they are not a ready-made Mars greenhouse operating manual.",
+    "source": "NASA Open Science Data Repository",
+    "url": "https://osdr.nasa.gov/bio/repo/"
+  },
+  {
+    "id": "csa-food-toolkit",
+    "title": "Plan food for a remote outpost",
+    "category": "Learning activities",
+    "destination": "Both",
+    "short": "The Canadian Space Agency has food and nutrition activities for Grades 6–9.",
+    "body": "The CSA food-production toolkit connects food in space with astronaut health and nutrition. Its activities include Interplanetary Farming, Master Chef: Mars, food safety and reading food labels. Use them to plan a varied menu and discuss which ingredients an outpost can grow, store or recycle. The activities are classroom resources, not mission-certified food-system designs.",
+    "source": "Canadian Space Agency — Food production toolkit",
+    "url": "https://www.asc-csa.gc.ca/eng/youth-educators/toolkits/food-production/"
+  },
+  {
+    "id": "csa-stem-resources",
+    "title": "Find more space and STEM activities",
+    "category": "Learning activities",
+    "destination": "Both",
+    "short": "The Canadian Space Agency shares STEM resources for youth and educators.",
+    "body": "Browse Canadian Space Agency resources and youth organizations for activities that connect space exploration with science, technology, engineering and mathematics. Use the listings to find age-appropriate classroom and youth-program material; they are learning resources, not mission operating procedures.",
+    "source": "Canadian Space Agency — STEM and youth resources",
+    "url": "https://www.asc-csa.gc.ca/eng/youth-educators/resources-stem-and-youth-organizations.asp"
   }
 ]
