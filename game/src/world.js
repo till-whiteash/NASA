@@ -1122,7 +1122,7 @@ export class World {
   }
 
   // Sun, glow, stars, sky and headlamp follow the camera; the sun's direction follows the time of day.
-  placeSky(p) {
+  placeSky(p, cinematic = false) {
     const focus=this.cinematicFocus || (this.cinematic?this.camera.position:p);
     this.terrain.userData.update(focus);this.rockDisplay.userData.update(focus);
     const cam = this.camera.position, dir = this.sunDir || new THREE.Vector3(0.5, 0.8, 0.3);
@@ -1132,6 +1132,7 @@ export class World {
     this.skyLights.disc.position.copy(cam).addScaledVector(dir, 820);
     this.skyLights.stars.position.copy(cam); this.skyLights.planets.position.copy(cam);
     this.skyLights.moons.userData.place(this.phase, cam, (this.nightness ?? 0) * (this.dustOn ? 0.2 : 1));
+    if (cinematic) return; // landing supplies its own dust; skip unrelated ambient particle simulation
     this.groundDust.userData.update(cam, this.time, this.dustOn, this.nightness ?? 0);
     this.stormDust3d.userData.update(cam, this.time, this.dustOn, this.nightness ?? 0);
     this.skyLights.motes.userData.update(this.frameDt || 0.016, cam, this.time, this.dustOn ? 3.5 : 0.6);

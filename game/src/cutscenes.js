@@ -85,6 +85,8 @@ function runScene(create, { world, total, caps, title, manual, fadeIn }) {
   const beams = [...world.pickups.map(p => p.group.children[1]), ...(world.lookouts?.beacons || []), ...(world.lookouts?.beacons || []).map(b => b.userData.halo)].filter(Boolean), beams0 = beams.map(b => b.visible); beams.forEach(b => (b.visible = false));
   const vs0 = world.viewSlot?.visible ?? true; if (world.viewSlot) world.viewSlot.visible = false;
   const keep = world.player.position.clone(); let cur = 0, ended = false;
+  const oldBudget = world.cutscenePixelBudget, oldRatio = world.renderer?.getPixelRatio?.();
+  world.cutscenePixelBudget = scene.pixelBudget;
   const oldFocus = world.cinematicFocus, oldFrame = world.cutsceneFrame, oldPreparing = world.cutscenePreparing;
   if (scene.surfaceFocus) world.cinematicFocus = scene.surfaceFocus;
   ttl.innerHTML = title.html;
@@ -98,10 +100,11 @@ function runScene(create, { world, total, caps, title, manual, fadeIn }) {
     world.player.position.copy(keep); world.player.visible = false; if (world.viewSlot) world.viewSlot.visible = false;   // the tool in your hand stayed glued to the corner of every shot
     const gp = scene.surfaceFocus ? cameraPos : cam.position.clone(), gq = scene.surfaceFocus ? cameraRotation : cam.quaternion.clone(), gf = fov0;
     tintEl.style.opacity = scene.frame(cur);
+    world.player.visible = false; if (world.viewSlot) world.viewSlot.visible = false;
     const b = Math.max(fadeIn ? 0 : 1 - smooth(cur / 1.6), smooth((cur - (total - 1.8)) / 1.8));   // glide in from, and back to, the player's own view
     if (b > 0) { cam.position.lerp(gp, b); cam.quaternion.slerp(gq, b); cam.fov = lerp(cam.fov, gf, b); }
     cam.updateProjectionMatrix();
-    if (scene.surfaceFocus) world.placeSky?.(scene.surfaceFocus);
+    if (scene.surfaceFocus) world.placeSky?.(scene.surfaceFocus, true);
   };
   world.cutsceneFrame = world.update;
   const setTime = t => {
@@ -112,7 +115,7 @@ function runScene(create, { world, total, caps, title, manual, fadeIn }) {
     const bars = smooth(t / 1) * (1 - smooth((t - (total - 1.2)) / 1.2)); barsEls.forEach(e => (e.style.height = 9 * bars + 'vh'));
     skipEl.style.opacity = .55 * bars;
   };
-  const dispose = () => { if (ended) return; ended = true; world.cinematic = false; if (world.viewSlot) world.viewSlot.visible = vs0; world.player.position.copy(keep); cam.position.copy(cameraPos); cam.quaternion.copy(cameraRotation); for (const key of Object.keys(world.keys)) world.keys[key] = false; world.update = upd; world.cutsceneFrame = oldFrame; world.cutscenePreparing = oldPreparing; world.cinematicFocus = oldFocus; scene.dispose(); cam.position.copy(cameraPos); cam.quaternion.copy(cameraRotation); cam.fov = fov0; cam.updateProjectionMatrix(); if (hud) { hud.style.visibility = hudShow || ''; hud.style.transition = 'none'; hud.style.opacity = 0; void hud.offsetWidth; hud.style.transition = 'opacity 1.2s'; hud.style.opacity = 1; setTimeout(() => { hud.style.transition = ''; hud.style.opacity = ''; }, 1400); } world.player.visible = pv; holdAwards(false); if (toastEl) toastEl.style.visibility = toastVis || ''; if (mg) mg.visible = mg0; beams.forEach((b, i) => (b.visible = beams0[i])); root.remove(); };
+  const dispose = () => { if (ended) return; ended = true; world.cinematic = false; if (world.viewSlot) world.viewSlot.visible = vs0; world.player.position.copy(keep); cam.position.copy(cameraPos); cam.quaternion.copy(cameraRotation); for (const key of Object.keys(world.keys)) world.keys[key] = false; world.update = upd; world.cutscenePixelBudget = oldBudget; if (oldRatio) world.renderer?.setPixelRatio(oldRatio); world.cutsceneFrame = oldFrame; world.cutscenePreparing = oldPreparing; world.cinematicFocus = oldFocus; scene.dispose(); cam.position.copy(cameraPos); cam.quaternion.copy(cameraRotation); cam.fov = fov0; cam.updateProjectionMatrix(); if (hud) { hud.style.visibility = hudShow || ''; hud.style.transition = 'none'; hud.style.opacity = 0; void hud.offsetWidth; hud.style.transition = 'opacity 1.2s'; hud.style.opacity = 1; setTimeout(() => { hud.style.transition = ''; hud.style.opacity = ''; }, 1400); } world.player.visible = pv; holdAwards(false); if (toastEl) toastEl.style.visibility = toastVis || ''; if (mg) mg.visible = mg0; beams.forEach((b, i) => (b.visible = beams0[i])); root.remove(); };
   setTime(0);
   if (manual) return { setTime, total, dispose, root };
   return new Promise(res => {

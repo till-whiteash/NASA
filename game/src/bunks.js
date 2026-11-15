@@ -50,6 +50,13 @@ export class Bunks {
     }
     for (const b of this.list) interior.stations.push({ type: 'bunk', bunk: b.id, x: b.station.x, z: b.station.z, priority: .4, get label() { return b.label; } });
   }
+  occupiesCabin(cabin, pos) {
+    const entry = this.cabins.find(c => c.cabin === cabin);
+    if (!entry || !pos) return false;
+    const v = this._occupant ??= new THREE.Vector3();
+    v.set(pos.x, 0, pos.z).applyMatrix4(entry.inv);
+    return v.x > -.85 && v.x < .85 && v.z > -2.35 && v.z < DOORWAY.z1 + .1;
+  }
   byId(id) { return this.list.find(b => b.id === id); }
   // Who (or what) is in the way of sleeping here? null when the bunk is free.
   // occupants: Map of player id -> { name, sl } for crewmates in co-op
@@ -77,7 +84,7 @@ export class Bunks {
       if (!inRoom && !inDoor) continue;
       if (!cabin.sleepDoor.visible) return true;
       v.set(from.x, 0, from.z).applyMatrix4(inv);
-      return v.z < -.05;   // already inside: you can always walk out (the door slides open for you)
+      return v.x > -.85 && v.x < .85 && v.z > -2.35 && v.z < DOORWAY.z1;   // already inside: you can always walk out (the door slides open for you)
     }
     return false;
   }

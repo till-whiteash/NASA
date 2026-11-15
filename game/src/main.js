@@ -1666,7 +1666,9 @@ renderer.setAnimationLoop(() => {
   if (state.phase === 'mars' && world?.cutsceneFrame) {
     if (world.cutscenePreparing) return;
     world.cutsceneFrame(dt, false);
-    renderer.shadowMap.needsUpdate = (++shadowFrame & 1) === 0;
+    const cap = Math.min(targetRatio(), Math.sqrt((world.cutscenePixelBudget || 1920 * 1080) / Math.max(1, innerWidth * innerHeight)));
+    if (renderer.getPixelRatio() > cap) renderer.setPixelRatio(cap);
+    renderer.shadowMap.needsUpdate = (++shadowFrame % 15) === 0; // fixed sun and scenery during the landing
     renderer.render(world.scene, world.camera);
     return;
   }

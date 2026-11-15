@@ -5,6 +5,8 @@
 // This file builds that sequence as a function of time. cutscenes.js plays it inside the real game.
 import * as THREE from 'three';
 import { heightAt } from './world.js';
+import { GRAPHICS_MODE } from './surface-detail.js';
+const highDetail = GRAPHICS_MODE === 'high';
 
 export const EDL_T = 20, LAND = { x: 70, z: -60 };
 export const clamp01 = x => Math.max(0, Math.min(1, x)), smooth = x => (x = clamp01(x)) * x * (3 - 2 * x), lerp = (a, b, t) => a + (b - a) * t;
@@ -87,7 +89,7 @@ function makeStage() {
     const n = new THREE.Mesh(new THREE.CylinderGeometry(.1, .27, .6, 12, 1, true), dk); n.position.y = -.25; pv.add(n);
     const o = new THREE.Mesh(new THREE.CylinderGeometry(.16, .5, 1, 16, 1, true).translate(0, -.5, 0), outer), c = new THREE.Mesh(new THREE.CylinderGeometry(.07, .2, 1, 12, 1, true).translate(0, -.5, 0), core); o.position.y = c.position.y = -.55; pv.add(o, c); g.add(pv); flames.push(o, c);
   }
-  const light = new THREE.PointLight('#ffb070', 0, 70, 2); light.position.y = -1.2; g.add(light);
+  const light = new THREE.PointLight('#ffb070', 0, 70, 2); light.position.y = -1.2; if (highDetail) g.add(light);
   g.userData.fire = (k, t) => { const f = 1 + .08 * Math.sin(t * 70) + .05 * Math.sin(t * 113); flames.forEach((m, i) => { m.visible = k > .02; m.scale.set(1, (i & 1 ? 1.8 : 5.4) * k * f, 1); }); light.intensity = k * 380 * f; };
   g.userData.fire(0, 0); return g;
 }
@@ -142,6 +144,7 @@ export function createEDL(world) {
   cam.far = 150000; cam.updateProjectionMatrix();
   const oldPad = world.lander?.pad;
   const old = world.lander?.group; if (old) old.visible = false;   // a replay: hide the parked lander while the new one comes down
+  const environment = scene.children.map(o => [o, o.visible]);
   const own = [];   const add = (...o) => { o.forEach(x => { scene.add(x); own.push(x); }); return o[0]; };
   // space set: stars, Mars, atmosphere, own sky for the parachute shot
   const R = 3389, NS = 2600, starsG = new THREE.BufferGeometry(), sp = new Float32Array(NS * 3), sc = new Float32Array(NS * 3);
@@ -177,7 +180,7 @@ export function createEDL(world) {
   const embers = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(ep, 3)), new THREE.PointsMaterial({ map: glowTexture(), color: '#ffb060', size: .16, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })); embers.frustumCulled = false; plasma.add(embers);
   const LN = 110, lp = new Float32Array(LN * 6), lseed = new Float32Array(LN * 4); for (let i = 0; i < LN * 4; i++) lseed[i] = r();
   const streaks = add(new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(lp, 3)), new THREE.LineBasicMaterial({ color: '#ffc8a0', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, fog: false }))); streaks.frustumCulled = false;
-  const heatLight = new THREE.PointLight('#ff7a30', 0, 60, 1.6); veh.add(heatLight);
+  const heatLight = new THREE.PointLight('#ff7a30', 0, 60, 1.6); if (highDetail) veh.add(heatLight);
   const flash = glow('#fff0d0'); add(flash);
   const sepStage = add(new THREE.Group());   // holds the heat shield once it falls away
   // landing-site props: pad, dust
@@ -207,6 +210,7 @@ export function createEDL(world) {
   const frame = t => {
     const shot = t < 3.8 ? 0 : t < 8 ? 1 : t < 12.4 ? 2 : 3, space = shot < 2, chuteShot = shot === 2, real = shot === 3;
     // what is visible in each shot
+    for (const [o, visible] of environment) if (!o.isLight && o !== cam) o.visible = real && visible;
     world.sky.visible = real; world.terrain.visible = real; scene.background = space ? new THREE.Color('#000000') : null;
     stars.visible = shot < 2; mars.visible = space; atmo.visible = space; dome.visible = chuteShot; pad.visible = real;
     dome.position.copy(cam.position); stars.position.copy(cam.position);
@@ -288,8 +292,9 @@ export function createEDL(world) {
     else { const k = smooth((t - 18.8) / 1.2), sp_ = stagePos(t); cam.position.set(LAND.x + 20, heightAt(LAND.x + 20, LAND.z + 26) + 3.4, LAND.z + 28); tmpC.copy(sp_).lerp(tmpV.set(LAND.x, gp + 4, LAND.z), k); cam.lookAt(tmpC); cam.fov = 48; }
     return 0;
   };
-  return { frame, surfaceFocus: new THREE.Vector3(LAND.x, gp, LAND.z), warmupTimes: [0, 6, 10, 16, 19], dispose: () => {
+  return { frame, pixelBudget: highDetail ? 1920 * 1080 : 1280 * 720, surfaceFocus: new THREE.Vector3(LAND.x, gp, LAND.z), warmupTimes: [0, 6, 10, 16, 19], dispose: () => {
     frame(EDL_T);
+    for (const [o, visible] of environment) o.visible = visible;
     cam.far = saved.far; cam.updateProjectionMatrix(); scene.background = saved.bg; world.sky.visible = saved.skyV; world.terrain.visible = saved.terV; if (old) scene.remove(old);
     if (oldPad) scene.remove(oldPad);
     for (const root of [old, oldPad]) root?.traverse(o => {
