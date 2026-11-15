@@ -75,6 +75,9 @@ import { Coop, CoopHud, openCoopDialog } from './coop.js';
 import { RemotePlayers } from './remote-players.js';
 import { nightVote, canSleepAt, morningClock } from './night-vote.js';
 import { SCREEN_MODES, screenName, screenMode, setScreenMode, nextScreenMode, onLayout } from './layout.js';
+import { openCircuitLab } from './circuit-lab.js';
+import { openFabricator } from './fabricator.js';
+import { powerLearn, missingPrints, labDone, completeLab, LAB_STEPS, canPowerAnotherBase, powerCapacityNote } from './power-tutorial-state.js';
 import { playCinematic, preloadCinematic } from './cinematic.js?v=films-autoplay-1';   // Blender movies in animation/previews/
 loadModel('sls.glb'); loadModel('mobile-launcher.glb');   // NASA's 3D models start downloading on the title screen
 
@@ -578,6 +581,7 @@ function stationAction(s) {
   if (s.type === 'ship-panel') return modal({ pause: false, title: '🖥 The glass cockpit', html: `<p>Like NASA's Orion capsule, your lander is flown with <b>three big screens</b> instead of hundreds of dials and switches. The crew can swap what each screen shows - flight path, power, air and the heat shield.</p>${factHTML(F.orion)}<p>Orion's <b>heat shield</b> is on its bottom. Coming home it gets hotter than the surface of a lava flow, and it slowly burns away to carry the heat off.</p>` });
   if (s.type === 'console') return openPower();
   if (s.type === 'workbench') return openWorkbench();
+  if (s.type === 'fabricator') return openPrinter();
   if (s.type === 'greenhouse') return toast('Walk forward through the pressure tube.');
 
   if (s.type === 'gh-out') return requestOutside();
@@ -707,7 +711,30 @@ function syncPowerHardware(){
     world.settlement.chargerCable.visible=false;
   }
 }
+// The 3D printer: prints the starter power parts (and the charger's) from feedstock.
+async function openPrinter() {
+  const need = [...missingPrints(outpost, 'array'), ...missingPrints(outpost, 'battery'), ...(outpost.baseConnected ? missingPrints(outpost, 'charger') : [])];
+  document.exitPointerLock?.();
+  await openFabricator({ outpost, store: colony.s.store, save: saveGame, need });
+  missionKey = ''; saveGame();
+}
+// Circuit training at the workbench: series, parallel and grounding, then real assembly.
+async function openLab(start) {
+  document.exitPointerLock?.();
+  const L = powerLearn(outpost);
+  await openCircuitLab({ start: start || LAB_STEPS.find(s => !labDone(outpost, s)) || 'series', done: { ...L.lab }, onStep: s => { completeLab(outpost, s); saveGame(); } });
+  missionKey = ''; saveGame();
+  if (labDone(outpost) && outpost.powerStep === 1) zhetela('Circuit training complete. Now assemble the solar array at the workbench: its cells are wired in series, just like your lab cells.', true);
+}
 function openWorkbench() {
+  if (outpost.powerStep === 1 || outpost.powerStep === 3) {                  // print first, then circuit training, then assembly
+    const kind = outpost.powerStep === 1 ? 'array' : 'battery', need = missingPrints(outpost, kind);
+    if (need.length) return modal({ pause: false, title: '🔧 Workbench', html: `<p>The kit needs parts you haven't printed yet: <b>${need.join(', ')}</b>.</p><p>Go to the <b>3D printer</b> in the workshop pod and print them. The solar cells and charge controller came from Earth.</p>`, choices: [{ label: 'OK', primary: true }] });
+    if (outpost.powerStep === 1 && !labDone(outpost)) return modal({ pause: false, title: '🔬 Circuit training first', html: '<p>Before you wire real power, practise on the circuit bench: connect real cells in <b>series</b> and <b>parallel</b>, and learn why everything is <b>grounded</b>. You\'ll see the current flow and measure volts, amps and watts.</p>', choices: [{ label: 'Open the circuit lab', primary: true, onPick: () => openLab() }, { label: 'Later' }] });
+  }
+  return openWorkbenchMenu();
+}
+function openWorkbenchMenu() {
   const byTier = TIERS.map((t, i) => {
     const items = Object.entries(UPGRADES).filter(([, u]) => u.tier === i).map(([k, u]) => {
       const open = outpost.unlocked(k), done = (u.once || u.max) && outpost.built(k);
@@ -720,12 +747,14 @@ function openWorkbench() {
   const closeWorkbench=modal({ title: '🔧 Workbench', pause: false, html: `
     ${[1,3].includes(outpost.powerStep)?`<button data-assemble>${outpost.powerStep===1?'Mount photovoltaic modules on their frame':'Fit battery pack and charge controller'}</button><p>These flight-built components arrived with the lander. The crew assembles and connects them on site. <a href="https://www.nasa.gov/lunar-surface-technology/" target="_blank" rel="noopener">NASA surface power research</a></p>`:''}
     ${outpost.baseConnected&&outpost.chargerStep===0?'<button data-charger>Assemble landed rover charger kit</button>':''}
+    ${labDone(outpost)?'<button data-lab>🔬 Practise in the circuit lab</button>':''}
     ${outpost.soilStep===2&&!outpost.upgrades.regolith?'<button data-soil>Fill and seal regolith shielding bags</button>':''}
     <p>You have <b>${outpost.parts} parts</b>. Find more outside: metal chunks, the old rover, and supply pods from Earth.</p>
     <p class="source">Your base is a <b>${TIERS[outpost.tier].name}</b>. Science sent to Earth: <b>${outpost.scienceSent}</b>.</p>${byTier}`,
     choices: [{ label: 'Done', primary: true }] });
   const step = outpost.powerStep, box=$('#modal .modal-box');
-  box.querySelector('[data-charger]')?.addEventListener('click',()=>{closeWorkbench();construction.begin('charger');});
+  box.querySelector('[data-charger]')?.addEventListener('click',()=>{closeWorkbench();const need=missingPrints(outpost,'charger');if(need.length)return toast(`🖨 Print first at the 3D printer: ${need.join(', ')}.`,5000);construction.begin('charger');});
+  box.querySelector('[data-lab]')?.addEventListener('click',()=>{closeWorkbench();openLab('series');});
   box.querySelector('[data-soil]')?.addEventListener('click',()=>{outpost.soilStep=3;saveGame();openWorkbench();});
   $('#modal [data-assemble]')?.addEventListener('click', () => { closeWorkbench();construction.begin(step===1?'array':'battery'); });
   $('#modal .modal-box').querySelectorAll('[data-build]').forEach(b => b.onclick = () => {
@@ -983,6 +1012,7 @@ function openBuild() {
     const key=b.dataset.recipe,r=RECIPES[key];
     if(buildSubmitted)return;
     if(inside||colony.tool!=='builder'||outpost.powerStep<6||!outpost.baseConnected||outpost.tier<r.tier||!colony.canPay(r.cost,outpost))return;
+    if(key==='greenhouse'&&!canPowerAnotherBase(outpost,colony.s)){toast('⚡ '+powerCapacityNote(outpost,colony.s),6000);return;}
     if(key==='greenhouse'){const spot=colony.buildSpot(world.player.position,world.yaw);if(!spot.ok){openBuild();return;}buildSubmitted=true;colony.pay(r.cost,outpost);colony.build(spot,world.yaw);}
     else {if(!outpost.buy(key))return;buildSubmitted=true;const ores={...r.cost};delete ores.parts;colony.pay(ores,outpost);syncPowerHardware();}
     s.buildHistory??={};s.buildHistory[key]=(s.buildHistory[key]||0)+1;if(s.buildPlan===key)s.buildPlan=null;missionKey='';toolbarKey='';saveGame();close();zhetela(r.name+' built. Open Builder (B) to choose your next project.',true);
@@ -1316,12 +1346,12 @@ function questBearing(){
   const task=marsObjective(outpost,colony.s),step=outpost.powerStep,exterior=['power','base','charger','shelter','soil','ice','seed-pod'].includes(task.target);
   let target,label;
   const galley=step===6 && colony.s.produce>0;
-  if(!inside&&['workbench','greenhouse','locker','water'].includes(task.target))return ({workbench:'Workbench',greenhouse:'Grow beds',locker:'Storage locker',water:'Water plant'})[task.target]+' · inside the base';
+  if(!inside&&['workbench','fabricator','greenhouse','locker','water'].includes(task.target))return ({workbench:'Workbench',fabricator:'3D printer',greenhouse:'Grow beds',locker:'Storage locker',water:'Water plant'})[task.target]+' · inside the base';
   if(!inside){
     target=exterior?missionTarget(task.target):missionTarget(task.target)||world.settlement.entrances[1];
     label=exterior?task.title:'Airlock';
   }else{
-    let station=room===capsule?'ship-exit':room===ghRoom?'gh-out':exterior?'exit':task.target==='water'?'water':task.target==='locker'?'locker':task.target==='workbench'?'workbench':'greenhouse';
+    let station=room===capsule?'ship-exit':room===ghRoom?'gh-out':exterior?'exit':task.target==='water'?'water':task.target==='locker'?'locker':task.target==='workbench'||task.target==='fabricator'?'workbench':'greenhouse';
     if(step===6&&room===ghRoom)station=task.target==='greenhouse'?'gh-bed':'tunnel';
     if(galley&&room===interior)station='locker';
     target=station==='tunnel'?{x:0,z:18.5}:room.stations.find(s=>s.type===station);
@@ -1823,7 +1853,7 @@ function missionTarget(kind){
   const m=world?.settlement;if(!m)return null;
   if(kind==='hab')return world.habBuild?.target()||null;
   const socketId=nextWiringSocket(outpost,kind,construction?.wire);const socket=construction?.sockets.find(p=>p.userData.id===socketId);if(socket)return socket.position;
-  if(['workbench','greenhouse','locker','water','console','safety-shelter','monitor'].includes(kind))return null; // The objective is the indoor station, never the stairs.
+  if(['workbench','fabricator','greenhouse','locker','water','console','safety-shelter','monitor'].includes(kind))return null; // The objective is the indoor station, never the stairs.
   if(kind==='ice'||kind==='seed-pod')return world.pickups.filter(p=>kind==='ice'?p.kind==='ice':p.kind==='pod'&&p.cargo?.seeds).sort((a,b)=>Math.hypot(a.x-world.player.position.x,a.z-world.player.position.z)-Math.hypot(b.x-world.player.position.x,b.z-world.player.position.z))[0]||null;
 
   if(kind==='build-ore'){const ore=builderQuest(outpost,colony.s)?.ore;return colony.deposits.filter(d=>d.ore===ore&&d.group.parent).sort((a,b)=>Math.hypot(a.x-world.player.position.x,a.z-world.player.position.z)-Math.hypot(b.x-world.player.position.x,b.z-world.player.position.z))[0]||null;}
@@ -1876,8 +1906,8 @@ function drawMissionHud(){
   const isGrow=task.target==='greenhouse';
   if(isGrow&&!ghRoom.objectiveMarker){ghRoom.objectiveMarker=interior.workbenchMarker.clone();ghRoom.scene.add(ghRoom.objectiveMarker);}
   const grow=ghRoom.objectiveMarker;if(grow){grow.visible=inside&&room===ghRoom&&isGrow&&!isModalOpen();const bedIndex=colony.s.base.findIndex(b=>b.ready)||0;const bed=ghRoom.stations.find(s=>s.type==='gh-bed'&&s.bed===Math.max(0,bedIndex));if(bed)grow.position.set(bed.x,2,bed.z);}
-  const marker=interior.workbenchMarker,bench=interior.stations.find(s=>s.type===(task.target==='safety-shelter'?'shelter':task.target==='monitor'?'monitor':task.target==='water'?'water':task.target==='locker'?'locker':task.target==='console'?'console':'workbench'));
-  marker.visible=inside&&room===interior&&['workbench','locker','water','console','safety-shelter','monitor'].includes(task.target)&&!isModalOpen();
+  const marker=interior.workbenchMarker,bench=interior.stations.find(s=>s.type===(task.target==='safety-shelter'?'shelter':task.target==='monitor'?'monitor':task.target==='water'?'water':task.target==='locker'?'locker':task.target==='console'?'console':task.target==='fabricator'?'fabricator':'workbench'));
+  marker.visible=inside&&room===interior&&['workbench','fabricator','locker','water','console','safety-shelter','monitor'].includes(task.target)&&!isModalOpen();
   if(marker.visible&&bench){marker.position.set(bench.x,2.1+.08*Math.sin(performance.now()/300),bench.z);marker.rotation.y=performance.now()/1000;}
   world.objectiveTarget=missionTarget(task.target);
   const beacon=world.settlement.objectiveBeacon;

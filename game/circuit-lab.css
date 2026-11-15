@@ -1,0 +1,43 @@
+/* Circuit lab (src/circuit-lab.js) and 3D printer (src/fabricator.js): full-screen workshop overlays. */
+.circuit-lab, .fabricator { position: fixed; inset: 0; z-index: 150; background: #0b1016; color: #eef1f2; font-family: Poppins, system-ui, sans-serif; transition: opacity .35s ease; }
+.circuit-lab.cl-out, .fabricator.cl-out { opacity: 0; pointer-events: none; }
+.circuit-lab canvas, .fabricator canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.circuit-lab.cl-flash::after { content: ""; position: absolute; inset: 0; background: rgba(255,220,140,.35); pointer-events: none; animation: cl-flash .4s ease-out forwards; }
+@keyframes cl-flash { to { opacity: 0; } }
+.cl-panel, .fab-panel { position: absolute; left: max(16px, env(safe-area-inset-left)); top: max(16px, env(safe-area-inset-top)); bottom: 16px; width: min(400px, 40vw); overflow-y: auto; padding: 20px 22px; border-radius: 18px; background: rgba(10,14,19,.86); border: 1px solid rgba(255,255,255,.1); backdrop-filter: blur(8px); font-size: 14px; line-height: 1.55; }
+.cl-kicker { margin: 0 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #ff9a5c; }
+.cl-panel h2, .fab-panel h2 { margin: 0 0 12px; font-size: 20px; line-height: 1.25; letter-spacing: -.02em; }
+.cl-teach p, .fab-intro, .fab-earth { margin: 0 0 9px; color: #cfd6d9; }
+.cl-teach b { color: #fff; }
+.cl-task { margin: 14px 0 8px; padding: 10px 12px; border-left: 3px solid #ff7a2f; background: rgba(255,122,47,.08); border-radius: 0 10px 10px 0; }
+.cl-feedback { margin: 10px 0 0; min-height: 2.6em; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.05); color: #e6eaeb; }
+.cl-feedback.good { background: rgba(80,200,120,.14); color: #bff0cd; }
+.cl-feedback.bad { background: rgba(255,90,74,.14); color: #ffc4bc; }
+.cl-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.cl-actions button, .cl-close, .fab-list button { font: 600 13px/1.2 Poppins, system-ui, sans-serif; color: #eef1f2; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); border-radius: 10px; padding: 10px 14px; cursor: pointer; min-height: 44px; }
+.cl-actions button:hover, .cl-close:hover, .fab-list button:hover:not(:disabled) { background: rgba(255,255,255,.14); }
+.cl-actions .cl-next, .cl-actions .fab-all { background: #ff7a2f; color: #1b0e07; border-color: transparent; }
+.cl-actions .cl-fault { background: rgba(255,200,60,.16); border-color: rgba(255,200,60,.4); }
+.cl-actions button:disabled, .fab-list button:disabled { opacity: .5; cursor: default; }
+.cl-close { position: absolute; right: max(16px, env(safe-area-inset-right)); top: max(16px, env(safe-area-inset-top)); }
+.cl-meters { position: absolute; right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(2, minmax(120px, 1fr)); gap: 8px; }
+.cl-meters > div { padding: 10px 14px; border-radius: 12px; background: rgba(10,14,19,.86); border: 1px solid rgba(255,255,255,.1); }
+.cl-meters small { display: block; font-size: 11px; color: #a9b3b8; }
+.cl-meters b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.cl-meters .cl-body { grid-column: 1 / -1; }
+.cl-meters .danger { border-color: #ff5a4a; background: rgba(120,20,12,.7); }
+.cl-legend { position: absolute; right: max(16px, env(safe-area-inset-right)); top: 76px; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 12px; background: rgba(10,14,19,.7); font-size: 12px; color: #c3cbcf; }
+.cl-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; vertical-align: -2px; }
+.lg-flow { background: #7ff0ff; } .lg-v0 { background: #3b82f6; } .lg-v48 { background: #ff7a2f; }
+.fab-feed { margin: 10px 0; font-size: 15px; }
+.fab-list { display: grid; gap: 8px; }
+.fab-list button { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; }
+.fab-list button.needed { border-color: #ff7a2f; }
+.fab-list small { display: block; font-weight: 400; color: #b9c2c6; font-size: 12px; margin-top: 2px; }
+.fab-list em { font-style: normal; font-size: 12px; color: #ffb27a; white-space: nowrap; }
+@media (max-width: 760px) {
+  .cl-panel, .fab-panel { top: auto; left: 10px; right: 10px; bottom: 10px; width: auto; max-height: 46vh; padding: 14px 16px; }
+  .cl-meters { top: 64px; bottom: auto; right: 10px; grid-template-columns: repeat(2, 1fr); }
+  .cl-meters b { font-size: 15px; } .cl-legend { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .circuit-lab, .fabricator { transition: none; } .circuit-lab.cl-flash::after { animation: none; opacity: 0; } }

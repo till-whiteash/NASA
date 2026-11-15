@@ -3,6 +3,30 @@ import {heightAt} from './world.js';
 import {ASSEMBLIES,buildState,fitPart,assemblyDone,circuitFor,circuitReady,circuitConnected,CIRCUITS,socketPartner,socketFeedback,SOCKET_LABELS,POLE_NAME,leadsOn,nextPole,connectLead,leadLesson,ORDER_LESSON,REVERSE_LESSON} from './construction-state.js';
 import {loadModel} from './nasamodels.js';
 
+// A real field cable: plug bodies at both posts, the lead drops to the ground, slack coiled in loops near each end
+// (cables are never laid tight - they expand and contract in the cold), then runs along the ground between them.
+function fieldCable(a,b,side,colour,r){
+ const g=new THREE.Group(),mat=new THREE.MeshStandardMaterial({color:colour,roughness:.65}),pts=[a.clone()];
+ const run=(t,dy=.04)=>{const x=THREE.MathUtils.lerp(a.x,b.x,t)+side.x,z=THREE.MathUtils.lerp(a.z,b.z,t)+Math.sin(t*Math.PI)*.6+side.z;return new THREE.Vector3(x,heightAt(x,z)+dy,z);};
+ const coil=(t,turns=2.5,rad=.17)=>{const c=run(t),dir=run(Math.min(1,t+.02)).sub(run(Math.max(0,t-.02))).setY(0).normalize(),perp=new THREE.Vector3(-dir.z,0,dir.x),start=Math.atan2(-perp.z,-perp.x);
+  for(let k=1;k<=turns*14;k++){const ang=start+k/14*Math.PI*2,x=c.x+perp.x*rad+Math.cos(ang)*rad,z=c.z+perp.z*rad+Math.sin(ang)*rad;pts.push(new THREE.Vector3(x,heightAt(x,z)+.03+k*.0016,z));}};
+ pts.push(new THREE.Vector3(a.x,a.y-.25,a.z));coil(.04);
+ for(let j=2;j<24;j++)pts.push(run(j/24));
+ coil(.96);pts.push(new THREE.Vector3(b.x,b.y-.25,b.z),b.clone());
+ g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts,false,'centripetal'),Math.min(900,pts.length*6),r,8,false),mat));
+ for(const p of [a,b]){const plug=new THREE.Mesh(new THREE.CylinderGeometry(r*1.9,r*1.9,.11,14),mat);plug.position.set(p.x,p.y-.07,p.z);g.add(plug);
+  const nut=new THREE.Mesh(new THREE.CylinderGeometry(r*2.3,r*2.3,.03,6),new THREE.MeshStandardMaterial({color:'#2b2f33',roughness:.5}));nut.position.set(p.x,p.y-.005,p.z);g.add(nut);}
+ return g;
+}
+// The ground rod beside the battery cabinet and its green-yellow bonding lead.
+function groundBond(pack){
+ const g=new THREE.Group(),rodX=pack.x+.95,rodZ=pack.z+.35,top=heightAt(rodX,rodZ);
+ const rod=new THREE.Mesh(new THREE.CylinderGeometry(.025,.025,.5,10),new THREE.MeshStandardMaterial({color:'#b07a3a',roughness:.3,metalness:.9}));rod.position.set(rodX,top+.1,rodZ);g.add(rod);
+ const clamp=new THREE.Mesh(new THREE.BoxGeometry(.08,.05,.06),new THREE.MeshStandardMaterial({color:'#8d969c',metalness:.8,roughness:.35}));clamp.position.set(rodX,top+.3,rodZ);g.add(clamp);
+ const lead=new THREE.CatmullRomCurve3([new THREE.Vector3(pack.x+.7,pack.y-.2,pack.z+.3),new THREE.Vector3(pack.x+.82,top+.05,pack.z+.38),new THREE.Vector3(rodX,top+.3,rodZ)]);
+ g.add(new THREE.Mesh(new THREE.TubeGeometry(lead,24,.016,8),new THREE.MeshStandardMaterial({color:'#c9c234',roughness:.6})));
+ return g;
+}
 // Workbench parts modelled after real hardware (animation/scripts/make_power_kit.py): each shows its red + / black - terminals.
 const PART_MODELS={'Support frame':'support-frame','Solar module':'solar-module','Output connector':'output-connector','Battery module':'battery-module','Charge controller':'charge-controller','Protected output':'protected-output','Charging post':'charging-post','Rover connector':'rover-connector'};
 const POLE_COLOUR={'+':'#c8231c','-':'#141414'};
@@ -23,7 +47,7 @@ export class Construction {
   const capMat={'+':new THREE.MeshStandardMaterial({color:POLE_COLOUR['+'],roughness:.45}),'-':new THREE.MeshStandardMaterial({color:POLE_COLOUR['-'],roughness:.5})},signMat={'+':signMaterial('+'),'-':signMaterial('-')};
   const point=(id,label,v)=>{const mat=new THREE.MeshStandardMaterial({color:'#8be5d1',emissive:'#163a33',roughness:.4});const port=new THREE.Mesh(new THREE.BoxGeometry(.46,.05,.26),mat);port.position.copy(v);port.userData={kind:'socket',id,label,pole:null,posts:{}};this.group.add(port);this.sockets.push(port);
    for(const [pole,x] of [['+',-.12],['-',.12]]){
-    const cap=new THREE.Mesh(new THREE.CylinderGeometry(.045,.052,.08,20),capMat[pole]);cap.position.set(x,.065,-.02);cap.userData={kind:'socket',id,label:`${label} ${pole==='+'?'+ red':'− black'}`,pole};
+    const cap=new THREE.Mesh(new THREE.CylinderGeometry(.045,.052,.08,20),capMat[pole]);cap.position.set(x,.065,-.02);cap.userData={kind:'socket',id,label:`${label} ${pole==='+'?'VCC + (red)':'GND − (black)'}`,pole};
     const stud=new THREE.Mesh(new THREE.CylinderGeometry(.017,.017,.05,10),brass);stud.position.y=.06;cap.add(stud);cap.add(new THREE.Mesh(new THREE.SphereGeometry(.13,12,8),pickMat));
     const sign=new THREE.Mesh(new THREE.PlaneGeometry(.09,.09),signMat[pole]);sign.rotation.x=-Math.PI/2;sign.position.set(x,.027,.08);port.add(sign);
     port.add(cap);port.userData.posts[pole]=cap;}
@@ -94,8 +118,9 @@ export class Construction {
   // one cable per lead: red + and black - laid side by side between the matching posts
   for(let i=0;i<3;i++)for(const pole of leadsOn(o,i)){if(this.cables.has(i+pole))continue;const ids=CIRCUITS[i];
    const a=this.postPosition(ids[0],pole),b=this.postPosition(ids[1],pole),side=new THREE.Vector3(-(b.z-a.z),0,b.x-a.x).normalize().multiplyScalar(pole==='+'?-.08:.08);
-   const pts=[a.clone()];for(let j=1;j<24;j++){const t=j/24,x=THREE.MathUtils.lerp(a.x,b.x,t)+side.x,z=THREE.MathUtils.lerp(a.z,b.z,t)+Math.sin(t*Math.PI)*.6+side.z;pts.push(new THREE.Vector3(x,heightAt(x,z)+.06,z));}pts.push(b.clone());
-   const cable=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),100,i===2?.035:.03,8,false),new THREE.MeshStandardMaterial({color:POLE_COLOUR[pole],roughness:.7}));this.world.scene.add(cable);this.cables.set(i+pole,cable);}
+   const cable=fieldCable(a,b,side,POLE_COLOUR[pole],i===2?.035:.028);this.world.scene.add(cable);this.cables.set(i+pole,cable);}
+  // once the solar side is wired, the cabinet is bonded to a ground rod (green-yellow lead): GND is tied to the soil
+  if(leadsOn(o,0).length===2&&!this.groundRod){this.groundRod=groundBond(this.world.settlement.pack.position);this.world.scene.add(this.groundRod);}
   // Legacy cables ended at the wrong model faces; visible leads now terminate at sockets.
   this.world.settlement.cable.visible=false;this.world.settlement.chargerCable.visible=false;
   this.hit=null;this.hint='';if(this.blocked){this.preview.visible=false;this.heldDisplay.visible=false;return;}

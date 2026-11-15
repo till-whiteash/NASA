@@ -43,7 +43,7 @@ export function nextWiringSocket(o,kind,held=null){
 // ---- Polarity: every cable is a pair of leads, red + (positive) and black − (negative).
 // Red goes on first and black last (the safe order on a real battery), colours must match, and power flows only
 // once both are on: electricity needs a closed loop out of +, through the load and back into −.
-export const POLE_NAME={'+':'red + (positive)','-':'black − (negative)'};
+export const POLE_NAME={'+':'red VCC + (positive)','-':'black GND − (ground return)'};
 export function leadsOn(o,index){if(circuitConnected(o,index))return ['+','-'];return buildState(o).leads?.[index]||[];}
 export function nextPole(o,index){const on=leadsOn(o,index);return !on.includes('+')?'+':!on.includes('-')?'-':null;}
 export function connectLead(o,index,heldPole,targetPole){
