@@ -3,7 +3,7 @@
 //   playCinematic('briefing_mission')                        -> Promise that resolves when it ends or is skipped
 //   playCinematic('failure_solar_panel', { clip: 'panel_failure', world })   (pauses the game while it plays)
 //   const loop = loopCinematic('cruise_loop', parentElement)  -> { stop() }  (loading-screen background)
-// Click, Space, Enter or Esc skips. With reduced motion, or if the file can't load, it resolves at once so the
+// Only the Skip button or Esc skips (a stray click or key press no longer ends the film). With reduced motion, or if the file can't load, it resolves at once so the
 // game always carries on.
 import * as THREE from 'three';
 import { loadModel } from './nasamodels.js';
@@ -16,7 +16,7 @@ const crewLoader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const crewCache = new Map();
 const crewFile = f => { if (!crewCache.has(f)) crewCache.set(f, crewLoader.loadAsync('assets/crew/' + f)); return crewCache.get(f); };
 const norm = n => n.replace(/^mixamorig\d*:?/, '').replace(/_\d+$/, '');
-async function fillCrewSlots(root, mixers) {
+export async function fillCrewSlots(root, mixers) {
   const slots = []; root.traverse(o => { if (o.userData?.crew_char) slots.push(o); });
   if (!slots.length) return;
   const clips = (await crewFile('crew-anims.glb')).animations;
@@ -40,8 +40,8 @@ async function fillCrewSlots(root, mixers) {
   }));
 }
 
-const BASE = '../animation/glb/';                     // loadModel() prefixes 'assets/'
-const LOOKS = {                                        // background, hemisphere sky/ground, sun colour
+export const BASE = '../animation/glb/';                     // loadModel() prefixes 'assets/'
+export const LOOKS = {                                        // background, hemisphere sky/ground, sun colour
   space: { bg: '#000', sky: '#9fb3ff', ground: '#000', sun: '#fff6ea', hemi: .35, sunI: 3.2 },
   room: { bg: '#05070d', sky: '#8fb4ff', ground: '#201008', hemi: .9, sunI: 1.6, glow: true, bars: true },   // the briefing room
   solar: { bg: '#000', sky: '#9fb3ff', ground: '#000', sun: '#fff6ea', hemi: .2, sunI: 3.2, point: true },   // lit by the Sun at the centre
@@ -100,8 +100,7 @@ async function stage(name, parent, { clip, loop = false } = {}) {
 }
 
 export function playCinematic(name, { clip, world } = {}) {
-  if (reduced()) return Promise.resolve(false);
-  return new Promise(resolve => {
+  return new Promise(resolve => {                    // plays even with reduced motion: the films carry the story
     const box = document.createElement('section'); box.className = 'cinematic'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Cutscene');
     box.innerHTML = '<p class="cine-phase"></p><p class="cine-cap" aria-live="polite"></p><button type="button" class="cine-skip">Skip ›</button><p class="cine-load">Loading…</p>';
     document.body.append(box);
@@ -115,10 +114,9 @@ export function playCinematic(name, { clip, world } = {}) {
       if (world) world.cinematic = false;
       resolve(played);
     };
-    const key = e => { if (['Escape', 'Space', 'Enter'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); end(true); } };
+    const key = e => { if (e.code === 'Escape') { e.preventDefault(); e.stopPropagation(); end(true); } else if (['Space', 'Enter'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); } };
     addEventListener('keydown', key, true);
     box.querySelector('.cine-skip').onclick = () => end(true);
-    box.onclick = e => { if (e.target === box || e.target.tagName === 'CANVAS') end(true); };
     stage(name, box, { clip }).then(s => {
       if (done) { s.dispose(); return; }
       st = s; box.querySelector('.cine-load').remove(); last = performance.now();

@@ -52,6 +52,7 @@ import { Mist } from './mist.js';
 import { Capsule } from './capsule.js';
 import { Greenhouse } from './greenhouse.js';
 import { showMissionPath } from './missionpath.js';
+import { walkBriefingRoom } from './briefing-room.js';
 import { showArrival } from './arrival.js';
 import { Survival } from './survival.js';
 import { playLanding, playStorm, placeLander } from './cutscenes.js';
@@ -296,6 +297,7 @@ async function startNew() {
   startSound();                                                // sound can only start after a click
   $('#title').classList.add('hidden');
   await playCinematic('ares_vi_briefing'); await playCinematic('briefing_mission');   // Director Hale's briefing, then the orbit plan
+  await walkBriefingRoom();                                    // walk around the briefing room, then Ready for launch
   setSound({ scene: 'launch', thrust: 0 });
   state.phase = 'launch';
   launch = new Launch();

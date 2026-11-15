@@ -28,6 +28,7 @@ with sync_playwright() as p:
     page.click('#start')
     for _ in range(2):                                    # skip the Ares VI briefing and the orbit plan
         page.wait_for_selector('.cinematic canvas', timeout=90000); page.wait_for_timeout(600); page.keyboard.press('Escape'); page.wait_for_timeout(900)
+    page.wait_for_selector('.briefing-walk .bw-ready', timeout=90000); page.click('.briefing-walk .bw-ready')   # leave the walkable briefing room
     page.wait_for_function('window.game?.construction && window.game.world?.settlement', timeout=180000)
     info = page.evaluate("""async () => {
       const THREE = await import('three');

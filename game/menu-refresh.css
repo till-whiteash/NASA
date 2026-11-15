@@ -1,0 +1,97 @@
+/* Title screen refresh (Nov 2026), layered over menu.css.
+   One accent (Mars orange), brighter secondary text, real tiles for the side missions, a framed planet viewer,
+   settings in the header and the destructive reset moved out of the main navigation. */
+#title { --menu-muted: #b9c0c1; --menu-faint: #868e90; --menu-accent: #ff7a2f; --menu-accent-ink: #1b0e07; --menu-card: rgba(255,255,255,.035); --menu-card-line: rgba(255,255,255,.08);
+  background: radial-gradient(1200px 700px at 78% 38%, rgba(255,122,47,.08), transparent 60%), radial-gradient(900px 600px at 10% 90%, rgba(80,130,255,.06), transparent 60%), var(--menu-ground) url("assets/menu-stars.svg") repeat; background-size: auto, auto, 1200px 900px; }
+#title button:hover { background: rgba(255,255,255,.07); }
+#title button { transition: background-color .18s ease, border-color .18s ease, color .18s ease, transform .18s ease; }
+#title button:active { transform: translateY(1px); }
+
+/* header: a quiet pill group with Settings */
+.mission-header nav { gap: 2px; padding: 4px; border: 1px solid var(--menu-card-line); border-radius: 999px; background: rgba(10,12,13,.6); backdrop-filter: blur(8px); }
+#title .mission-header button { font-size: 13px; padding: 9px 14px; border-radius: 999px; color: var(--menu-muted); display: inline-flex; align-items: center; gap: 7px; }
+#title .mission-header button:hover { color: var(--menu-ink); }
+#title #age-btn { color: var(--menu-ink); background: rgba(255,255,255,.06); }
+.mission-header nav span { margin-left: 0; }
+.nav-settings svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+
+/* copy column */
+.mission-series { display: inline-flex; align-items: center; gap: 9px; padding: 6px 12px 6px 10px; border: 1px solid var(--menu-card-line); border-radius: 999px; background: var(--menu-card); color: var(--menu-ink); font-size: 12px; letter-spacing: .02em; }
+.mission-series i { width: 7px; height: 7px; border-radius: 50%; background: var(--menu-accent); box-shadow: 0 0 0 4px rgba(255,122,47,.18); }
+#title h1 { letter-spacing: -.055em; }
+.h1-accent { background: linear-gradient(95deg, #ffb27a 0%, #ff7a2f 45%, #e8562a 100%); -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: .04em; }
+.mission-intro { color: var(--menu-muted); font-size: 16px; line-height: 1.7; }
+.mission-level legend { font-size: 12px; color: var(--menu-muted); text-transform: uppercase; letter-spacing: .12em; }
+#title #difficulties { border: 1px solid var(--menu-card-line); background: rgba(255,255,255,.03); padding: 4px; border-radius: 12px; max-width: 460px; }
+#title #difficulties .card { border-radius: 9px; padding: 11px 6px; min-height: 44px; }
+#title #difficulties b { font-size: 14px; font-weight: 600; }
+#title #difficulties .selected { background: #f1f2f2; color: #111415; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+#title #difficulties .selected:hover { background: #ffffff; }
+.mission-summary { font-size: 13px; color: var(--menu-muted); padding-left: 12px; border-left: 2px solid var(--menu-accent); margin: 14px 0 22px; line-height: 1.5; }
+.launch-actions { max-width: 460px; gap: 10px; }
+#title #start, #title #resume.primary { display: flex; justify-content: space-between; align-items: center; background: var(--menu-accent); color: var(--menu-accent-ink); border-radius: 12px; padding: 18px 22px; font-size: 16px; font-weight: 700; box-shadow: 0 10px 30px -12px rgba(255,122,47,.75); text-align: left; }
+#title #start:hover, #title #resume.primary:hover { background: #ff8c4a; }
+#title #start:not(.primary) { background: transparent; color: var(--menu-ink); border: 1px solid rgba(255,255,255,.18); box-shadow: none; font-weight: 600; padding: 15px 22px; font-size: 15px; }
+#title #start:not(.primary):hover { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.3); }
+.side-missions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 460px; margin-top: 12px; }
+#title .mission-tile { display: flex; align-items: center; gap: 12px; text-align: left; padding: 14px; border: 1px solid var(--menu-card-line); border-radius: 12px; background: var(--menu-card); min-height: 72px; }
+#title .mission-tile:hover { border-color: rgba(255,255,255,.2); background: rgba(255,255,255,.06); }
+.tile-icon { flex: none; width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: rgba(255,255,255,.06); }
+.tile-icon svg { width: 20px; height: 20px; fill: none; stroke: var(--menu-ink); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+#moon-mission .tile-icon svg { fill: #d9dde0; stroke: none; }
+.tile-text { flex: 1; min-width: 0; }
+.tile-text b { display: block; font-size: 14px; font-weight: 600; }
+.tile-text small { display: block; margin-top: 3px; font-size: 12px; color: var(--menu-muted); line-height: 1.35; }
+.tile-go { color: var(--menu-faint); font-size: 16px; }
+#title .mission-tile:hover .tile-go { color: var(--menu-accent); }
+#title .journey-link, #title #story-btn { display: inline-flex; align-items: center; gap: 10px; margin-top: 16px; padding: 8px 2px; font-size: 13px; color: var(--menu-muted); text-align: left; }
+#title .journey-link:hover { color: var(--menu-ink); }
+.journey-link span { margin-left: 0; transition: transform .18s ease; }
+#title .journey-link:hover span { transform: translateX(4px); color: var(--menu-accent); }
+
+/* planet viewer: a framed panel */
+.planet-explorer { margin-left: 16px; padding: 20px 24px 18px; border: 1px solid var(--menu-card-line); border-radius: 22px; background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.01)); overflow: hidden; }
+.planet-heading { font-size: 12px; text-transform: uppercase; letter-spacing: .12em; }
+.planet-annotation { font-size: 12px; color: var(--menu-ink); text-shadow: 0 1px 6px #000; }
+.planet-scale { font-size: 12px; color: var(--menu-faint); }
+#title .planet-caption h2 { font-size: 34px; font-weight: 600; letter-spacing: -1.2px; }
+.planet-caption p { font-size: 13px; color: var(--menu-muted); line-height: 1.5; }
+.planet-spin { font-size: 12px; padding: 6px 10px; border: 1px solid var(--menu-card-line); border-radius: 999px; }
+.planet-tabs { gap: 4px; padding: 4px; border-radius: 14px; background: rgba(255,255,255,.03); border: 1px solid var(--menu-card-line); }
+#title .planet-tabs button { border-top: 0; margin-top: 0; border-radius: 10px; padding: 11px 12px; }
+#title .planet-tabs button[aria-pressed="true"] { background: rgba(255,255,255,.09); color: var(--menu-ink); }
+#title .planet-tabs button[aria-pressed="true"] small { color: var(--menu-accent); }
+.planet-tabs span { font-size: 14px; font-weight: 600; }
+.planet-tabs small { font-size: 12px; }
+.planet-credit { font-size: 12px; color: var(--menu-faint); }
+
+/* footer: live data badge, display picker, settings, and the reset kept out of the way */
+.mission-footer { border-top-color: var(--menu-card-line); }
+#title .sun-line { font-size: 13px; color: var(--menu-muted); }
+.weather-symbol { display: none; }
+#title .real-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: .08em; border-radius: 999px; background: rgba(255,90,74,.14); color: #ff8f80; padding: 3px 9px 3px 8px; margin-right: 6px; }
+#title .real-tag:not(.archived)::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #ff5a4a; animation: live-pulse 1.8s ease-out infinite; }
+#title .real-tag.archived { background: rgba(255,255,255,.08); color: var(--menu-muted); }
+@keyframes live-pulse { 0% { box-shadow: 0 0 0 0 rgba(255,90,74,.6); } 70% { box-shadow: 0 0 0 7px rgba(255,90,74,0); } 100% { box-shadow: 0 0 0 0 rgba(255,90,74,0); } }
+#title .screen-pick { padding: 3px; border: 1px solid var(--menu-card-line); border-radius: 999px; }
+#title .screen-pick span { margin: 0 6px 0 10px; font-size: 12px; }
+#title .screen-pick button { border-radius: 999px; padding: 6px 11px; font-size: 12px; color: var(--menu-muted); }
+#title .screen-pick button.selected { background: rgba(255,255,255,.1); color: var(--menu-ink); box-shadow: none; }
+#title .footer-settings { font-size: 13px; padding: 8px 14px; border: 1px solid var(--menu-card-line); border-radius: 999px; }
+#title #reset-progress { font-size: 12px; padding: 8px 6px; color: var(--menu-faint); opacity: 1; }
+#title #reset-progress:hover { color: #ff8f80; background: transparent; }
+
+@media (max-width: 1050px) { .mission-intro { font-size: 14px; } }
+@media (max-width: 720px) {
+  .mission-header nav { padding: 3px; } #title .mission-header button { padding: 8px 10px; font-size: 12px; }
+  .nav-settings span { display: none; }
+  .side-missions, .launch-actions, #title #difficulties { max-width: none; }
+  .planet-explorer { margin-left: 0; padding: 16px 14px 14px; border-radius: 18px; }
+  .mission-settings { flex-wrap: wrap; }
+}
+@media (max-width: 430px) { .side-missions { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { #title .real-tag::before { animation: none; } #title button { transition: none; } }
+#title #mission-summary { margin: 14px 0 20px; }
+#title #data-btn-title { display: none; }                       /* credits live in Settings (as before) */
+#title .mission-header button { white-space: nowrap; }
+@media (max-width: 720px) { .mission-brand > span { font-size: 17px; } #title .mission-header button { padding: 8px 9px; } }

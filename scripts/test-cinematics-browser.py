@@ -57,9 +57,17 @@ with sync_playwright() as p:
     page.wait_for_timeout(800)
     page.wait_for_selector('.cinematic canvas', timeout=60000)
     assert page.is_hidden('#countdown'), 'countdown should wait for the orbit plan too'
+    page.mouse.click(640, 300); page.keyboard.press('Space'); page.wait_for_timeout(500)   # a stray click or key must not skip the film
+    assert page.locator('.cinematic:not(.cine-out)').count() == 1, 'a click or Space should not skip the film'
     page.keyboard.press('Escape')
+    page.wait_for_selector('.briefing-walk canvas', timeout=60000)                  # then the walkable briefing room
+    page.wait_for_timeout(3000)
+    assert page.is_hidden('#countdown'), 'countdown should wait until the player is ready'
+    page.keyboard.down('KeyW'); page.wait_for_timeout(1200); page.keyboard.up('KeyW')
+    if SHOTS: page.screenshot(path=str(SHOTS / 'start-room.png'))
+    page.click('.briefing-walk .bw-ready')
     page.wait_for_selector('#countdown:not(.hidden)', timeout=20000)
-    print('START: Ares VI briefing, orbit plan, then countdown')
+    print('START: Ares VI briefing, orbit plan, walkable briefing room, Ready, then countdown')
     # phone: subtitles stay on screen, readable and short
     phone = b.new_page(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True)
     phone.on('pageerror', lambda e: errors.append(str(e)))
