@@ -655,6 +655,11 @@ export class World {
         value=this.rockContact.surface(x,z,heightAt(x,z));
         const prop=this.driveProps.surface(x,z,heightAt(x,z));
         if(prop&&prop.height>value.height)value=prop;
+        for (const c of this.colliders) {
+          if (!c.driveOver || !c.surfaceContact || Math.abs(x-c.x)>c.r || Math.abs(z-c.z)>c.r) continue;
+          const bank=c.surfaceContact.surface(x,z,heightAt(x,z));
+          if(bank.height>value.height)value=bank;
+        }
         this.roverSurfaceCache.set(key,value);
       }
       return value;
