@@ -81,7 +81,8 @@ for i, img in enumerate(SCREENS):
     w, h = (2.0, 2.0) if i == 2 else (2.6, 1.46)
     fr = cube(f'screen_frame_{i}', (w + 0.12, 0.06, h + 0.12), loc=tuple(p + Vector((math.sin(a), math.cos(a), 0)) * 0.03), m=mat('frame', (0.12, 0.13, 0.16), rough=0.3, metal=0.8))
     fr.rotation_euler.z = -a
-    bpy.ops.mesh.primitive_plane_add(size=1, location=tuple(p))
+    # Keep the image 15 mm in front of the frame face to prevent depth fighting.
+    bpy.ops.mesh.primitive_plane_add(size=1, location=tuple(p - Vector((math.sin(a), math.cos(a), 0)) * 0.015))
     sc_ = bpy.context.active_object; sc_.name = f'screen_{i}'; sc_.scale = (w, h, 1)
     sc_.rotation_euler = (math.pi / 2, 0, -a)
     setmat(sc_, screen_mat(f'screen_{i}', img))
