@@ -140,6 +140,7 @@ export function createEDL(world) {
   const scene = world.scene, cam = world.camera, r = seeded(63), gp = heightAt(LAND.x, LAND.z), S = new THREE.Vector3(0, 40000, 0);
   const saved = { far: cam.far, bg: scene.background, skyV: world.sky.visible, terV: world.terrain.visible };
   cam.far = 150000; cam.updateProjectionMatrix();
+  const oldPad = world.lander?.pad;
   const old = world.lander?.group; if (old) old.visible = false;   // a replay: hide the parked lander while the new one comes down
   const own = [];   const add = (...o) => { o.forEach(x => { scene.add(x); own.push(x); }); return o[0]; };
   // space set: stars, Mars, atmosphere, own sky for the parachute shot
@@ -190,6 +191,17 @@ export function createEDL(world) {
     const k = 1 - smooth((t - 12.4) / 3.0), dx = t < PH.cut ? 0 : 3.2 * Math.pow(t - PH.cut, 2), sway = t > 15 && t < PH.cut ? Math.sin(t * 2.2) * .12 : 0;
     return new THREE.Vector3(LAND.x - 34 * k + dx + sway, gp + A, LAND.z + 24 * k + sway);
   };
+  const transientGeometry = new Set(), transientMaterials = new Set(), transientTextures = new Set();
+  const kept = new Set(); lander.traverse(o => kept.add(o)); kept.add(pad);
+  const sharedTextures = new Set([puffTex, glowTex, starTex, _plume]);
+  for (const root of own) root.traverse(o => {
+    if (kept.has(o)) return;
+    if (o.geometry) transientGeometry.add(o.geometry);
+    for (const m of [].concat(o.material || [])) {
+      transientMaterials.add(m);
+      for (const value of Object.values(m)) if (value?.isTexture && !sharedTextures.has(value)) transientTextures.add(value);
+    }
+  });
   const tmpV = new THREE.Vector3(), tmpC = new THREE.Vector3();
   const place = (o, p) => o.position.copy(p);
   const frame = t => {
@@ -279,9 +291,17 @@ export function createEDL(world) {
   return { frame, surfaceFocus: new THREE.Vector3(LAND.x, gp, LAND.z), warmupTimes: [0, 6, 10, 16, 19], dispose: () => {
     frame(EDL_T);
     cam.far = saved.far; cam.updateProjectionMatrix(); scene.background = saved.bg; world.sky.visible = saved.skyV; world.terrain.visible = saved.terV; if (old) scene.remove(old);
+    if (oldPad) scene.remove(oldPad);
+    for (const root of [old, oldPad]) root?.traverse(o => {
+      o.geometry?.dispose();
+      for (const m of [].concat(o.material || [])) m.dispose();
+    });
     lander.userData.setLegs(1);
     own.forEach(o => { if (o !== pad) scene.remove(o); }); payload.parent?.remove(payload);
-    world.lander = { group: lander }; world.lander.group.parent !== scene && scene.add(lander); lander.position.set(LAND.x, gp, LAND.z);
+    for (const g of transientGeometry) g.dispose();
+    for (const m of transientMaterials) m.dispose();
+    for (const t of transientTextures) t.dispose();
+    world.lander = { group: lander, pad }; world.lander.group.parent !== scene && scene.add(lander); lander.position.set(LAND.x, gp, LAND.z);
     if (!world._landerCol) { world._landerCol = true; world.colliders?.push({ x: LAND.x, z: LAND.z, r: 3 }); }
   } };
 }
@@ -291,6 +311,6 @@ export function placeLander(world) {
   if (world.lander) return;
   const gp = heightAt(LAND.x, LAND.z), lander = makeLander(); lander.position.set(LAND.x, gp, LAND.z);
   const pad = new THREE.Mesh(new THREE.CylinderGeometry(14, 14, 2, 40).translate(0, -1, 0), new THREE.MeshStandardMaterial({ color: '#5b4538', roughness: 1 })); pad.position.set(LAND.x, gp + .1, LAND.z);
-  world.scene.add(lander, pad); world.lander = { group: lander };
+  world.scene.add(lander, pad); world.lander = { group: lander, pad };
   if (!world._landerCol) { world._landerCol = true; world.colliders?.push({ x: LAND.x, z: LAND.z, r: 3 }); }
 }

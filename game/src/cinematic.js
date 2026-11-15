@@ -55,6 +55,12 @@ const CLEAN_VIDEO = name => HD_FILMS.has(name);
 const FILM_NEXT = { ares_vi_briefing: 'briefing_mission', briefing_mission: 'launch_earth', launch_earth: 'cruise_loop',
   ares_vi_briefing_moon: 'briefing_moon', briefing_moon: 'launch_moon', mars_approach: 'outpost_26_months' };
 const preloaded = new Map();
+function releaseVideo(video) {
+  if (!video) return;
+  video.pause(); video.onended = null; video.onerror = null;
+  video.removeAttribute('src'); video.load(); // explicitly release decoder and buffered media
+}
+
 function filmVideo(name) {
   const v = document.createElement('video'); v.className = 'cine-video';
   v.muted = true; v.defaultMuted = true; v.setAttribute('muted', '');          // muted films may always autoplay
@@ -64,6 +70,8 @@ function filmVideo(name) {
 // Start downloading a film before it is needed (call it a scene early). Safe to call more than once.
 export function preloadCinematic(name) {
   if (!name || preloaded.has(name)) return;
+  for (const video of preloaded.values()) releaseVideo(video);
+  preloaded.clear(); // one upcoming film, not an accumulating set of decoders
   const v = filmVideo(name); v.load(); preloaded.set(name, v); captionsFor(name);
 }
 const VIDEO = name => new URL(`previews/${name}${CLEAN_VIDEO(name) ? '-hd' : ''}.mp4`, ANIMATION_ROOT).href;
@@ -184,7 +192,7 @@ export function playCinematic(name, { clip, world, onSkip } = {}) {
     const end = played => {
       if (done) return; done = true; video?.pause(); endLoader?.(); stopRetry?.(); removeEventListener('keydown', key, true);
       box.classList.add('cine-out');
-      setTimeout(() => box.remove(), 400);
+      setTimeout(() => { releaseVideo(video); box.remove(); }, 400);
       if (world) { world.cinematic = false; world.cinematicVideo = previousVideo; }
       resolve(played);
     };
@@ -201,7 +209,7 @@ export function playCinematic(name, { clip, world, onSkip } = {}) {
 // Looping background (the loading screen during the trip). Captions show under it; stop() removes it.
 export function loopCinematic(name, parent) {
   const holder = document.createElement('div'); holder.className = 'cine-loop'; parent.prepend(holder);
-  const video = document.createElement('video');
+  const video = preloaded.get(name) || document.createElement('video'); preloaded.delete(name);
   Object.assign(video, { src: VIDEO(name), muted: true, defaultMuted: true, playsInline: true, loop: true, autoplay: true, preload: 'auto' }); video.setAttribute('muted', '');
   Object.assign(video.style, { width: '100%', height: '100%', objectFit: 'contain' });
   video.setAttribute('playsinline', ''); holder.append(video);

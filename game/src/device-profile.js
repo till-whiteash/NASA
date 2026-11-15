@@ -9,7 +9,8 @@ export function detectPhone({ mobile, ua = '', coarse = false, touchPoints = 0, 
 export function isPhone() {
   return detectPhone({ mobile: navigator.userAgentData?.mobile, ua: navigator.userAgent, coarse: matchMedia('(pointer: coarse)').matches, touchPoints: navigator.maxTouchPoints, width: screen.width, height: screen.height });
 }
-export function effectiveQuality(requested, phone = isPhone()) {
-  if (requested === 'high') return requested;
-  return phone ? 'low' : 'high'; // Auto and Lite: only phones are automatically reduced.
+export function effectiveQuality(requested, phone = isPhone(), memoryGB = globalThis.navigator?.deviceMemory) {
+  if (['low', 'balanced', 'high'].includes(requested)) return requested;
+  if (phone || (memoryGB > 0 && memoryGB <= 4)) return 'low';
+  return 'balanced'; // Auto leaves memory headroom for models, video decoders and browser tabs.
 }
