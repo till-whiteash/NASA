@@ -48,7 +48,11 @@ export const LOOKS = {                                        // background, hem
   earth: { bg: '#9db8dc', sky: '#cfe2ff', ground: '#5d6b45', sun: '#fff4e2', hemi: 1.2, sunI: 3.0 },
   mars: { bg: '#c49a78', sky: '#f2d2b4', ground: '#6b3d26', sun: '#ffe6c8', hemi: 1.1, sunI: 2.6, fog: [160, 1400] },
 };
-const LOOK_OF = { ares_vi_briefing: 'room', briefing_mission: 'solar', launch_earth: 'earth', cruise_loop: 'space', mars_approach: 'space' };
+const LOOK_OF = { ares_vi_briefing: 'room', ares_vi_briefing_moon: 'room', briefing_mission: 'solar', briefing_moon: 'space', launch_earth: 'earth', cruise_loop: 'space', mars_approach: 'space' };
+// Every film also exists as a pre-rendered MP4 (animation/previews, captions burned in). It plays instead when the
+// device has no WebGL, the 3D version fails or is slow to load, or it runs too slowly - so the film always plays.
+const VIDEO = name => `animation/previews/${name}.mp4`;
+const hasWebGL = () => { try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch { return false; } };
 const reduced = () => matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const captionsCache = new Map();
 function captionsFor(name) {
@@ -105,10 +109,31 @@ export function playCinematic(name, { clip, world } = {}) {
     box.innerHTML = '<p class="cine-phase"></p><p class="cine-cap" aria-live="polite"></p><button type="button" class="cine-skip">Skip ›</button><p class="cine-load">Loading…</p>';
     document.body.append(box);
     const cap = box.querySelector('.cine-cap'), phase = box.querySelector('.cine-phase');
-    let st = null, raf = 0, done = false, last = performance.now();
+    let st = null, raf = 0, done = false, last = performance.now(), video = null, slow = 0;
+    const perf = { n: 0, sum: 0 };
+    const playVideo = async (why, at = 0) => {
+      if (done || video) return;
+      console.warn(`Playing the video version of ${name}: ${why}`);
+      clearTimeout(slow); cancelAnimationFrame(raf); st?.dispose(); st = null;
+      const range = clip ? (await captionsFor(name))?.clips?.find(c => c.name === clip) : null;   // one clip of a longer film
+      if (done) return;
+      video = document.createElement('video'); video.className = 'cine-video';
+      Object.assign(video, { src: VIDEO(name), muted: true, playsInline: true, preload: 'auto' }); video.setAttribute('playsinline', '');
+      box.prepend(video); box.classList.add('cine-has-video'); cap.textContent = ''; phase.textContent = '';
+      box.querySelector('.cine-load')?.remove();
+      const from = (range?.start || 0) + at, to = range?.end;
+      video.addEventListener('loadedmetadata', () => { if (from) video.currentTime = from; }, { once: true });
+      if (to) video.addEventListener('timeupdate', () => { if (video.currentTime >= to - .05) end(true); });
+      video.onended = () => end(true);
+      video.onerror = () => { console.warn('Video unavailable too:', name); end(false); };
+      video.play().catch(() => {                       // a browser that blocks autoplay: one tap starts it
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'cine-play'; b.textContent = '▶ Play';
+        b.onclick = () => { b.remove(); video.play(); }; box.append(b);
+      });
+    };
     if (world) { world.cinematic = true; for (const k of Object.keys(world.keys || {})) world.keys[k] = false; }
     const end = played => {
-      if (done) return; done = true; cancelAnimationFrame(raf); removeEventListener('keydown', key, true);
+      if (done) return; done = true; cancelAnimationFrame(raf); clearTimeout(slow); video?.pause(); removeEventListener('keydown', key, true);
       st?.dispose(); box.classList.add('cine-out');
       setTimeout(() => box.remove(), 400);
       if (world) world.cinematic = false;
@@ -117,13 +142,17 @@ export function playCinematic(name, { clip, world } = {}) {
     const key = e => { if (e.code === 'Escape') { e.preventDefault(); e.stopPropagation(); end(true); } else if (['Space', 'Enter'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); } };
     addEventListener('keydown', key, true);
     box.querySelector('.cine-skip').onclick = () => end(true);
+    if (!hasWebGL()) playVideo('no WebGL on this device');
+    else slow = setTimeout(() => { if (!st) playVideo('the 3D version is slow to load'); }, 12000);
     stage(name, box, { clip }).then(s => {
-      if (done) { s.dispose(); return; }
+      clearTimeout(slow);
+      if (done || video) { s.dispose(); return; }
       st = s; box.querySelector('.cine-load').remove(); last = performance.now();
       box.classList.toggle('cine-bars', st.bars);
       const tick = now => {
         const dt = Math.min(.1, (now - last) / 1000); last = now;
         const t = st.frame(dt);
+        if (++perf.n > 20 && perf.n <= 140) { perf.sum += dt; if (perf.n === 140 && perf.sum / 120 > .09) return playVideo('the 3D version runs too slowly here', t); }   // under ~11 fps
         const l = st.lines.find(l => t >= l.t0 && t < l.t1), key = l ? l.t0 + l.text : '';
         if (cap.dataset.key !== key) {              // speaker on its own line, then the words
           cap.dataset.key = key; cap.textContent = '';
@@ -135,7 +164,7 @@ export function playCinematic(name, { clip, world } = {}) {
         raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);
-    }).catch(err => { console.warn('Cutscene unavailable:', name, err); end(false); });
+    }).catch(err => { clearTimeout(slow); console.warn('3D cutscene unavailable:', name, err); playVideo('the 3D version failed to load'); });
   });
 }
 

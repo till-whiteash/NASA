@@ -12,16 +12,28 @@ const OBSTACLES = [
   { x: 0, z: -2.3, r: .55 },                                                   // Director Hale
   ...[-2.4, -.8, .8, 2.4].map(x => ({ x, z: 2.6, r: .35 })),                   // crew chairs
 ];
-const SPOTS = [                                                                // what you hear when you walk up to things
-  { x: 0, z: -2.3, r: 2.1, text: 'Director Hale: "Six months to Mars, twenty-six months to build. Check your suit seals twice, Engineer."' },
-  { x: 0, z: 0, r: 3.0, text: 'Mars hologram: your landing zone, the habitat, solar field, fission unit and ISRU plant that makes oxygen and fuel.' },
-  { x: 0, z: -7.2, r: 2.6, text: 'Mission screens: real NASA images of Mars - the ground you will build on.' },
-  { x: -2.4, z: 2.6, r: 1.5, text: 'Mei Lin, commander: "Strap in tight on launch day. The first two minutes are the loudest of your life."' },
-  { x: 2.4, z: 2.6, r: 1.5, text: 'Medic: "Mars gravity is 38% of Earth\'s. Keep exercising on the trip, or your bones will notice."' },
-  { x: .8, z: 2.6, r: 1.5, text: 'Engineer 3: "The power trade-off is everything out there. Every watt counts."' },
-];
+const AT = { hale: { x: 0, z: -2.3, r: 2.1 }, holo: { x: 0, z: 0, r: 3.0 }, screens: { x: 0, z: -7.2, r: 2.6 }, mei: { x: -2.4, z: 2.6, r: 1.5 }, medic: { x: 2.4, z: 2.6, r: 1.5 }, eng: { x: .8, z: 2.6, r: 1.5 } };
+const LINES = {                                                                // what you hear when you walk up to things
+  mars: {
+    hale: 'Director Hale: "Six months to Mars, twenty-six months to build. Check your suit seals twice, Engineer."',
+    holo: 'Mars hologram: your landing zone, the habitat, solar field, fission unit and ISRU plant that makes oxygen and fuel.',
+    screens: 'Mission screens: real NASA images of Mars - the ground you will build on.',
+    mei: 'Mei Lin, commander: "Strap in tight on launch day. The first two minutes are the loudest of your life."',
+    medic: 'Medic: "Mars gravity is 38% of Earth\'s. Keep exercising on the trip, or your bones will notice."',
+    eng: 'Engineer 3: "The power trade-off is everything out there. Every watt counts."',
+  },
+  moon: {
+    hale: 'Director Hale: "Four days out, a week on the surface. The south pole has never had visitors, Engineer. Be the first."',
+    holo: 'Moon hologram: the south pole landing zone, the solar mast on the sunlit ridge and the dark craters that hold ice.',
+    screens: 'Mission screens: real NASA images - Artemis I, the Moon\'s far side, polar ice and Earth setting over the Moon.',
+    mei: 'Mei Lin, commander: "No air on the Moon, so no parachutes. The lander\'s engine does all the braking."',
+    medic: 'Medic: "Lunar gravity is one sixth of Earth\'s. You\'ll bounce more than you walk."',
+    eng: 'Engineer 3: "Lunar nights last two weeks. Our power has to last that long without the Sun."',
+  },
+};
 
-export function walkBriefingRoom() {
+export function walkBriefingRoom({ destination = 'mars' } = {}) {
+  const SPOTS = Object.entries(AT).map(([k, at]) => ({ ...at, text: LINES[destination === 'moon' ? 'moon' : 'mars'][k] }));
   return new Promise(resolve => {
     const box = document.createElement('section'); box.className = 'briefing-walk'; box.setAttribute('aria-label', 'Briefing room');
     box.innerHTML = `<canvas></canvas>
@@ -44,7 +56,7 @@ export function walkBriefingRoom() {
     const keys = {}, pad = { x: 0, y: 0 }, mixers = [];
     let raf = 0, done = false, last = performance.now(), mixer = null;
 
-    loadModel(BASE + 'ares_vi_briefing.glb').then(async gltf => {
+    loadModel(BASE + (destination === 'moon' ? 'ares_vi_briefing_moon' : 'ares_vi_briefing') + '.glb').then(async gltf => {
       if (done || !gltf) return;
       const root = gltf.scene.clone(true); scene.add(root);
       root.traverse(o => { if (o.isCamera || /^tag_/.test(o.name)) o.visible = false; });   // name tags face the film camera; from behind they read backwards

@@ -1,0 +1,109 @@
+{
+ "clips": [
+  {
+   "name": "ares_vi_briefing_moon",
+   "start": 0.0,
+   "end": 58.611
+  }
+ ],
+ "captions": [
+  {
+   "t0": 0.0,
+   "t1": 5.5,
+   "text": "Crew, take your seats. This is the last briefing before launch.",
+   "who": "DIRECTOR HALE",
+   "phase": "ARTEMIS · FINAL BRIEFING"
+  },
+  {
+   "t0": 5.5,
+   "t1": 8.0,
+   "text": "Our destination is the Moon.",
+   "who": "DIRECTOR HALE",
+   "phase": "ARTEMIS · FINAL BRIEFING"
+  },
+  {
+   "t0": 8.0,
+   "t1": 12.71,
+   "text": "Four of you aboard Orion. The Moon is 384,000 kilometres away:",
+   "who": "DIRECTOR HALE",
+   "phase": "MISSION OVERVIEW"
+  },
+  {
+   "t0": 12.71,
+   "t1": 16.0,
+   "text": "about four days of flight, not six months.",
+   "who": "DIRECTOR HALE",
+   "phase": "MISSION OVERVIEW"
+  },
+  {
+   "t0": 16.0,
+   "t1": 19.46,
+   "text": "Phase one. Orion brakes into lunar orbit,",
+   "who": "DIRECTOR HALE",
+   "phase": "PHASE 1 · LUNAR ORBIT"
+  },
+  {
+   "t0": 19.46,
+   "t1": 24.0,
+   "text": "then your lander undocks and heads for the south pole.",
+   "who": "DIRECTOR HALE",
+   "phase": "PHASE 1 · LUNAR ORBIT"
+  },
+  {
+   "t0": 24.0,
+   "t1": 27.33,
+   "text": "Phase two. Touchdown near Shackleton Crater.",
+   "who": "DIRECTOR HALE",
+   "phase": "PHASE 2 · SURFACE"
+  },
+  {
+   "t0": 27.33,
+   "t1": 32.0,
+   "text": "The Sun stays low there, so the solar mast goes on the ridge.",
+   "who": "DIRECTOR HALE",
+   "phase": "PHASE 2 · SURFACE"
+  },
+  {
+   "t0": 32.0,
+   "t1": 36.96,
+   "text": "Phase three. Craters that never see sunlight hold water ice.",
+   "who": "DIRECTOR HALE",
+   "phase": "PHASE 3 · ICE"
+  },
+  {
+   "t0": 36.96,
+   "t1": 40.0,
+   "text": "Find it, sample it and bring it home.",
+   "who": "DIRECTOR HALE",
+   "phase": "PHASE 3 · ICE"
+  },
+  {
+   "t0": 40.0,
+   "t1": 44.96,
+   "text": "Commander, you fly the lander. Engineer owns power and the rover,",
+   "who": "DIRECTOR HALE",
+   "phase": "CREW ROLES"
+  },
+  {
+   "t0": 44.96,
+   "t1": 49.33,
+   "text": "Geologist the samples, Medic every one of you. Questions?",
+   "who": "DIRECTOR HALE",
+   "phase": "CREW ROLES"
+  },
+  {
+   "t0": 49.33,
+   "t1": 53.71,
+   "text": "Launch window opens in seventy-two hours. Rest up.",
+   "who": "DIRECTOR HALE",
+   "phase": "T-MINUS 72 HOURS"
+  },
+  {
+   "t0": 53.71,
+   "t1": 58.67,
+   "text": "In a week you walk where only twelve people have walked.",
+   "who": "DIRECTOR HALE",
+   "phase": "T-MINUS 72 HOURS"
+  }
+ ]
+}

@@ -192,3 +192,15 @@ For quick checks, run one script with stills, or build it in an open Blender thr
 (set `ANIM_LIVE=1` so `reset()` empties the file instead of a factory reset, which would unload the MCP add-on):
 `blender -b --factory-startup -P seq_storm.py -- --stills 60,200,320 --scale 40` (PNGs go to `stills/`, which is
 not committed).
+
+## Moon mission films and the video fallback
+
+- `ares_vi_briefing_moon` (`seq_ares_briefing_moon.py`, which runs `seq_ares_briefing.py` with `BRIEF=moon`): the same
+  room, shots and crew with the Moon mission's dialogue, a Moon hologram with south-pole sites and NASA Moon photos.
+- `briefing_moon` (`seq_briefing_moon.py`): parking orbit, trans-lunar injection, the ~4-day coast on the transfer
+  ellipse (Kepler's equation; the Moon moves ~53 degrees meanwhile), then lunar orbit insertion and capture.
+- "Explore the Moon" plays both, then the walkable briefing room with Moon talk (`src/briefing-room.js`), then the
+  Moon mission. "Launch to Mars" plays the Mars versions, the room with Mars talk, then the countdown.
+- Every film also plays as its MP4 in `previews/` (captions burned in) when the device has no WebGL, the 3D version
+  fails or is slow to load (12 s), or it runs under ~11 fps (`src/cinematic.js`; `scripts/test-cinematic-video-fallback.py`).
+- Only the Skip button or Esc skips a film.

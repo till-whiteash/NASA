@@ -10,7 +10,8 @@ from mars_kit import lander, hab, fission_unit, solar_tracker, isru_plant, ascen
 from crew_kit import person, gesture
 from mathutils import Vector
 
-NAME = 'ares_vi_briefing'
+MOON = os.environ.get('BRIEF') == 'moon'          # BRIEF=moon builds the Moon mission's version of the same briefing
+NAME = 'ares_vi_briefing_moon' if MOON else 'ares_vi_briefing'
 opts = args()
 V3 = lambda x, y, z: Vector((x, -z, y))          # the storyboard's three.js coordinates -> Blender
 SHOTS = [  # seconds, camera from->to, look from->to, phase, line, highlighted site
@@ -29,6 +30,17 @@ SHOTS = [  # seconds, camera from->to, look from->to, phase, line, highlighted s
     (7, (V3(0, 1.7, 5), V3(0, 2.6, 7.4)), (V3(0, 1.3, 0), V3(0, 1.4, 0)), 'T-MINUS 72 HOURS',
      'Launch window opens in seventy-two hours. Get some sleep. Then go build the first home we’ve ever had on another world.', None),
 ]
+if MOON:   # same shots and timing, the Moon mission's words
+    MOON_LINES = [
+        ('ARTEMIS · FINAL BRIEFING', 'Crew, take your seats. This is the last briefing before launch. Our destination is the Moon.'),
+        ('MISSION OVERVIEW', 'Four of you aboard Orion. The Moon is 384,000 kilometres away: about four days of flight, not six months.'),
+        ('PHASE 1 · LUNAR ORBIT', 'Phase one. Orion brakes into lunar orbit, then your lander undocks and heads for the south pole.'),
+        ('PHASE 2 · SURFACE', 'Phase two. Touchdown near Shackleton Crater. The Sun stays low there, so the solar mast goes on the ridge.'),
+        ('PHASE 3 · ICE', 'Phase three. Craters that never see sunlight hold water ice. Find it, sample it and bring it home.'),
+        ('CREW ROLES', 'Commander, you fly the lander. Engineer owns power and the rover, Geologist the samples, Medic every one of you. Questions?'),
+        ('T-MINUS 72 HOURS', 'Launch window opens in seventy-two hours. Rest up. In a week you walk where only twelve people have walked.'),
+    ]
+    SHOTS = [(d, cam_, look_, MOON_LINES[i][0], MOON_LINES[i][1], hi) for i, (d, cam_, look_, ph, line, hi) in enumerate(SHOTS)]
 starts = [0]
 for s in SHOTS: starts.append(starts[-1] + s[0] * FPS)
 sc = reset(NAME, starts[-1] / FPS)
@@ -61,7 +73,9 @@ def screen_mat(name, image):
     b = nt.nodes['Principled BSDF']; b.inputs['Base Color'].default_value = (0, 0, 0, 1)
     nt.links.new(t.outputs['Color'], b.inputs['Emission Color']); b.inputs['Emission Strength'].default_value = 1.4
     return m
-for i, img in enumerate(('mars-map.jpg', 'perched-above-gusev-crater.jpg', 'zhetalis-badge.png', 'sunset-at-mars-gusev-crater-spirit.jpg', 'mount-sharp-on-the-horizon.jpg')):
+SCREENS = (('../moon/assets/nasa/artemis1.jpg', '../moon/assets/nasa/farside.jpg', 'zhetalis-badge.png', '../moon/assets/nasa/polar-ice.jpg', '../moon/assets/nasa/earthset.jpg') if MOON else
+           ('mars-map.jpg', 'perched-above-gusev-crater.jpg', 'zhetalis-badge.png', 'sunset-at-mars-gusev-crater-spirit.jpg', 'mount-sharp-on-the-horizon.jpg'))
+for i, img in enumerate(SCREENS):
     a = (i - 2) * 0.42
     p = Vector((math.sin(a) * 7.7, math.cos(a) * 7.7, 2.2))
     w, h = (2.0, 2.0) if i == 2 else (2.6, 1.46)
@@ -80,17 +94,18 @@ o = bpy.context.active_object; o.name = 'table_ring'; setmat(o, mat('table_ring'
 beam = lathe('projector_beam', [(1.45, 0.75), (0.85, 0.32)], mat('beam', (1, 0.6, 0.35), emit=(1, 0.55, 0.3), strength=1.0, alpha=0.08), 48, caps=False)
 beam.visible_shadow = False
 globe = empty('mars_hologram', loc=(0, 0, 1.5))
-gm = textured('holo_mars', 'mars-map.jpg')
+gm = textured('holo_mars', 'moon-map.jpg' if MOON else 'mars-map.jpg')
 b = gm.node_tree.nodes['Principled BSDF']
 t = next(n for n in gm.node_tree.nodes if n.type == 'TEX_IMAGE')
 gm.node_tree.links.new(t.outputs['Color'], b.inputs['Emission Color']); b.inputs['Emission Strength'].default_value = 0.9
 mars = uvsphere('holo_mars_globe', 0.7, m=gm, parent=globe, seg=64, rings=32)
-atmo = uvsphere('holo_atmosphere', 0.74, m=mat('holo_atmo', (1, 0.55, 0.3), emit=(1, 0.5, 0.25), strength=0.6, alpha=0.12), parent=globe, seg=48, rings=24)
+atmo = uvsphere('holo_atmosphere', 0.74, m=(mat('holo_glow', (0.6, 0.75, 1), emit=(0.55, 0.7, 1), strength=0.4, alpha=0.06) if MOON else mat('holo_atmo', (1, 0.55, 0.3), emit=(1, 0.5, 0.25), strength=0.6, alpha=0.12)), parent=globe, seg=48, rings=24)   # the Moon has no air: just a faint hologram glow
 atmo.visible_shadow = False
 A.key(globe, 0, rot=(0, 0, 0), interp='LINEAR'); A.key(globe, END, rot=(0, 0, math.degrees(0.15 * END / FPS)), interp='LINEAR')
 A.key(globe, starts[2] - 1, scale=(1, 1, 1)); A.key(globe, starts[2] + 30, scale=(1.15, 1.15, 1.15))
 A.key(globe, starts[5] - 30, scale=(1.15, 1.15, 1.15)); A.key(globe, starts[5], scale=(1, 1, 1))
 SITES = [((0.4, 0.3), (0.4, 0.8, 1.0)), ((0.1, 1.2), (1, 1, 1)), ((-0.2, 0.6), (0.4, 1.0, 0.6)), ((0.25, 0.9), (1.0, 0.82, 0.3))]   # lander, power, isru, hab
+if MOON: SITES = [((-1.3, 0.4), (0.4, 0.8, 1.0)), ((-1.2, 0.9), (1, 1, 1)), ((-1.45, -0.3), (0.4, 1.0, 0.6)), ((-1.25, 0.1), (1.0, 0.82, 0.3))]   # south pole: lander, solar ridge, shadowed ice, camp
 markers = []
 for i, ((la, lo), c) in enumerate(SITES):
     p = Vector((math.cos(la) * math.sin(lo), math.cos(la) * math.cos(lo), math.sin(la))) * 0.72
@@ -232,4 +247,4 @@ for nm_, loc_, rot_ in (('hale_light', (0, -0.5, 3.6), (math.radians(40), 0, 0))
     o_ = bpy.data.objects.new(nm_, ld); o_.location = loc_; o_.rotation_euler = rot_; link(o_); o_['preview_only'] = True
 world_sky((0.06, 0.08, 0.13), (0.04, 0.05, 0.08), (0.03, 0.03, 0.04), strength=1.5)
 
-run([('ares_vi_briefing', 0, END)], opts, NAME)
+run([(NAME, 0, END)], opts, NAME)

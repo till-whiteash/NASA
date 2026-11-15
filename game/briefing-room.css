@@ -21,3 +21,10 @@
 @media (hover: none) and (pointer: coarse) { .bw-pad { display: block; } .bw-help span { display: none; } .bw-tip { bottom: 170px; } }
 @media (max-width: 640px) { .bw-ready { top: auto; bottom: max(26px, env(safe-area-inset-bottom)); transform: none; font-size: 16px; padding: 13px 40px 13px 16px; } .bw-ready:active { transform: translateY(1px); } }
 @media (prefers-reduced-motion: reduce) { .briefing-walk, .bw-tip, .bw-ready { transition: none; } }
+
+/* Video version of a film (src/cinematic.js plays it when the 3D version can't run): captions are in the video. */
+.cinematic { cursor: default; }
+.cinematic .cine-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
+.cinematic.cine-has-video .cine-cap, .cinematic.cine-has-video .cine-phase { display: none; }
+.cinematic .cine-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2; padding: 18px 30px; border: 0; border-radius: 14px; background: #ff7a2f; color: #1b0e07; font: 700 20px/1 Poppins, system-ui, sans-serif; cursor: pointer; }
+.cinematic .cine-skip { z-index: 3; }
