@@ -33,7 +33,7 @@ function meshCollider(group) {
   const size = geometry.boundingBox.getSize(new THREE.Vector3());
   const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial());
   return { x: center.x, z: center.z, r: Math.hypot(size.x, size.z) / 2,
-    object: group, surfaceContact: createRockContact(mesh) };
+    object: group, roverBounds: { x: center.x, z: center.z, halfX: size.x / 2, halfZ: size.z / 2 }, surfaceContact: createRockContact(mesh) };
 }
 
 const TAU = Math.PI * 2;
@@ -400,7 +400,7 @@ export function dressOutpost({ world, heightAt, layout, access }) {
       for (let j = 0; j < vertices.count; j++) vertices.setY(j, Math.max(0, vertices.getY(j)) ** 2);
       vertices.needsUpdate = true; g.geometry.computeVertexNormals();
       g.rotation.y = rnd() * 3; g.receiveShadow = true; g.name = 'walkable-isru-berm';
-      colliders.push({ x, z, r: 3.2, object: g, surfaceContact: createRockContact(g) });
+      colliders.push({ x, z, r: 3.2, object: g, driveOver: true, surfaceContact: createRockContact(g) });
     }
   }
 

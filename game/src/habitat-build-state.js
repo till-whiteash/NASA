@@ -17,7 +17,7 @@ export function habBuildObjective(o, modules = 6) {
     case 0: return { ...base, id: 'hab-0', title: 'Walk to the habitat site', step: 'Follow the marker to the flat ground beside your lander',
       detail: 'Nothing is built yet: your lander is your shelter for now, and your suit air is limited. Follow the quest marker to the site where your habitat will stand.' };
     case 1: return { ...base, id: 'hab-1', title: 'Clear the building site', step: `${b.cleared.length}/${ROCKS} rocks cleared · equip the pickaxe`,
-      detail: 'Equip the pickaxe (1 or 2). Aim at each marked rock and press E / Action until it breaks. Modules need clear, level ground.' };
+      detail: 'Equip the pickaxe (1 or 2). Aim at each marked rock and click or press E / Action three times. Let each pickaxe swing finish. Modules need clear, level ground.' };
     case 2: return { ...base, id: 'hab-2', title: 'Lay foundations and raise the frames', step: `${b.frames.length}/${modules} modules framed`,
       detail: 'Walk to each glowing footprint and press E / Action. Footings spread the weight on soft soil, then the frame goes up. Build them in any order.' };
     case 3: return { ...base, id: 'hab-3', title: 'Fit the pressure shells', step: 'Use the yellow control post at the front of the site',

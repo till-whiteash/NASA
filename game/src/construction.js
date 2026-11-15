@@ -129,8 +129,10 @@ export class Construction {
   this.group.updateMatrixWorld(true);this.interior.scene.updateMatrixWorld(true);
   this.ray.setFromCamera(this.world.aimPoint||new THREE.Vector2(0,0),camera);
   const objects=inside?(this.bench.visible?this.slots.filter(p=>p.visible):[]):[...this.sockets,...this.rubble,...this.ghosts,this.packGhost,this.chargerGhost,...(this.world.habBuild?.targets()||[])].filter(p=>p.visible);
+  // Layout and habitat changes can hide scenery after rockSamples was captured.
+  // Pick against the live instance transform so removed rubble cannot steal a strike.
   let hit=this.ray.intersectObjects(objects,true)[0];
-  if(!inside&&this.colony().tool==='pickaxe'){const player=this.world.player.position;for(const sample of this.rockSamples){if(this.removedApplied.has(sample.id)||Math.hypot(sample.position.x-player.x,sample.position.z-player.z)>sample.radius+3.3)continue;this.rockProxy.matrixWorld.copy(sample.matrix);const rock=this.ray.intersectObject(this.rockProxy,false)[0];if(rock&&(!hit||rock.distance<hit.distance)){rock.object=this.world.rocks;rock.instanceId=sample.id;hit=rock;}}}
+  if(!inside&&this.colony().tool==='pickaxe'){const player=this.world.player.position;for(const sample of this.rockSamples){if(this.removedApplied.has(sample.id)||Math.hypot(sample.position.x-player.x,sample.position.z-player.z)>sample.radius+3.3)continue;this.world.rocks.getMatrixAt(sample.id,this.rockProxy.matrixWorld);if(this.rockProxy.matrixWorld.elements[13]<-1000)continue;const rock=this.ray.intersectObject(this.rockProxy,false)[0];if(rock&&(!hit||rock.distance<hit.distance)){rock.object=this.world.rocks;rock.instanceId=sample.id;hit=rock;}}}
   if(hit&&hit.object!==this.world.rocks){while(!hit.object.userData.kind&&hit.object.parent)hit.object=hit.object.parent;}
   const player=inside?room.pos.clone().add(room.scene.position):this.world.player.position;
   if(hit&&hit.point.distanceTo(player.clone().add(new THREE.Vector3(0,1,0)))<3.3){this.hit=hit;this.hint=hit.object===this.world.rocks?'E / Action · break surface rock with pickaxe':`E / Action · ${hit.object.userData.label}`;}

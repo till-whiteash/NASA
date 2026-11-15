@@ -11,7 +11,7 @@ import { loadModel } from './nasamodels.js';
 import { GREENHOUSE } from './colony.js';
 import { GH, heightAt } from './world.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { dressOutpost } from './outpost-kit.js?v=walkable-berms-1';
+import { dressOutpost } from './outpost-kit.js?v=rover-traversal-2';
 
 export async function installSettlement(world){
   const gltf=await loadAssetWithRetry(new GLTFLoader(), 'assets/mars-base/scene.gltf', { critical: true }),model=gltf.scene;

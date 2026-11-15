@@ -5,6 +5,8 @@
 // This file builds that sequence as a function of time. cutscenes.js plays it inside the real game.
 import * as THREE from 'three';
 import { heightAt } from './world.js';
+import { GRAPHICS_MODE } from './surface-detail.js';
+const highDetail = GRAPHICS_MODE === 'high';
 
 export const EDL_T = 20, LAND = { x: 70, z: -60 };
 export const clamp01 = x => Math.max(0, Math.min(1, x)), smooth = x => (x = clamp01(x)) * x * (3 - 2 * x), lerp = (a, b, t) => a + (b - a) * t;
@@ -87,7 +89,7 @@ function makeStage() {
     const n = new THREE.Mesh(new THREE.CylinderGeometry(.1, .27, .6, 12, 1, true), dk); n.position.y = -.25; pv.add(n);
     const o = new THREE.Mesh(new THREE.CylinderGeometry(.16, .5, 1, 16, 1, true).translate(0, -.5, 0), outer), c = new THREE.Mesh(new THREE.CylinderGeometry(.07, .2, 1, 12, 1, true).translate(0, -.5, 0), core); o.position.y = c.position.y = -.55; pv.add(o, c); g.add(pv); flames.push(o, c);
   }
-  const light = new THREE.PointLight('#ffb070', 0, 70, 2); light.position.y = -1.2; g.add(light);
+  const light = new THREE.PointLight('#ffb070', 0, 70, 2); light.position.y = -1.2; if (highDetail) g.add(light);
   g.userData.fire = (k, t) => { const f = 1 + .08 * Math.sin(t * 70) + .05 * Math.sin(t * 113); flames.forEach((m, i) => { m.visible = k > .02; m.scale.set(1, (i & 1 ? 1.8 : 5.4) * k * f, 1); }); light.intensity = k * 380 * f; };
   g.userData.fire(0, 0); return g;
 }
@@ -140,7 +142,9 @@ export function createEDL(world) {
   const scene = world.scene, cam = world.camera, r = seeded(63), gp = heightAt(LAND.x, LAND.z), S = new THREE.Vector3(0, 40000, 0);
   const saved = { far: cam.far, bg: scene.background, skyV: world.sky.visible, terV: world.terrain.visible };
   cam.far = 150000; cam.updateProjectionMatrix();
+  const oldPad = world.lander?.pad;
   const old = world.lander?.group; if (old) old.visible = false;   // a replay: hide the parked lander while the new one comes down
+  const environment = scene.children.map(o => [o, o.visible]);
   const own = [];   const add = (...o) => { o.forEach(x => { scene.add(x); own.push(x); }); return o[0]; };
   // space set: stars, Mars, atmosphere, own sky for the parachute shot
   const R = 3389, NS = 2600, starsG = new THREE.BufferGeometry(), sp = new Float32Array(NS * 3), sc = new Float32Array(NS * 3);
@@ -176,13 +180,13 @@ export function createEDL(world) {
   const embers = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(ep, 3)), new THREE.PointsMaterial({ map: glowTexture(), color: '#ffb060', size: .16, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })); embers.frustumCulled = false; plasma.add(embers);
   const LN = 110, lp = new Float32Array(LN * 6), lseed = new Float32Array(LN * 4); for (let i = 0; i < LN * 4; i++) lseed[i] = r();
   const streaks = add(new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(lp, 3)), new THREE.LineBasicMaterial({ color: '#ffc8a0', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, fog: false }))); streaks.frustumCulled = false;
-  const heatLight = new THREE.PointLight('#ff7a30', 0, 60, 1.6); veh.add(heatLight);
+  const heatLight = new THREE.PointLight('#ff7a30', 0, 60, 1.6); if (highDetail) veh.add(heatLight);
   const flash = glow('#fff0d0'); add(flash);
   const sepStage = add(new THREE.Group());   // holds the heat shield once it falls away
   // landing-site props: pad, dust
   const pad = add(new THREE.Mesh(new THREE.CylinderGeometry(14, 14, 2, 40).translate(0, -1, 0), new THREE.MeshStandardMaterial({ color: '#5b4538', roughness: 1 }))); pad.position.set(LAND.x, gp + .1, LAND.z);
   const dust = [], tex = puffTexture();
-  for (let i = 0; i < 150; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color: '#c9966c', transparent: true, depthWrite: false, fog: false, opacity: 0 })); s.userData = { a: r() * 6.283, v: 8 + r() * 18, tb: 14.6 + r() * 3.4, rot: r() * 6, sz: 4 + r() * 6, lift: 1 + r() * 4 }; add(s); dust.push(s); }
+  for (let i = 0; i < 64; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color: '#c9966c', transparent: true, depthWrite: false, fog: false, opacity: 0 })); s.visible = false; s.userData = { a: r() * 6.283, v: 8 + r() * 18, tb: 14.6 + r() * 3.4, rot: r() * 6, sz: 4 + r() * 6, lift: 1 + r() * 4 }; add(s); dust.push(s); }
 
   // where the descent stage is (world coords) from t = 12.4 on
   const stagePos = t => {
@@ -190,11 +194,23 @@ export function createEDL(world) {
     const k = 1 - smooth((t - 12.4) / 3.0), dx = t < PH.cut ? 0 : 3.2 * Math.pow(t - PH.cut, 2), sway = t > 15 && t < PH.cut ? Math.sin(t * 2.2) * .12 : 0;
     return new THREE.Vector3(LAND.x - 34 * k + dx + sway, gp + A, LAND.z + 24 * k + sway);
   };
+  const transientGeometry = new Set(), transientMaterials = new Set(), transientTextures = new Set();
+  const kept = new Set(); lander.traverse(o => kept.add(o)); kept.add(pad);
+  const sharedTextures = new Set([puffTex, glowTex, starTex, _plume]);
+  for (const root of own) root.traverse(o => {
+    if (kept.has(o)) return;
+    if (o.geometry) transientGeometry.add(o.geometry);
+    for (const m of [].concat(o.material || [])) {
+      transientMaterials.add(m);
+      for (const value of Object.values(m)) if (value?.isTexture && !sharedTextures.has(value)) transientTextures.add(value);
+    }
+  });
   const tmpV = new THREE.Vector3(), tmpC = new THREE.Vector3();
   const place = (o, p) => o.position.copy(p);
   const frame = t => {
     const shot = t < 3.8 ? 0 : t < 8 ? 1 : t < 12.4 ? 2 : 3, space = shot < 2, chuteShot = shot === 2, real = shot === 3;
     // what is visible in each shot
+    for (const [o, visible] of environment) if (!o.isLight && o !== cam) o.visible = real && visible;
     world.sky.visible = real; world.terrain.visible = real; scene.background = space ? new THREE.Color('#000000') : null;
     stars.visible = shot < 2; mars.visible = space; atmo.visible = space; dome.visible = chuteShot; pad.visible = real;
     dome.position.copy(cam.position); stars.position.copy(cam.position);
@@ -258,11 +274,11 @@ export function createEDL(world) {
     stage.userData.fire(free ? burn * (t < PH.cut ? .85 + .15 * smooth((t - 15) / 1) : 1) : 0, t);
     // ---------- dust from the engines ----------
     const sA = stagePos(t).y - gp, gate = free ? smooth((60 - sA) / 40) : 0;
-    for (const s of dust) { const d = s.userData, age = t - d.tb; if (age < 0 || !real) { s.material.opacity = 0; continue; }
+    for (const s of dust) { const d = s.userData, age = t - d.tb; if (age < 0 || !real) { s.visible = false; s.material.opacity = 0; continue; }
       const rad = 4 + d.v * 1.5 * (1 - Math.exp(-age / 2.6)), grow = d.sz * .6 + age * 1.3;
       s.position.set(LAND.x + Math.cos(d.a) * rad, gp + 1.2 + d.lift * (1 - Math.exp(-age / 2.2)), LAND.z + Math.sin(d.a) * rad); s.scale.set(grow, grow * .65, 1); s.material.rotation = d.rot + age * .1;
       const lift = t > PH.cut ? 1 - smooth((t - PH.cut - .6) / 1.6) * .7 : 1;
-      s.material.opacity = .11 * Math.max(gate, .0) * smooth(age * 1.5) * Math.max(0, 1 - age / 7) * lift; const lit = .85 + .1 * Math.sin(d.a); s.material.color.setRGB(.5 * lit, .3 * lit, .18 * lit); }
+      s.material.opacity = (.11 * 150 / 64) * Math.max(gate, .0) * smooth(age * 1.5) * Math.max(0, 1 - age / 7) * lift; s.visible = s.material.opacity > .001; const lit = .85 + .1 * Math.sin(d.a); s.material.color.setRGB(.5 * lit, .3 * lit, .18 * lit); }
     // flash when the shield is thrown off
     const fl = Math.max(0, 1 - Math.abs(t - PH.shield - .08) / .18); flash.visible = fl > .01; flash.position.copy(veh.position).add(tmpC.set(0, 0, 0)); flash.scale.setScalar(14 * fl + .01); flash.material.opacity = fl * .9;
     // ---------- cameras ----------
@@ -276,12 +292,21 @@ export function createEDL(world) {
     else { const k = smooth((t - 18.8) / 1.2), sp_ = stagePos(t); cam.position.set(LAND.x + 20, heightAt(LAND.x + 20, LAND.z + 26) + 3.4, LAND.z + 28); tmpC.copy(sp_).lerp(tmpV.set(LAND.x, gp + 4, LAND.z), k); cam.lookAt(tmpC); cam.fov = 48; }
     return 0;
   };
-  return { frame, dispose: () => {
-    cam.far = saved.far; cam.updateProjectionMatrix(); scene.background = saved.bg; world.sky.visible = saved.skyV; world.terrain.visible = saved.terV;
-    frame(EDL_T); if (old) scene.remove(old);
+  return { frame, pixelBudget: highDetail ? 1920 * 1080 : 1280 * 720, surfaceFocus: new THREE.Vector3(LAND.x, gp, LAND.z), warmupTimes: [0, 6, 10, 16, 19], dispose: () => {
+    frame(EDL_T);
+    for (const [o, visible] of environment) o.visible = visible;
+    cam.far = saved.far; cam.updateProjectionMatrix(); scene.background = saved.bg; world.sky.visible = saved.skyV; world.terrain.visible = saved.terV; if (old) scene.remove(old);
+    if (oldPad) scene.remove(oldPad);
+    for (const root of [old, oldPad]) root?.traverse(o => {
+      o.geometry?.dispose();
+      for (const m of [].concat(o.material || [])) m.dispose();
+    });
     lander.userData.setLegs(1);
     own.forEach(o => { if (o !== pad) scene.remove(o); }); payload.parent?.remove(payload);
-    world.lander = { group: lander }; world.lander.group.parent !== scene && scene.add(lander); lander.position.set(LAND.x, gp, LAND.z);
+    for (const g of transientGeometry) g.dispose();
+    for (const m of transientMaterials) m.dispose();
+    for (const t of transientTextures) t.dispose();
+    world.lander = { group: lander, pad }; world.lander.group.parent !== scene && scene.add(lander); lander.position.set(LAND.x, gp, LAND.z);
     if (!world._landerCol) { world._landerCol = true; world.colliders?.push({ x: LAND.x, z: LAND.z, r: 3 }); }
   } };
 }
@@ -291,6 +316,6 @@ export function placeLander(world) {
   if (world.lander) return;
   const gp = heightAt(LAND.x, LAND.z), lander = makeLander(); lander.position.set(LAND.x, gp, LAND.z);
   const pad = new THREE.Mesh(new THREE.CylinderGeometry(14, 14, 2, 40).translate(0, -1, 0), new THREE.MeshStandardMaterial({ color: '#5b4538', roughness: 1 })); pad.position.set(LAND.x, gp + .1, LAND.z);
-  world.scene.add(lander, pad); world.lander = { group: lander };
+  world.scene.add(lander, pad); world.lander = { group: lander, pad };
   if (!world._landerCol) { world._landerCol = true; world.colliders?.push({ x: LAND.x, z: LAND.z, r: 3 }); }
 }

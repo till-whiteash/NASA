@@ -55,6 +55,13 @@ const CLEAN_VIDEO = name => HD_FILMS.has(name);
 const FILM_NEXT = { ares_vi_briefing: 'briefing_mission', briefing_mission: 'launch_earth', launch_earth: 'cruise_loop',
   ares_vi_briefing_moon: 'briefing_moon', briefing_moon: 'launch_moon', mars_approach: 'outpost_26_months' };
 const preloaded = new Map();
+let preloadExpiry;
+function releaseVideo(video) {
+  if (!video) return;
+  video.pause(); video.onended = null; video.onerror = null;
+  video.removeAttribute('src'); video.load(); // explicitly release decoder and buffered media
+}
+
 function filmVideo(name) {
   const v = document.createElement('video'); v.className = 'cine-video';
   v.muted = true; v.defaultMuted = true; v.setAttribute('muted', '');          // muted films may always autoplay
@@ -64,7 +71,12 @@ function filmVideo(name) {
 // Start downloading a film before it is needed (call it a scene early). Safe to call more than once.
 export function preloadCinematic(name) {
   if (!name || preloaded.has(name)) return;
+  for (const video of preloaded.values()) releaseVideo(video);
+  preloaded.clear(); clearTimeout(preloadExpiry); // at most one upcoming film
   const v = filmVideo(name); v.load(); preloaded.set(name, v); captionsFor(name);
+  preloadExpiry = setTimeout(() => {
+    if (preloaded.get(name) === v) { preloaded.delete(name); releaseVideo(v); }
+  }, 60000); // release unused look-ahead buffers during long gameplay sessions
 }
 const VIDEO = name => new URL(`previews/${name}${CLEAN_VIDEO(name) ? '-hd' : ''}.mp4`, ANIMATION_ROOT).href;
 const POSTER = name => new URL(`previews/posters/${name}.jpg`, ANIMATION_ROOT).href;
@@ -120,7 +132,7 @@ function captionsFor(name) {
   return captionsCache.get(name);
 }
 
-export function playCinematic(name, { clip, world } = {}) {
+export function playCinematic(name, { clip, world, onSkip } = {}) {
   return new Promise(resolve => {                    // plays even with reduced motion: the films carry the story
     const box = document.createElement('section'); box.className = 'cinematic'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Cutscene');
     box.innerHTML = '<p class="cine-phase"></p><p class="cine-cap" aria-live="polite"></p><button type="button" class="cine-skip">Skip ›</button><p class="cine-load">Loading…</p>';
@@ -144,7 +156,7 @@ export function playCinematic(name, { clip, world } = {}) {
       const onProgress = () => loader?.progress(video);
       for (const ev of ['progress', 'loadedmetadata', 'durationchange']) video.addEventListener(ev, onProgress);
       video.addEventListener('canplay', () => loader?.ready());
-      video.addEventListener('playing', () => { clearTimeout(loaderTimer); box.classList.add('cine-playing'); loader?.done(true); preloadCinematic(FILM_NEXT[name]); });
+      video.addEventListener('playing', () => { clearTimeout(loaderTimer); box.classList.add('cine-playing'); loader?.done(true); preloadCinematic(FILM_NEXT[name]); }, { once: true });
       endLoader = () => { clearTimeout(loaderTimer); loader?.done(true); };
       // a slow connection mid-film: a small buffering badge instead of a frozen picture
       video.addEventListener('waiting', () => { if (video.currentTime > .2) box.classList.add('cine-buffering'); });
@@ -179,15 +191,16 @@ export function playCinematic(name, { clip, world } = {}) {
       stopRetry = () => { clearInterval(retry); for (const ev of ['pointerdown', 'keydown', 'touchstart']) removeEventListener(ev, tryPlay, true); };
       tryPlay();
     };
-    if (world) { world.cinematic = true; for (const k of Object.keys(world.keys || {})) world.keys[k] = false; }
+    const previousVideo = world?.cinematicVideo;
+    if (world) { world.cinematicVideo = true; world.cinematic = true; for (const k of Object.keys(world.keys || {})) world.keys[k] = false; }
     const end = played => {
       if (done) return; done = true; video?.pause(); endLoader?.(); stopRetry?.(); removeEventListener('keydown', key, true);
       box.classList.add('cine-out');
-      setTimeout(() => box.remove(), 400);
-      if (world) world.cinematic = false;
+      setTimeout(() => { releaseVideo(video); box.remove(); }, 400);
+      if (world) { world.cinematic = false; world.cinematicVideo = previousVideo; }
       resolve(played);
     };
-    const advance = () => end(true);
+    const advance = () => { onSkip?.(); end(true); };
     const key = e => { if (e.code === 'Escape') { e.preventDefault(); e.stopPropagation(); advance(); } else if (['Space', 'Enter'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); } };
     addEventListener('keydown', key, true);
     // Skip exits this film; the caller advances the mission.
@@ -200,7 +213,7 @@ export function playCinematic(name, { clip, world } = {}) {
 // Looping background (the loading screen during the trip). Captions show under it; stop() removes it.
 export function loopCinematic(name, parent) {
   const holder = document.createElement('div'); holder.className = 'cine-loop'; parent.prepend(holder);
-  const video = document.createElement('video');
+  const video = preloaded.get(name) || document.createElement('video'); preloaded.delete(name);
   Object.assign(video, { src: VIDEO(name), muted: true, defaultMuted: true, playsInline: true, loop: true, autoplay: true, preload: 'auto' }); video.setAttribute('muted', '');
   Object.assign(video.style, { width: '100%', height: '100%', objectFit: 'contain' });
   video.setAttribute('playsinline', ''); holder.append(video);

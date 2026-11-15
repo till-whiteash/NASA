@@ -202,7 +202,7 @@ export function createCrew(I, CREW) {
       }
     }
     // doors shut while someone sleeps inside; treadmill hum only while it is in use
-    for (const c of I.habCabins ?? []) { const id = c.person.id, sleeping = people.some(pp => pp.p.id === id && pp.spot === 'bed-' + id && pp.f.root.visible); c.openDoor.visible = c.lived.visible && !sleeping; c.sleepDoor.visible = c.lived.visible && sleeping; }
+    for (const c of I.habCabins ?? []) { const id = c.person.id, sleeping = people.some(pp => pp.p.id === id && pp.spot === 'bed-' + id && pp.f.root.visible); const occupied = I.bunks?.occupiesCabin(c, I.pos); c.openDoor.visible = c.lived.visible && (!sleeping || occupied); c.sleepDoor.visible = c.lived.visible && sleeping && !occupied; }
     I.habTreadmill = people.some(pp => pp.spot === 'treadmill' && pp.f.root.visible);
     // talk stations follow the people
     for (const st of talk) I.stations.splice(I.stations.indexOf(st), 1); talk.length = 0;

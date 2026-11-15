@@ -216,6 +216,15 @@ export class Launch {
     this.dropped.push({ obj, vel });
   }
 
+  // Continue the authored pad film at the shared booster-separation event (47 km).
+  // Step the simulation so detached parts, camera, sky and flames agree with the clock.
+  resumeAtBoosterSeparation() {
+    if (!this.modelsReady) this.modelsReady = true; // retain procedural fallback on download failure
+    const target = this.countFrom + T.boosters;
+    while (this.t < target - 1e-8) this.update(Math.min(1 / 60, target - this.t));
+    return this.update(0);
+  }
+
   // The flight, slowed down so there is time to read: about 50 seconds from lift-off to orbit
   // (the real climb to orbit takes about 8 minutes). Each stage gets several seconds.
   update(dt) {

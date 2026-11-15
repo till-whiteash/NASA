@@ -307,9 +307,20 @@ async function startNew() {
   state.phase = 'launch-film';
   buildWorld(); // build Mars while the Blender launch movie plays
   loadMarsMap(); loadRoverPhotos(); loadEarthToday();
-  await playCinematic('launch_earth');
-  state.phase = 'cruise';
-  await arrive();
+  // Match the HD film to the original flight at 47 km, before booster separation.
+  // Its remaining animation includes the 100 km crossing, tower/core staging and orbit.
+  launch = new Launch();
+  let skipLaunch = false;
+  await playCinematic('launch_earth', { clip: 'launch_pad', onSkip: () => { skipLaunch = true; } });
+  if (skipLaunch) { state.phase = 'cruise'; await arrive(); return; }
+  await launch.ready;
+  launch.resumeAtBoosterSeparation();
+  launch.resize();
+  $('#countdown').classList.remove('hidden');
+  const skip = document.createElement('button'); skip.id = 'skip'; skip.textContent = 'Skip launch ›';
+  Object.assign(skip.style, { position: 'fixed', right: '16px', bottom: '16px', zIndex: 5 });
+  skip.onclick = () => { launch.done = true; }; document.body.appendChild(skip);
+  state.phase = 'launch'; // existing render loop runs all the way through the old orbit ending
 }
 // Start downloading the opening briefing while the title screen is up, so it plays the moment you launch.
 (window.requestIdleCallback || setTimeout)(() => preloadCinematic('ares_vi_briefing'), { timeout: 2500 });
@@ -430,7 +441,7 @@ async function arrive() {
   let landingFilm = null;
   // Ewan's existing Mars landing owns the world camera and leaves its lander on the surface.
   const landFilm = async () => { state.phase = 'mars'; await playLanding(world); };
-  const selectedSite = await showArrival(F, outpost.delayMinutes(), {onDescent:()=>{landingFilm = landFilm();}});
+  const selectedSite = await showArrival(F, outpost.delayMinutes(), {onDescent:()=>{landingFilm = landFilm(); return landingFilm;}});
   if (!selectedSite) { location.reload(); return; }
   state.site = selectedSite;
   outpost.site = selectedSite;
@@ -443,7 +454,7 @@ async function arrive() {
   state.phase = 'mars';
   await landingFilm?.catch?.(() => {});        // let the landing film finish before the welcome box opens
   placeLander(world);
-  await playCinematic('outpost_26_months', { world });   // the goal: from two pods to a full outpost
+  // The player builds the base through HabitatBuild; the construction movie is optional in Cutscenes.
   $('#hud').classList.remove('hidden');
   phoneTips();
   say('welcome');
@@ -1678,6 +1689,17 @@ renderer.setAnimationLoop(() => {
     if (lifted && !launch.logged) { launch.logged = true; [F.sls, F.mobileLauncher, F.boosters, F.ascent, F.orbitSpeed].forEach(logFact); }
     renderer.render(launch.scene, launch.camera);
     if (launch.done) { state.phase = 'cruise'; arrive(); }
+    return;
+  }
+  // Ewan's cutscene owns this frame: avoid player physics, rover contacts, HUD, farming and mission checks.
+  if (world?.cinematicVideo) return; // the opaque movie owns the screen; leave GPU time for video decoding
+  if (state.phase === 'mars' && world?.cutsceneFrame) {
+    if (world.cutscenePreparing) return;
+    world.cutsceneFrame(dt, false);
+    const cap = Math.min(targetRatio(), Math.sqrt((world.cutscenePixelBudget || 1920 * 1080) / Math.max(1, innerWidth * innerHeight)));
+    if (renderer.getPixelRatio() > cap) renderer.setPixelRatio(cap);
+    renderer.shadowMap.needsUpdate = (++shadowFrame % 15) === 0; // fixed sun and scenery during the landing
+    renderer.render(world.scene, world.camera);
     return;
   }
   if (state.phase === 'mars' && world) {
