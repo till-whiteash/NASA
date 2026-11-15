@@ -1,3 +1,4 @@
+import { ObjectiveBeacon } from './objective-beacon.js';
 import {advanceISRU} from './isru-state.js';
 import {installRenderHealth,renderRatio} from './render-health.js';
 import { HabitatBuild } from './habitat-build.js';
@@ -461,7 +462,7 @@ async function arrive() {
   say('welcome');
   modal({ title: 'Welcome to Mars, junior astronaut!', html: `
     <p><b>First job: build your habitat.</b> Nothing is built yet, so your lander is your shelter. Follow the arrow to the habitat site, then the quest shows each step: clear the ground, raise the frames, fit the shells and pressurise.</p>
-    <p>To work on something, aim at it and ${keyWord('press E','tap Action')}. Rocks need the pickaxe (1).</p>
+    <p>To work on something, aim at it and ${keyWord('press E','tap Action')}. For rocks, equip the pickaxe (1) and ${keyWord('left-click to strike','tap Action to strike')}.</p>
     <p>You landed at <b>${outpost.s.name}</b>. ${outpost.s.why}${outpost.site === 'gusev' ? '' : ' The ground you walk on is Gusev Crater, used for training.'}</p>`,
     choices: [{ label: "Let's go!", primary: true }] });
 }
@@ -805,6 +806,9 @@ const oreDot = k => `<i class="ore-dot" style="background:${ORES[k].color}"></i>
 function mine(dep) {
   if (!colony.has('pickaxe')) return toast('⛏ Your pickaxe is in the storage locker at the base. Your belt only holds 2 tools.');
   if (colony.tool !== 'pickaxe') return;
+  // Site rocks and surface rubble use construction hit counts, not ore deposits.
+  const hit = construction?.hit?.object;
+  if (hit && (hit === world.rocks || ['hab-rock','rubble'].includes(hit.userData.kind)) && construction.use()) return;
   world.swingTool(() => {
     if (colony.tool !== 'pickaxe' || inside || world.driving) return;
     dep = dep || colony.targets(world.player.position).filter(t => t.type === 'ore').sort((a,b) => a.d-b.d)[0]?.deposit;
@@ -1437,7 +1441,7 @@ function drawHUD() {
       const names = { 'survey-meteorite':'inspect the meteorite field', 'survey-relay':'check the relay station', 'survey-ice':'perform a subsurface survey', door: 'go inside the outpost', rover: 'salvage the old rover', heli: 'look at the Ingenuity helicopter', ice: 'collect ice', metal: 'collect metal parts', pod: 'open the supply pod', panels: `clean the dusty solar panels (${Math.round(o.clean * 100)}% clean)` };
       names['mission-work']=near?.task?.title;
       if (near?.type === 'site') names.site = near.label; names['power-site']=powerSteps[o.powerStep]; names.lookout = 'scan the land from the lookout tower'; names.find = 'collect the survey find'; names.scout = 'send Ingenuity on a scout flight'; names.sev = 'get in the rover and drive'; names.ship = 'climb the ladder into your lander'; names.ghdoor = 'go into the greenhouse'; names['sev-exit'] = 'climb out';
-      if (near?.type === 'ore') hint = `${useWord} to mine ${ORES[near.deposit.ore].name.toLowerCase()}${colony.tool === 'pickaxe' ? '' : ' with your pickaxe'}${colony.bagCount() >= BAG ? ' (bag full!)' : ''}`;
+      if (near?.type === 'ore') hint = `${keyWord('Left-click', 'Tap Action')} to mine ${ORES[near.deposit.ore].name.toLowerCase()}${colony.tool === 'pickaxe' ? '' : ' with your pickaxe'}${colony.bagCount() >= BAG ? ' (bag full!)' : ''}`;
       else if (near?.type === 'greenhouse') hint = `${useWord} to tend the greenhouse${near.house.gh.ready ? ' - ready to harvest!' : ''}`;
       else if (world.driving) hint = `🚙 Battery ${Math.round(world.sev.battery * 100)}% · ${keyWord('W/S drive, A/D steer', 'left thumb drives')} · ${useWord} to climb out${body.canEat && body.rations < 14 ? keyWord(' · hold F to eat', ' · hold Eat to eat') : ''}`;
       else if (!near && colony.tool === 'builder') hint = `🛠 ${useWord} to build a greenhouse in front of you`;
@@ -1970,7 +1974,11 @@ function drawMissionHud(){
   if(marker.visible&&bench){marker.position.set(bench.x,2.1+.08*Math.sin(performance.now()/300),bench.z);marker.rotation.y=performance.now()/1000;}
   world.objectiveTarget=missionTarget(task.target);
   const beacon=world.settlement.objectiveBeacon;
-  if(beacon){beacon.visible=!!world.objectiveTarget&&!inside;if(beacon.visible){beacon.position.set(world.objectiveTarget.x,heightAt(world.objectiveTarget.x,world.objectiveTarget.z)+.08,world.objectiveTarget.z);beacon.scale.setScalar(1+.12*Math.sin(performance.now()/250));}}
+  if(beacon)beacon.visible=false;
+  world.questBeacon??=new ObjectiveBeacon(world.scene,$('#hud'));
+  let destination=world.objectiveTarget;
+  if(!destination&&task.target&&!inside){const e=world.settlement.entrances[task.target==='greenhouse'?2:1];if(e)destination={x:e.x,z:e.bottom+.65};}
+  world.questBeacon.update(destination,task,world,destination?heightAt(destination.x,destination.z):0,!inside&&!missionCard.hidden&&!world.cinematic);
 
 }
 function researchMenu(){openResearch(outpost,colony,world,saveGame);}

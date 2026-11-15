@@ -108,7 +108,7 @@ export class Construction {
   if(!inside&&this.colony().tool==='pickaxe'){const player=this.world.player.position;for(const sample of this.rockSamples){if(this.removedApplied.has(sample.id)||Math.hypot(sample.position.x-player.x,sample.position.z-player.z)>sample.radius+3.3)continue;this.rockProxy.matrixWorld.copy(sample.matrix);const rock=this.ray.intersectObject(this.rockProxy,false)[0];if(rock&&(!hit||rock.distance<hit.distance)){rock.object=this.world.rocks;rock.instanceId=sample.id;hit=rock;}}}
   if(hit&&hit.object!==this.world.rocks){while(!hit.object.userData.kind&&hit.object.parent)hit.object=hit.object.parent;}
   const player=inside?room.pos.clone().add(room.scene.position):this.world.player.position;
-  if(hit&&hit.point.distanceTo(player.clone().add(new THREE.Vector3(0,1,0)))<3.3){this.hit=hit;this.hint=hit.object===this.world.rocks?'E / Action · break surface rock with pickaxe':`E / Action · ${hit.object.userData.label}`;}
+  if(hit&&hit.point.distanceTo(player.clone().add(new THREE.Vector3(0,1,0)))<3.3){this.hit=hit;this.hint=hit.object===this.world.rocks?'Left-click / tap Action · break surface rock with pickaxe':`${['hab-rock','rubble'].includes(hit.object.userData.kind)?'Left-click / tap Action':'E / Action'} · ${hit.object.userData.label}`;}
   if(this.hit?.object.userData.kind==='socket')this.hint=this.hit.object.userData.label+' - '+socketFeedback(o,this.hit.object.userData.id,this.wire);
   if(this.held)this.hint=`Holding ${this.held} · `+this.hint+' · R to cancel';
   if(this.wire){const target=this.sockets.find(p=>p.userData.id===partner);this.hint=`${this.pole==='-'?'Black − lead':'Red + lead'} → ${target.userData.label} ${this.pole==='-'?'−':'+'} · ${Math.round(target.position.distanceTo(player))} m · E / Action · R to drop. `+this.hint;}
@@ -124,7 +124,6 @@ export class Construction {
   if(d.kind?.startsWith('hab-'))return this.world.habBuild?.use(mesh)??false;   // habitat construction (habitat-build.js)
   if(mesh===this.world.rocks||d.kind==='rubble'){
    if(this.colony().tool!=='pickaxe'){this.guide('Equip the pickaxe from your tool belt before breaking this rock.');return true;}
-   if(mesh===this.world.rocks){const near=this.world.nearest();if(near&&['ore','ice','pod','panels','door'].includes(near.type)&&near.d<1.8)return false;}
    let strikes=3;if(mesh===this.world.rocks){const matrix=new THREE.Matrix4(),size=new THREE.Vector3();mesh.getMatrixAt(this.hit.instanceId,matrix);size.setFromMatrixScale(matrix);if(Math.max(size.x,size.z)>6){this.notify('Boulder too large for a hand pickaxe · go around it');return true;}strikes=Math.min(12,3+Math.ceil(Math.max(size.x,size.y,size.z)));}
    const id=mesh===this.world.rocks?'rock-'+this.hit.instanceId:'site-'+d.id,instance=this.hit.instanceId;
    if(this.striking)return true;this.striking=true;
