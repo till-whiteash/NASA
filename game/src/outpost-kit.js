@@ -14,6 +14,27 @@
 // cables the missions build are separate; this only dresses the site and adds a few colliders.
 import * as THREE from 'three';
 import { mergeStatic } from './static-merge.js';
+import { createRockContact } from './rock-contact.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+// Bake collision triangles before render merging removes the original parts. This mesh
+// is never added to the scene, so accurate equipment gaps cost no extra draw calls.
+function meshCollider(group) {
+  group.updateWorldMatrix(true, true);
+  const parts = [];
+  group.traverse(o => {
+    if (!o.isMesh || o.material.transparent) return;
+    const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+    g.applyMatrix4(o.matrixWorld); parts.push(g);
+  });
+  const geometry = mergeGeometries(parts, false); parts.forEach(g => g.dispose());
+  geometry.computeBoundingBox();
+  const center = geometry.boundingBox.getCenter(new THREE.Vector3());
+  const size = geometry.boundingBox.getSize(new THREE.Vector3());
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial());
+  return { x: center.x, z: center.z, r: Math.hypot(size.x, size.z) / 2,
+    object: group, surfaceContact: createRockContact(mesh) };
+}
 
 const TAU = Math.PI * 2;
 let seed = 11;
@@ -329,7 +350,7 @@ export function dressOutpost({ world, heightAt, layout, access }) {
     for (const x of [-.42, .42]) { box(T, .16, .06, .22, darkM, x, .06, 4.5); rod(T, [x, 2.52, 3.46], [x * .92, 2.45, 3.25], .025, steel); }
     // Tank identity is bolted to the exposed end cap instead of hovering in front of the row.
     sign(T, 'H2O ICE · 40 t\n-20 C · SEALED', 1.65, .48, -3.26, 1.3, -2.7, -Math.PI / 2, { bg: '#1c3340', fg: '#e9f4ef', font: 'bold 25px system-ui' });
-    grime(T, 8.5, 10.5); colliders.push({ x: cx - 4.2, z: cz + 8.2, r: 3.4, halfX: 3.3, halfZ: 3.8, minY: 0, maxY: 2.45, object: T });
+    grime(T, 8.5, 10.5); colliders.push(meshCollider(T));
     // fuel production: Sabatier reactor column with heat exchanger, two cryo spheres (O2 and CH4) on leg frames, a flare stack
     const F = new THREE.Group(); F.position.set(4.6, 0, 8.4); Y.add(F);
     cyl(F, .75, .75, 5.2, paint, -1.4, 2.7, -1.6, 0, 0, 0, 24); for (const y of [1, 2.2, 3.4, 4.6]) cyl(F, .79, .79, .1, steel, -1.4, y, -1.6, 0, 0, 0, 24); sph(F, .75, paint, -1.4, 5.3, -1.6, 1, .5, 1, 24);
@@ -340,7 +361,7 @@ export function dressOutpost({ world, heightAt, layout, access }) {
     cyl(F, .1, .14, 9, paintGrey, 3.5, 4.5, -1.8, 0, 0, 0, 10); cyl(F, .2, .08, .4, darkM, 3.5, 9.1, -1.8, 0, 0, 0, 10); const flame = new THREE.Mesh(new THREE.ConeGeometry(.16, .55, 8), new THREE.MeshBasicMaterial({ color: '#ffb24a', transparent: true, opacity: .9 })); flame.position.set(3.5, 9.55, -1.8); F.add(flame); live.push(flame); flame.onBeforeRender = () => { const t = performance.now() * .01; flame.scale.set(1 + Math.sin(t) * .1, 1 + Math.sin(t * 1.7) * .25, 1 + Math.cos(t) * .1); };
     box(F, 2.25, .72, .07, paintGrey, 1, 1.2, -.96); bolts(F, [[-.02, .9, -.91], [2.02, .9, -.91], [-.02, 1.5, -.91], [2.02, 1.5, -.91]], .022, steel);
     sign(F, 'FUEL PLANT\nCH4 + O2 · NO FLAMES', 2.1, .56, 1, 1.2, -.91, 0, { bg: '#b3261e', fg: '#fff', font: 'bold 28px system-ui', tape: true });
-    grime(F, 10, 9, 1, 0); colliders.push({ x: cx + 4.6, z: cz + 8.4, r: 4.5, halfX: 4.2, halfZ: 3.6, object: F });
+    grime(F, 10, 9, 1, 0); colliders.push(meshCollider(F));
     // pipe rack tying it all together: four coloured lines on a frame, with a cable tray and valve wheels
     const P = new THREE.Group(); P.position.set(0.3, 0, 4.6); Y.add(P);
     for (let x = -8; x <= 8; x += 2.8) { box(P, .12, 2.4, .12, paintGrey, x, 1.2, 0); box(P, .12, .12, 1.4, paintGrey, x, 2.4, 0); }
@@ -350,7 +371,7 @@ export function dressOutpost({ world, heightAt, layout, access }) {
       for (const dx of [-.18, .18]) rod(P, [x + dx, 2.25, .22], [x + dx, 2.54, .68], .012, steel);
       sign(P, t, .5, .14, x, 2.62, .71, 0, { w: 128, h: 40, bg: '#f4f1e8', font: 'bold 24px monospace' });
     }
-    colliders.push(...[-8, 0, 8].map(x => ({ x: cx + .3 + x, z: cz + 4.6, r: .6, object: P })));
+    colliders.push(meshCollider(P));
     // shielding blocks: palletised polyethylene and regolith-brick stacks waiting to be placed
     const B = new THREE.Group(); B.position.set(7.2, 0, 4.0); Y.add(B);
     for (let r = 0; r < 4; r++) for (let c = 0; c < 4 - (r >> 1); c++) { const m = (r + c) % 3 ? std('blockWhite', '#e6e3dc', { roughness: .7 }) : regolith; const b = box(B, .96, .46, .48, m, (c - 1.6 + (r & 1) * .5) * 1.0, .55 + r * .47, 0); if (r === 3 && c === 0) { b.rotation.y = .12; b.position.x += .08; } }
@@ -368,7 +389,19 @@ export function dressOutpost({ world, heightAt, layout, access }) {
     root.add(Y);
     // berm wall: a long regolith bank behind the yard (north and east) so a blast or a dust storm takes the berm first
     const berm = new THREE.Group(); root.add(berm);
-    for (let i = 0; i <= 26; i++) { const a = -Math.PI * .62 + i / 26 * Math.PI * 1.2, rr = 15.5 + Math.sin(i * 1.7) * .5, x = cx + Math.cos(a) * rr * .95, z = cz + Math.sin(a) * rr * 1.05; if (z > cz + 3) continue; const g = sph(berm, 1, i % 4 === 0 ? regolithDark : regolith, x, ground(x, z) + .2, z, 2.2 + rnd() * .5, 1.3 + rnd() * .35, 2.2 + rnd() * .4, 12); g.rotation.y = rnd() * 3; g.receiveShadow = true; colliders.push({ x, z, r: 1.7, object: g }); }
+    for (let i = 0; i <= 26; i++) {
+      const a = -Math.PI * .62 + i / 26 * Math.PI * 1.2, rr = 15.5 + Math.sin(i * 1.7) * .5;
+      const x = cx + Math.cos(a) * rr * .95, z = cz + Math.sin(a) * rr * 1.05;
+      if (z > cz + 3) continue;
+      const g = sph(berm, 1, i % 4 === 0 ? regolithDark : regolith, x, ground(x, z), z,
+        2.7 + rnd() * .4, 1.3 + rnd() * .35, 2.7 + rnd() * .4, 12);
+      // A soil bank tapers into the ground, unlike a sphere's vertical rim.
+      const vertices = g.geometry.attributes.position;
+      for (let j = 0; j < vertices.count; j++) vertices.setY(j, Math.max(0, vertices.getY(j)) ** 2);
+      vertices.needsUpdate = true; g.geometry.computeVertexNormals();
+      g.rotation.y = rnd() * 3; g.receiveShadow = true; g.name = 'walkable-isru-berm';
+      colliders.push({ x, z, r: 3.2, object: g, surfaceContact: createRockContact(g) });
+    }
   }
 
   // ====================================================================================================

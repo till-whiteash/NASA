@@ -952,9 +952,10 @@ export class World {
   oreHeight(x,z,ceiling) {
     let top=-Infinity;
     for(const c of this.colliders){
-      if(!c.oreContact || Math.hypot(x-c.x,z-c.z)>c.r)continue;
+      const contact=c.surfaceContact??c.oreContact;
+      if(!contact || Math.hypot(x-c.x,z-c.z)>c.r)continue;
       c.object.updateWorldMatrix(true,false);
-      top=Math.max(top,c.oreContact.height(x,z,ceiling));
+      top=Math.max(top,contact.height(x,z,ceiling));
     }
     return top;
   }
@@ -962,10 +963,11 @@ export class World {
   collide(pos, previous=pos, grounded=false) {
     for (const c of this.colliders) {
       if (c.rock) continue;
-      if(c.oreContact){
+      const contact=c.surfaceContact??c.oreContact;
+      if(contact){
         if(Math.hypot(pos.x-c.x,pos.z-c.z)<=c.r+0.5){
           c.object.updateWorldMatrix(true,false);
-          c.oreContact.block(pos,previous,grounded);
+          contact.block(pos,previous,grounded);
         }
         continue;
       }
