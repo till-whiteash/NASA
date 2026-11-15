@@ -70,6 +70,9 @@ import { startSound, setSound, tickSound, footstep, toggleMute, isMuted, soundDe
 import { initTouch, isTouch } from './touch.js';
 import { earthGlobe, moonGlobe } from './globe.js';
 import { Colony, newColony, ORES, TOOLS, CROPS, SHOP, GREENHOUSE, BAG, JUG_L, priceWords } from './colony.js';
+import {openInventory} from './inventory.js';
+import {TOOL_SLOTS,SAMPLE_SLOTS,usedSlots} from './inventory-state.js';
+import {itemIcon} from './inventory-icons.js';
 import { initMissionMenu } from './menu.js';
 import { showRealMars } from './real-mars.js';
 import { Coop, CoopHud, openCoopDialog } from './coop.js';
@@ -832,11 +835,39 @@ function openWaterPlant() {
 const cargoWords = c => [...Object.entries(c.seeds || {}).map(([k, n]) => `${n} × ${CROPS[k].name.toLowerCase()} seeds`), c.parts ? `${c.parts} parts` : ''].filter(Boolean).join(', ');
 const oreDot = k => `<i class="ore-dot" style="background:${ORES[k].color}"></i>`;
 
+// The aiming ray, not the nearest item label, decides which mineral receives a click.
+function aimedMineral() {
+  if(!world||!colony||inside||world.driving)return null;
+  const ray=new THREE.Raycaster();ray.setFromCamera(world.aimPoint||{x:0,y:0},world.camera);
+  const eye=world.player.position.clone().add(new THREE.Vector3(0,1,0));let best=null;
+  for(const dep of colony.deposits){
+    if(colony.s.mined.includes(dep.id)||!dep.group.parent||!dep.group.visible||Math.hypot(dep.x-eye.x,dep.z-eye.z)>5.5)continue;
+    dep.group.updateWorldMatrix(true,true);
+    const hit=ray.intersectObject(dep.group,true).find(h=>h.object.isMesh&&h.object.visible&&h.point.distanceTo(eye)<=3.3);
+    if(hit&&(!best||hit.distance<best.hit.distance))best={dep,hit};
+  }
+  if(best&&construction?.hit&&construction.hit.distance<best.hit.distance-.03)return null;
+  return best?.dep||null;
+}
+function inspectMineral(dep){
+  if(!dep||colony.s.mined.includes(dep.id))return;
+  const ore=ORES[dep.ore],left=Math.max(0,ore.hits-(colony.s.hits[dep.id]||0));
+  modal({title:ore.name+' · rock inspection',html:`<div class="rock-inspection">${itemIcon(dep.ore)}<p>${ore.desc}</p><p><b>${keyWord('Left click','Tap Mine')}</b> with the pickaxe to mine. <b>E / Inspect</b> only examines the rock.</p><p>${left} strike${left===1?'':'s'} remaining · yields ${ore.yield} sample${ore.yield===1?'':'s'}.</p></div>`,choices:[{label:'Back to the rock',primary:true}]});
+}
+function primaryAction(){
+  if(state.phase!=='mars'||isModalOpen()||world?.cinematic||world?.driving)return;
+  construction?.update(inside,room,false);
+  const mineral=aimedMineral();if(mineral){mine(mineral);return;}
+  if(construction?.mine?.())return;
+  if(colony?.tool==='builder'){openBuild();return;}
+  if(!inside&&colony?.tool==='pickaxe')world.swingTool(()=>{});
+}
 function mine(dep) {
-  if (!colony.has('pickaxe')) return toast('⛏ Your pickaxe is in the storage locker at the base. Your belt only holds 2 tools.');
+  if (!colony.has('pickaxe')) return toast('⛏ Your pickaxe is in the storage locker at the base. Open the backpack (I) to check your six quick-tool slots.');
   if (colony.tool !== 'pickaxe' || !world.aimsAt(dep.group)) return;
-  if (colony.bagCount() >= BAG) return toast(`🎒 Your sample bag is full (${BAG}). Unload it at the storage locker inside the base.`);
+  if (colony.sampleRoom(dep.ore) < ORES[dep.ore].yield) return toast('Your backpack needs room for this rock’s samples. Store a stack at the base locker.');
   world.swingTool(() => {
+    if(colony.tool!=='pickaxe'||colony.s.mined.includes(dep.id)||!dep.group.parent||Math.hypot(dep.x-world.player.position.x,dep.z-world.player.position.z)>5.5)return;
     footstep(1);
     const o = ORES[dep.ore];
     { const b = new THREE.Box3().setFromObject(dep.group), p = world.player.position;   // the near, upper side of the rock
@@ -845,7 +876,7 @@ function mine(dep) {
     const r = colony.strike(dep);
     if(r.broke){recordLesson(colony.s,'mine');saveGame();}
     toolbarKey = '';
-    if (r.full) return toast(`🎒 Your sample bag is full (${BAG}). Unload it at the storage locker inside the base.`);
+    if (r.full) return toast('Your backpack needs room for this rock’s samples. Store a stack at the base locker.');
     if (!r.broke) return toast(`⛏ ${o.name}: ${r.left} more swing${r.left === 1 ? '' : 's'}`, 900);
     toast(`🪨 +${r.got} ${o.name.toLowerCase()} in your sample bag (${colony.bagCount()}/${BAG})`);
     if (dep.ore === 'carbonate') { outpost.science += 10; toast('Carbonate rock: +10 science. It formed in water that was not acid.', 4500); }
@@ -899,9 +930,10 @@ function drawToolbar() {
   if (key === toolbarKey) return;
   toolbarKey = key;
   const tb = $('#toolbar');
-  tb.innerHTML = `<button data-slot="-1" aria-pressed="${s.held===-1}" class="${s.held===-1?'held':''}" title="Unequip tools (Q)">✋<small>Empty hands</small></button>` + s.belt.map((t, i) => `<button data-slot="${i}" aria-pressed="${i===s.held}" class="${i === s.held ? 'held' : ''}" title="${TOOLS[t].name}: ${TOOLS[t].desc}">${TOOLS[t].icon}<small>${keyWord(`${i + 1} · `, '')}${TOOLS[t].name}${t === 'jug' ? ` ${s.jug} L` : ''}</small></button>`).join('')
-    + `<div class="bag" title="Rock samples you are carrying - unload them at the storage locker">${Object.keys(ORES).map(k => `<span>${oreDot(k)}${s.bag[k]}</span>`).join(' ')}<small>bag ${colony.bagCount()}/${BAG}</small></div>`;
+  tb.innerHTML = `<button data-slot="-1" aria-pressed="${s.held===-1}" class="${s.held===-1?'held':''}" title="Empty hands (Q)"><small>Q</small><small>Hands</small></button>` + Array.from({length:TOOL_SLOTS},(_,i)=>s.belt[i]?`<button data-slot="${i}" aria-pressed="${i===s.held}" class="${i===s.held?'held':''}" title="${TOOLS[s.belt[i]].name}"><kbd>${i+1}</kbd>${itemIcon(s.belt[i])}<small>${TOOLS[s.belt[i]].name}${s.belt[i]==='jug'?` ${s.jug} L`:''}</small></button>`:`<div class="tool-slot-empty" aria-hidden="true">${i+1}</div>`).join('')
+    + `<button class="inventory-launch" data-inventory title="Open backpack (I)">${itemIcon('backpack')}<small>Backpack · I</small><small>${usedSlots(s.bag)}/${SAMPLE_SLOTS} slots</small></button>`;
   tb.querySelectorAll('[data-slot]').forEach(b => (b.onclick = e => { e.stopPropagation(); selectPlayerTool(+b.dataset.slot); }));
+  tb.querySelector('[data-inventory]').onclick=e=>{e.stopPropagation();if(!isModalOpen()&&!world?.cinematic)openBackpack();};
 }
 
 // The hazard monitor: live readings, and storms the instruments have spotted before they arrive.
@@ -933,32 +965,27 @@ function openMonitor() {
 }
 
 // The storage locker: tools, samples, seeds and water - and the radio link for trading with Earth.
-function openLocker() {
-  const unloaded = colony.unload(); if(unloaded){recordLesson(colony.s,'unload');saveGame();} if (unloaded) toast(`🪨 Unloaded ${unloaded} rock sample${unloaded === 1 ? '' : 's'} into storage.`);
-  const s = colony.s, o = outpost, link = o.today.link, beltFull = s.belt.length >= 2;
+function openBackpack(atLocker=false) {
+  return openInventory({colony,outpost,atLocker,onChange:()=>{toolbarKey='';missionKey='';saveGame();drawToolbar();},onLesson:id=>recordLesson(colony.s,id),onServices:openLockerServices,onKits:()=>advancePower(0)});
+}
+function openLocker(){return openBackpack(true);}
+function openLockerServices() {
+  const s = colony.s, o = outpost, link = o.today.link;
   const onWay = pending.filter(p => p.cargo);
   const req = s.request;
   const shop = SHOP.map(item => `<button data-buy="${item.id}" ${!link || !colony.canPay(item.price, o) ? 'disabled' : ''}><span><b>${item.label}</b><small>${priceWords(item.price)}</small></span></button>`).join('');
-  modal({ pause: false, title: '🗄 Storage locker', html: `
+  modal({ title: 'Base supplies & trade', html: `
     ${s.produce ? `<button data-prepare>Prepare harvested food · ${s.produce} portions</button>` : ''}
     <p>Sealed rations · <b>${o.rations}</b> portions <button data-rations ${o.rations ? '' : 'disabled'}>Stock galley</button></p>
     ${o.powerStep===0?'<button data-kits>Collect landed power kits</button>':''}
-    <div class="inv-grid">
-      <div><h5>Tool belt (holds 2)</h5>${s.belt.map(t => `<div>${TOOLS[t].icon} ${TOOLS[t].name} <button data-store="${t}">Put away</button></div>`).join('') || '<p>Empty</p>'}</div>
-      <div><h5>In the locker</h5>${s.locker.map(t => `<div>${TOOLS[t].icon} ${TOOLS[t].name} <button data-take="${t}" ${beltFull ? 'disabled title="Your belt is full - put a tool away first"' : ''}>Take</button></div>`).join('') || '<p>Empty</p>'}</div>
-      <div><h5>Rock samples</h5>${Object.keys(ORES).map(k => `<div>${oreDot(k)}${ORES[k].name}: <b>${s.store[k]}</b></div>`).join('')}<div>🔩 Parts: <b>${o.parts}</b></div></div>
-      <div><h5>Seeds and water</h5>${Object.keys(CROPS).map(k => `<div>${CROPS[k].icon} ${CROPS[k].name}: <b>${s.seeds[k]}</b></div>`).join('')}
-        <div>💧 Water tank: <b>${s.tank} L</b> · jug: <b>${s.jug} L</b></div>
-        <button data-fill ${!colony.has('jug') || s.tank <= 0 || s.jug >= JUG_L ? 'disabled' : ''}>Fill the water jug</button>${colony.has('jug') ? '' : '<small> (take the jug first)</small>'}</div>
-    </div>
     <h4>📡 Trade with Earth</h4>
     ${!s.farmQuest?.seedsCollected && !s.farmQuest?.seedsLanded && s.farmQuest?.seedArrival==null ? `<button data-starter ${!link?'disabled':''}>Request starter seeds · free training supply</button><small>Released from the pre-positioned Mars depot; arrives near the base in 3 training sols. Orange minimap marker on landing.</small>` : ''}
     ${link ? '<p>Send sample research to Earth for supply authorization. Trade samples locally; a pre-positioned Mars depot releases your cargo in 3 training sols. This is not a three-sol flight from Earth. Open the pod at the orange square on your minimap to receive the seeds.</p>' : '<p class="neg">The Earth link is off. Give "Talk to Earth" more power at the console to trade.</p>'}
     ${req ? `<div class="hazard"><b>Request:</b> ${req.who} wants <b>${req.n} ${ORES[req.ore].name.toLowerCase()}</b> (until sol ${req.until}). Reward: +${req.reward.science} science and ${cargoWords(req.reward)}. <button data-request ${!link || s.store[req.ore] < req.n ? 'disabled' : ''}>Send samples</button></div>` : ''}
     <div class="shop">${shop}</div>
     ${onWay.length ? `<p class="source">On the way: ${onWay.map(p => `${cargoWords(p.cargo)} (lands sol ${p.sol})`).join('; ')}</p>` : ''}
-    ${factHTML(F.samples)}`, choices: [{ label: 'Done', primary: true }] });
-  const box = $('#modal .modal-box'), again = () => { toolbarKey = ''; openLocker(); };
+    ${factHTML(F.samples)}`, choices: [{ label: 'Back to inventory', primary: true, onPick:openLocker }] });
+  const box = $('#modal .modal-box'), again = () => { toolbarKey = ''; saveGame(); openLockerServices(); };
   box.querySelector('[data-starter]')?.addEventListener('click',()=>{
     const q=s.farmQuest??={};if(q.seedArrival!=null||!o.today.link)return;
     q.seedArrival=o.sol+3;pending.push({sol:q.seedArrival,type:'pod',cargo:{seeds:{lettuce:2},starter:true}});
@@ -969,9 +996,6 @@ function openLocker() {
     o.food += s.produce; s.freshMeals = (s.freshMeals || 0) + s.produce; s.produce = 0; farmProgress('prepared'); again();
   });
   box.querySelector('[data-rations]').onclick = () => { o.food += o.rations; o.rations = 0; saveGame(); again(); };
-  box.querySelectorAll('[data-take]').forEach(b => (b.onclick = () => { if(colony.take(b.dataset.take)){recordLesson(colony.s,'equip');saveGame();} again(); }));
-  box.querySelectorAll('[data-store]').forEach(b => (b.onclick = () => { colony.store(b.dataset.store); again(); }));
-  box.querySelector('[data-fill]')?.addEventListener('click', () => { const l = colony.fillJug(); toast(`💧 Filled the jug with ${l} L.`); again(); });
   box.querySelectorAll('[data-buy]').forEach(b => (b.onclick = () => {
     const item = SHOP.find(x => x.id === b.dataset.buy);
     if (!colony.pay(item.price, o)) return;
@@ -1122,7 +1146,7 @@ function collect(n) {
   if (n.type === 'door') return startAirlock('in',()=>goInside(n.entrance));
   if (n.type === 'ship') return startAirlock('in',()=>goInShip());
   if (n.type === 'ghdoor') return startAirlock('in',()=>goInGreenhouse('out'));
-  if (n.type === 'ore') { mine(n.deposit); return; }
+  if (n.type === 'ore') { inspectMineral(n.deposit); return; }
   if (n.type === 'greenhouse') return openGreenhouse(n.house);
   if (n.type === 'sev' && outpost.roverStuck) {
     return modal({ title: '🚙 Rover stuck in sand', html: '<p>Dig out the sand in front of the wheels, lay traction boards behind them, then back out slowly, the way you came in.</p>',
@@ -1217,15 +1241,19 @@ function pressKey(code) {
   if (sleepBunk && ['KeyE','KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(code)) { wake(); return; }
   if (code === 'KeyN' && coop.active) { voteToSkip(); return; }
   if(airlockRoom&&room===airlockRoom){if(code==='KeyE')useAirlock();if(code==='KeyR')cancelAirlock();return;}
+  if (code === 'PrimaryAction') { primaryAction(); return; }
+  if (code === 'KeyI') { openBackpack(); return; }
   if (code === 'KeyB') { openBuild(); return; }
   if (code === 'KeyX') { construction?.placeBattery(); return; }
   if (code === 'KeyR') { construction?.cancel(); return; }
   if (code === 'KeyE') {
+    construction?.update(inside,room,false);
+    const mineral=aimedMineral();if(mineral){inspectMineral(mineral);return;}
     if(construction?.use()) return;
     if (inside) { const s = room.nearest(); if (s) stationAction(s); }
     else { const n = world.nearest(); if (n) collect(n); else if (colony.tool === 'builder' && !world.driving) openBuild(); }
   }
-  if ((code === 'Digit1' || code === 'Digit2') && colony) { selectPlayerTool(+code.slice(5) - 1); }
+  if (/^Digit[1-6]$/.test(code) && colony) { selectPlayerTool(+code.slice(5) - 1); }
   if(code==='KeyQ'&&colony){selectPlayerTool(-1);}
   if(code==='KeyT')openMissionLog();
   if (code === 'KeyG') $('#map-btn').click();
@@ -1253,14 +1281,9 @@ $('#view').addEventListener('pointermove', e => {
   world.aimPoint=mouseLocked()||e.pointerType==='touch'?null:{x:2*e.clientX/innerWidth-1,y:1-2*e.clientY/innerHeight};
 });
 document.addEventListener('pointerlockchange',()=>{if(world)world.aimPoint=null;});
-$('#view').addEventListener('click', () => {
-  if (lastPointer==='touch')return;
-  if(state.phase==='mars'&&!isModalOpen()&&construction?.use()){captureMouse();return;}
-  if(state.phase==='mars' && colony.tool==='builder' && !world.driving && !isModalOpen()){openBuild();return;}
-  if(state.phase==='mars' && !inside && !world.driving && !isModalOpen()){
-    const target=world.nearest();if(target?.type==='panels')collect(target);else if(target?.type==='ore')mine(target.deposit);
-  }
-  captureMouse();
+$('#view').addEventListener('click', e => {
+  if(lastPointer==='touch'||e.button!==0)return;
+  primaryAction();captureMouse();
 });
 // Free the mouse (Esc, which the browser always handles, or C) and capture it again (click the game, or C).
 addEventListener('keydown', e => {
@@ -1450,7 +1473,7 @@ function drawHUD() {
       const names = { 'survey-meteorite':'inspect the meteorite field', 'survey-relay':'check the relay station', 'survey-ice':'perform a subsurface survey', door: 'go inside the outpost', rover: 'salvage the old rover', heli: 'look at the Ingenuity helicopter', ice: 'collect ice', metal: 'collect metal parts', pod: 'open the supply pod', panels: `clean the dusty solar panels (${Math.round(o.clean * 100)}% clean)` };
       names['mission-work']=near?.task?.title;
       if (near?.type === 'site') names.site = near.label; names['power-site']=powerSteps[o.powerStep]; names.lookout = 'scan the land from the lookout tower'; names.find = 'collect the survey find'; names.scout = 'send Ingenuity on a scout flight'; names.sev = 'get in the rover and drive'; names.ship = 'climb the ladder into your lander'; names.ghdoor = 'go into the greenhouse'; names['sev-exit'] = 'climb out';
-      if (near?.type === 'ore') hint = `${useWord} to mine ${ORES[near.deposit.ore].name.toLowerCase()}${colony.tool === 'pickaxe' ? '' : ' with your pickaxe'}${colony.bagCount() >= BAG ? ' (bag full!)' : ''}`;
+      if (near?.type === 'ore') hint = `${keyWord('Left click','Tap Mine')} to mine · E / Inspect · ${ORES[near.deposit.ore].name.toLowerCase()}${colony.tool === 'pickaxe' ? '' : ' with your pickaxe'}${colony.sampleRoom(near.deposit.ore) < ORES[near.deposit.ore].yield ? ' (backpack needs room)' : ''}`;
       else if (near?.type === 'greenhouse') hint = `${useWord} to tend the greenhouse${near.house.gh.ready ? ' - ready to harvest!' : ''}`;
       else if (world.driving) hint = `🚙 Battery ${Math.round(world.sev.battery * 100)}% · ${keyWord('W/S drive, A/D steer', 'left thumb drives')} · ${useWord} to climb out${body.canEat && body.rations < 14 ? keyWord(' · hold F to eat', ' · hold Eat to eat') : ''}`;
       else if (!near && colony.tool === 'builder') hint = `🛠 ${useWord} to build a greenhouse in front of you`;
@@ -1471,12 +1494,13 @@ function drawHUD() {
   // just says what will happen; while you sleep the button gets you up
   let useLabel = '';
   if (isTouch() && hint.startsWith('Tap Action to ')) { hint = hint.slice(14); hint = hint[0].toUpperCase() + hint.slice(1); useLabel = hint.split(/[\s,(]/)[0]; }
+  if(near?.type==='ore'||construction?.hit?.object===world.rocks||['rubble','hab-rock'].includes(construction?.hit?.object?.userData.kind))useLabel='Inspect';
   if (sleepBunk) { useLabel = 'Get up'; hint = ''; }
   hint = noEmoji(hint);
   if (hint) { if (hintEl.textContent !== hint) hintEl.textContent = hint; hintEl.classList.remove('gone'); }
   else hintEl.classList.add('gone');
   drawMouseNote();
-  touch.sync({ active: !isModalOpen() && !o.over && !$('#hud').classList.contains('menu-open'), canUse: !!near || !!sleepBunk || (!inside && colony.tool === 'builder'), inside, canEat: !!body.canEat, useLabel });
+  touch.sync({ active: !isModalOpen() && !o.over && !$('#hud').classList.contains('menu-open'), canUse: !!near || !!construction?.hit || !!sleepBunk || (!inside && colony.tool === 'builder'), inside, canEat: !!body.canEat, canMine:!inside&&!world.driving&&colony.tool==='pickaxe', useLabel });
   // rations row and the suit-air ring next to your astronaut
   let sx = null, sy = null;
   if (!inside && !world.driving) {
@@ -1934,7 +1958,8 @@ function drawMissionHud(){
   if(!q.seedsCollected){const seedOrder=pending.find(p=>p.cargo?.seeds);if(seedOrder)q.seedArrival=seedOrder.sol;q.seedsLanded=world.pickups.some(p=>p.kind==='pod'&&p.cargo?.seeds);}
   const task=activeMissionObjective();
   const milestones=firstMissionReport(outpost,colony.s);
-  missionCard.querySelector('.mission-progress').textContent=habitatBuilt(outpost)?`First base: ${milestones.filter(m=>m.done).length}/4 milestones · E / Action to interact`:'Follow the marker · aim at the object · E / Action';
+  const miningTask=task.id==='hab-1'||task.target==='build-ore'||(task.id==='power-2'&&(outpost.construction?.cleared?.length||0)<4);
+  missionCard.querySelector('.mission-progress').textContent=miningTask?keyWord('Left click to mine · E to inspect','Tap Mine to break rocks · Inspect to learn'):habitatBuilt(outpost)?`First base: ${milestones.filter(m=>m.done).length}/4 milestones · E / Action to interact`:'Follow the marker · aim at the object · E / Action';
   if(milestones.every(m=>m.done)&&!outpost.firstBaseDebrief){outpost.firstBaseDebrief=true;saveGame();zhetela('First base mission complete! Open the quest log for your learning debrief. Keep packaged food in reserve. Next: rover charging, supported shelter shielding and food-culture research.',true);}
   missionCard.hidden=isModalOpen()||world.cinematic||$('#hud').classList.contains('menu-open');
   if(task.id+'|'+(task.step||'')!==missionKey){missionKey=task.id+'|'+(task.step||'');zhetela(task.step||task.detail);missionCard.querySelector('summary').textContent=task.target==='workbench'?'Go to the workbench':task.title;if(task.step){const next=document.createElement('small');next.className='mission-next-step';next.textContent=task.step;missionCard.querySelector('summary').append(next);}missionCard.querySelector('p').textContent=task.detail;missionCard.open=true;missionCollapseAt=task.id==='explore'?performance.now()+8000:0;}
