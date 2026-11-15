@@ -1,6 +1,6 @@
 // Command window for the team. Press ` (backtick) or F2 to open. Type "help".
 // Lets you trigger events on demand so nobody waits for a storm to roll in.
-export function devConsole(cmds) {
+export function devConsole(cmds, { onToggle = () => {} } = {}) {
   const css = document.createElement('style');
   css.textContent = `#dev-con{position:fixed;left:0;right:0;top:0;z-index:4000;background:rgba(6,10,14,.94);border-bottom:1px solid #5fe3ff55;font:13px/1.45 ui-monospace,Consolas,monospace;color:#cfe;display:none;padding:8px 12px}
 #dev-con.on{display:block}#dev-con .out{max-height:34vh;overflow:auto;white-space:pre-wrap}#dev-con .out .e{color:#ff8a7a}#dev-con .out .k{color:#7dffb0}
@@ -21,7 +21,7 @@ export function devConsole(cmds) {
     const c = cmds[name]; if (!c) return say(`Unknown command "${name}". Type help.`, 'e');
     try { const r = await c.run(...args); say(r || 'ok', 'k'); } catch (e) { say(String(e.message || e), 'e'); }
   };
-  const toggle = on => { el.classList.toggle('on', on); if (el.classList.contains('on')) { document.exitPointerLock?.(); inp.focus(); if (!out.children.length) say('Dev console. Type help.'); } else inp.blur(); };
+  const toggle = on => { el.classList.toggle('on', on); onToggle(el.classList.contains('on')); if (el.classList.contains('on')) { document.exitPointerLock?.(); inp.focus(); if (!out.children.length) say('Dev console. Type help.'); } else inp.blur(); };
   addEventListener('keydown', e => {
     const typing = e.target === inp;
     if ((e.key === '`' || e.key === 'F2') && !(typing && e.key === '`' && inp.value)) { e.preventDefault(); toggle(!el.classList.contains('on')); return; }

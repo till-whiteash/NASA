@@ -168,8 +168,8 @@ const NASA_TOOL = {
   pickaxe: { file: 'tools/rock-pick.glb', length: 0.62, upright: true, grip: 0.06, keepColours: true },
   builder: { file: 'pistol-grip-tool.glb', length: 0.42, upright: false, grip: 0 },
 };
-async function nasaTool(kind) {
-  const spec = NASA_TOOL[kind], gltf = await loadModel(spec.file);
+async function nasaTool(kind, forView = false) {
+  const spec = kind === 'pickaxe' && forView ? { ...NASA_TOOL.pickaxe, file: 'tools/rock-pick-view.glb', length: .75, grip: .35 } : NASA_TOOL[kind], gltf = await loadModel(spec.file);
   if (!gltf) return null;
   const m = gltf.scene.clone(true);
   m.traverse(o => {
@@ -230,7 +230,7 @@ export function makeTool(kind, forView = false) {
   }
   g.traverse(o => { if (o.isMesh) o.castShadow = true; });
   // Swap in NASA's own 3D model of the tool once it has loaded (the simple shape shows until then)
-  if (NASA_TOOL[kind]) nasaTool(kind).then(t => {
+  if (NASA_TOOL[kind]) nasaTool(kind, forView).then(t => {
     if (!t) return;
     g.clear(); g.add(t);
     if (forView) t.traverse(o => { if (o.material) { o.material = [].concat(o.material).map(m => Object.assign(m.clone(), { depthTest: false, fog: false })); if (o.material.length === 1) o.material = o.material[0]; } o.renderOrder = 10; });
@@ -238,9 +238,9 @@ export function makeTool(kind, forView = false) {
   if (forView) {
     // first person: small and low in the bottom-right corner, like a real hand holding it below your chin
     const holder = new THREE.Group(); holder.add(g);
-    holder.scale.setScalar(kind === 'pickaxe' ? 0.42 : 0.6);
-    g.rotation.set(-0.25, 0.5, kind === 'pickaxe' ? 0.55 : 0.15);
-    if (kind === 'pickaxe') g.position.set(0.05, -0.32, 0);
+    holder.scale.setScalar(kind === 'pickaxe' ? 0.9 : 0.6);
+    g.rotation.set(-0.15, kind === 'pickaxe' ? Math.PI-.2 : .5, kind === 'pickaxe' ? .25 : .15);
+    if (kind === 'pickaxe') g.position.set(0, -.04, 0);
     return holder;
   }
   // held in the right glove, hanging down and tilted out away from the leg, so you can see it from behind

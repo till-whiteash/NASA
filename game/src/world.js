@@ -894,7 +894,7 @@ export class World {
   }
   updateSwing(dt) {
     this.updateImpacts(dt);
-    if (this.toolSwing < 0) { this.viewSlot.rotation.set(0, 0, 0); this.viewSlot.position.set(0, 0, 0); return; }
+    if (this.toolSwing < 0) { this.viewSlot.rotation.set(0, 0, 0); this.placeViewSlot(); return; }
     if (this.hitStop > 0) { this.hitStop -= dt; dt *= 0.08; }        // a split-second pause as the pick bites the rock
     const before = this.toolSwing;
     this.toolSwing += dt / 0.8;
@@ -902,8 +902,11 @@ export class World {
     const { lift, crouch } = swingCurve(Math.min(1, this.toolSwing));
     // first person: the pick comes up past your view, chops down, jolts on the rock and settles back
     const jolt = this.toolSwing > 0.55 && this.toolSwing < 0.62 ? Math.sin((this.toolSwing - 0.55) / 0.07 * Math.PI) * 0.03 : 0;
-    this.viewSlot.rotation.set(lift * 1.1, lift * 0.12, -lift * 0.25);
-    this.viewSlot.position.set(0, -crouch * 0.12 - jolt, 0);
+    this.viewSlot.rotation.set(lift * .75, lift * .12, -lift * .35);
+    this.placeViewSlot();
+    this.viewSlot.position.x -= crouch * .3;
+    this.viewSlot.position.y += lift * .08 - crouch * .12 - jolt;
+    this.viewSlot.position.z -= crouch * .15;
     if (this.toolSwing >= 1) this.toolSwing = -1;
   }
 
@@ -1207,5 +1210,9 @@ export class World {
 
   resize() { this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); this.placeViewSlot(); }
   // the first-person tool sits in the bottom-right corner - closer to the middle on tall, narrow screens
-  placeViewSlot() { this.viewSlot.position.set(Math.min(0.36, 0.25 * this.camera.aspect), -0.34, -0.7); }
+  placeViewSlot() {
+    const scale = Math.min(1, Math.max(.55, this.camera.aspect / .95));
+    this.viewSlot.scale.setScalar(scale);
+    this.viewSlot.position.set(Math.min(.24, .17 * this.camera.aspect), -.28 - .08 * scale, -.8);
+  }
 }

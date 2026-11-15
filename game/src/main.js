@@ -801,9 +801,12 @@ const oreDot = k => `<i class="ore-dot" style="background:${ORES[k].color}"></i>
 
 function mine(dep) {
   if (!colony.has('pickaxe')) return toast('⛏ Your pickaxe is in the storage locker at the base. Your belt only holds 2 tools.');
-  if (colony.tool !== 'pickaxe' || !world.aimsAt(dep.group)) return;
-  if (colony.bagCount() >= BAG) return toast(`🎒 Your sample bag is full (${BAG}). Unload it at the storage locker inside the base.`);
+  if (colony.tool !== 'pickaxe') return;
   world.swingTool(() => {
+    if (colony.tool !== 'pickaxe' || inside || world.driving) return;
+    dep = dep || colony.targets(world.player.position).filter(t => t.type === 'ore').sort((a,b) => a.d-b.d)[0]?.deposit;
+    if (!dep?.group.parent || Math.hypot(world.player.position.x-dep.x,world.player.position.z-dep.z)>=4 || !world.aimsAt(dep.group)) return;
+    if (colony.bagCount() >= BAG) return toast(`Sample bag full (${BAG}). Unload at the locker.`);
     footstep(1);
     const o = ORES[dep.ore];
     { const b = new THREE.Box3().setFromObject(dep.group), p = world.player.position;   // the near, upper side of the rock
@@ -1200,9 +1203,17 @@ function pressKey(code) {
   if (code === 'KeyM') muteButton();
   if (code === 'KeyV' && !inside) { world.firstPerson = !world.firstPerson; toast(world.firstPerson ? `👁 First-person view (${keyWord('V', 'tap View')} to switch back)` : '🎥 Third-person view'); }
 }
-addEventListener('blur',()=>{if(world)for(const key of Object.keys(world.keys))world.keys[key]=false;});
-addEventListener('keydown', e => { if(e.target.closest?.('input,textarea,select,[contenteditable=true]'))return; if(e.ctrlKey&&document.pointerLockElement)e.preventDefault(); if (world) world.keys[e.code] = true; if(!e.repeat)pressKey(e.code); });
-addEventListener('keyup', e => { if (world) world.keys[e.code] = false; });
+let devConsoleOpen = false;
+function releaseControls() {
+  if (!world) return;
+  for (const key of Object.keys(world.keys)) world.keys[key] = false;
+  world.move?.set(0,0,0); if(world.sev)world.sev.speed=0;
+  if(room?.vel){room.vel.x=0;room.vel.z=0;}
+}
+addEventListener('blur',releaseControls);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseControls();});
+addEventListener('keydown', e => { if(devConsoleOpen || e.target.closest?.('input,textarea,select,[contenteditable=true]'))return; if(e.ctrlKey&&document.pointerLockElement)e.preventDefault(); if (world) world.keys[e.code] = true; if(!e.repeat)pressKey(e.code); });
+addEventListener('keyup', e => { if (world) world.keys[e.code] = false; }, true);
 // Mouse look needs pointer lock (desktop only). Phones have no pointer lock - they use the touch drag below.
 let lastPointer = 'mouse';
 $('#view').addEventListener('pointerdown', e => {
@@ -1220,7 +1231,8 @@ $('#view').addEventListener('pointermove', e => {
 });
 document.addEventListener('pointerlockchange',()=>{if(world)world.aimPoint=null;});
 $('#view').addEventListener('click', () => {
-  if (lastPointer==='touch')return;
+  if (lastPointer==='touch'||devConsoleOpen)return;
+  if(state.phase==='mars' && !inside && !world.driving && !world.cinematic && !isModalOpen() && colony.tool==='pickaxe'){mine();captureMouse();return;}
   if(state.phase==='mars'&&!isModalOpen()&&construction?.use()){captureMouse();return;}
   if(state.phase==='mars' && colony.tool==='builder' && !world.driving && !isModalOpen()){openBuild();return;}
   if(state.phase==='mars' && !inside && !world.driving && !isModalOpen()){
@@ -1444,7 +1456,18 @@ function drawHUD() {
 
 // Command window: press ` or F2. Fires events on demand so nobody waits for the weather.
 const needOut = () => { if (state.phase !== 'mars') throw new Error('Start the game and reach Mars first.'); if (inside) throw new Error('Go outside first.'); };
+function setDevTime(name) {
+  if(!world||state.phase!=='mars')throw new Error('Reach Mars first.');
+  if(coop.guest)throw new Error('The room host controls shared time.');
+  const phases={day:.5,noon:.5,night:0,dawn:.25,evening:.73};
+  if(name==='toggle')name=world.night?'day':'night';
+  if(!Object.hasOwn(phases,name))throw new Error('time dawn|noon|evening|night|day|toggle');
+  solClock=phases[name]*TUNED.solSeconds;world.setTime(phases[name]);return 'Time: '+name;
+}
 devConsole({
+  time: {help:'time dawn|noon|evening|night|day|toggle',run:setDevTime},
+  ...Object.fromEntries(['day','night','dawn','noon','evening'].map(name=>[name,{help:'set time to '+name,run:()=>setDevTime(name)}])),
+  'daynight': {help:'toggle day and night',run:()=>setDevTime('toggle')},
   landing: { help: 'play the Mars landing cutscene', run: () => { needOut(); playLanding(world).catch(() => {}); return 'landing...'; } },
   storm: { help: 'play the dust storm cutscene only', run: () => { needOut(); playStorm(world).catch(() => {}); return 'storm rolling in...'; } },
   dust: { help: 'real dust storm event (cutscene, pop-up, power drop)', run: () => { if (state.phase !== 'mars') throw new Error('Reach Mars first.'); queue.push({ type: 'dust', sols: 3, seen: true }); return 'dust event queued'; } },
@@ -1452,7 +1475,7 @@ devConsole({
   conjunction: { help: 'Sun-blocks-Earth pop-up', run: () => { queue.push({ type: 'conjunction' }); return 'queued'; } },
   'blackout-end': { help: 'Earth can hear you again', run: () => { queue.push({ type: 'blackout-end' }); return 'queued'; } },
   event: { help: 'event <type> : push any event type by name', run: t => { if (!t) throw new Error('usage: event <type>'); queue.push({ type: t }); return 'queued ' + t; } },
-});
+}, { onToggle: open => {devConsoleOpen=open;releaseControls();} });
 
 // Testing helper for the team: open the game with #debug in the address, then use
 // game.event('solar-storm-warning'), game.event('dust', {sols: 5}), game.outpost.parts = 50 ...
@@ -1676,11 +1699,11 @@ renderer.setAnimationLoop(() => {
     return;
   }
   if (state.phase === 'mars' && world) {
-    const paused = (isPaused() && !coop.active) || !!world.cinematic || (airlockRoom && room===airlockRoom);
+    const paused = ((isPaused() || devConsoleOpen) && !coop.active) || !!world.cinematic || (airlockRoom && room===airlockRoom);
     if(interior.rackedSuit)interior.rackedSuit.visible=!eva.equipped;
     setSound({ inside, suit, dust: !!outpost.dust, running: !!(!world.keys.ControlLeft && !world.keys.ControlRight && (world.keys.ShiftLeft || world.keys.ShiftRight)), habPod: inside && room === interior ? Math.round(interior.pos.x / 10.2) : -1, habTread: !!interior?.habTreadmill }); tickSound(dt);
     if (inside && room === interior) interior.setHabClock?.(solClock / TUNED.solSeconds, outpost.sol, outpost.crew);   // hab lights follow the sol; cabins follow crew size
-    if (inside) room.update(dt, world.keys, !isModalOpen());
+    if (inside) room.update(dt, world.keys, !isModalOpen() && !devConsoleOpen);
     if (airlockRoom && room === airlockRoom) updateAirlockGuide();
     if (inside && room===interior && interior.pos.z < -4.65 && Math.abs(interior.pos.x - 20.4) < 1.5){   // only the greenhouse tunnel (pod 2), not the storm shelter room in pod 3
       if(!colony.s.farmQuest.visited)farmProgress('visited');
@@ -1692,7 +1715,7 @@ renderer.setAnimationLoop(() => {
       interior.yaw=ghRoom.yaw;interior.pitch=ghRoom.pitch;interior.vel={...ghRoom.vel};interior.update(0,world.keys,false);
     }
     if (inside && room === ghRoom) ghRoom.draw(colony.s.base, GREENHOUSE.tank, outpost.today.total*outpost.split.life>=1);
-    if (!inside) { world.stormDust = outpost?.dustCover || 0; world.update(dt, !isModalOpen()); renderer.shadowMap.needsUpdate = world.shadowDirty(dt) && (adaptiveRes.scale >= 1 || (++shadowFrame & 1) === 0); }
+    if (!inside) { world.stormDust = outpost?.dustCover || 0; world.update(dt, !isModalOpen() && !devConsoleOpen); renderer.shadowMap.needsUpdate = world.shadowDirty(dt) && (adaptiveRes.scale >= 1 || (++shadowFrame & 1) === 0); }
     construction?.update(inside,room,isModalOpen()||world.cinematic);
     if(!inside&&!isModalOpen())world.habBuild?.update(dt);
     if(!isModalOpen()&&room!==airlockRoom)updateMissionPower(dt);
