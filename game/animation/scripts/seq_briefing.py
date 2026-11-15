@@ -71,7 +71,7 @@ def parking(f):
     a = PHI - math.tau * (F_BURN - f) / LAP
     return Vector((math.cos(a) * RP, math.sin(a) * RP, 0))
 ESCAPE_END = hyper(F_LAUNCH)
-R_CAP, CAP_LAP = 2.2, 60.0       # capture orbit round Mars (enlarged), frames per lap
+R_CAP, CAP_LAP = 3.0, 60.0       # capture orbit round Mars (enlarged, well clear of the planet), frames per lap
 
 def ship_at(f):
     if f <= F_BURN: return E0 + parking(f)
@@ -79,9 +79,11 @@ def ship_at(f):
     d = day(f)
     if f <= F_ARRIVE:
         k = ease(min(1.0, (f - F_LAUNCH) / 45))          # hand over from the close-up path to the Sun-scale orbit
-        return ship_pos(d) + ESCAPE_END * (1 - k)
-    k = ease(min(1.0, (f - F_ARRIVE) / 24)); a = math.pi + math.tau * (f - F_ARRIVE) / CAP_LAP
-    return mars_pos(d) + Vector((math.cos(a), math.sin(a), 0)) * R_CAP * k
+        # the last stretch aims beside Mars (the start of the capture orbit), never at the planet's centre
+        aim = ease(min(1.0, max(0.0, (f - (F_ARRIVE - 40)) / 40)))
+        return ship_pos(d) + ESCAPE_END * (1 - k) + Vector((-R_CAP, 0, 0)) * aim
+    a = math.pi + math.tau * (f - F_ARRIVE) / CAP_LAP
+    return mars_pos(d) + Vector((math.cos(a), math.sin(a), 0)) * R_CAP
 
 # ---------- bodies (enlarged so you can see them)
 sun_b = uvsphere('sun_body', 4.0, m=mat('sun_glow', (1, 0.8, 0.4), emit=(1, 0.75, 0.3), strength=6))
@@ -122,11 +124,11 @@ for f0, f1 in ((F_BURN - 3, F_BURN + 24), (F_ARRIVE - 4, F_ARRIVE + 16)):   # TM
     A.key(burn, f1 - 3, scale=(1, 1, 1), interp='LINEAR'); A.key(burn, f1, scale=(0.001,) * 3, interp='CONSTANT')
 A.key(burn, 0, scale=(0.001,) * 3, interp='CONSTANT')
 
-def ship_scale(f):               # small in the close-ups, full size on the Sun-scale view
+def ship_scale(f):               # a small marker: never the size of a moon next to the planets
     if f <= F_LAUNCH: return 0.32
-    if f <= F_LAUNCH + 50: return 0.32 + 0.68 * ease((f - F_LAUNCH) / 50)
-    if f <= F_ARRIVE - 30: return 1.0
-    return 1.0 - 0.72 * ease(min(1.0, (f - F_ARRIVE + 30) / 40))
+    if f <= F_LAUNCH + 50: return 0.32 + 0.28 * ease((f - F_LAUNCH) / 50)
+    if f <= F_ARRIVE - 30: return 0.6
+    return 0.6 - 0.42 * ease(min(1.0, (f - F_ARRIVE + 30) / 40))
 
 for f in range(F_TMI0 - 30, END + 1):
     p = ship_at(f); q = ship_at(f + 1) - ship_at(f - 1)
@@ -155,7 +157,7 @@ ma = mars_pos(day(F_ARRIVE))
 look(cam, F_ARRIVE, tuple(ma + Vector((0, -40, 40))), tuple(ma))
 for f in range(F_ARRIVE + 3, END + 1, 3):
     m = mars_pos(day(f)); k = ease((f - F_ARRIVE) / (F_ZOOM - F_ARRIVE + 40))
-    near = m - m.normalized() * 7 + Vector((0, -2, 4))
+    near = m - m.normalized() * 10 + Vector((0, -3, 6))   # far enough to keep the whole capture orbit in view
     look(cam, f, tuple((m + Vector((0, -40, 40))).lerp(near, k)), tuple(m), interp='LINEAR')
 
 ld = bpy.data.lights.new('sunlight', 'POINT'); ld.energy = 7e5; ld.shadow_soft_size = 4; ld.use_shadow = False

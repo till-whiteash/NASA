@@ -50,7 +50,8 @@ export const LOOKS = {                                        // background, hem
 };
 // Films with a clean 1080p movie (previews/<name>-hd.mp4) get captions drawn by the page; the rest still play their
 // legacy movie with baked captions until their HD render is added here.
-const HD_FILMS = new Set(['ares_vi_briefing', 'ares_vi_briefing_moon', 'launch_moon', 'briefing_mission', 'briefing_moon', 'cruise_loop', 'mars_approach', 'launch_earth']);
+const HD_FILMS = new Set(['ares_vi_briefing', 'ares_vi_briefing_moon', 'launch_moon', 'briefing_mission', 'briefing_moon', 'cruise_loop', 'mars_approach', 'launch_earth',
+  'outpost_26_months', 'ascent_mars', 'dust_storm', 'failure_rover_stuck', 'failure_solar_panel', 'failure_air_leak']);
 const CLEAN_VIDEO = name => HD_FILMS.has(name);
 // The film that usually follows each one: it starts downloading while this one plays, so there is no wait between them.
 const FILM_NEXT = { ares_vi_briefing: 'briefing_mission', briefing_mission: 'launch_earth', launch_earth: 'cruise_loop',

@@ -17,7 +17,7 @@ V3 = lambda x, y, z: Vector((x, -z, y))          # the storyboard's three.js coo
 SHOTS = [  # seconds, camera from->to, look from->to, phase, line, highlighted site
     (6, (V3(0, 3.4, 6.8), V3(0, 2.3, 5.2)), (V3(0, 1.2, 0), V3(0, 1.3, 0)), 'ARES VI · FINAL STAGE',
      'Crew, take your seats. This is the last briefing before Ares VI. After this, we build humanity’s first outpost on Mars.', None),
-    (6, (V3(1.6, 1.8, -0.4), V3(.9, 1.7, .3)), (V3(0, 1.55, -2.3), V3(0, 1.55, -2.3)), 'MISSION OVERVIEW',
+    (6, (V3(1.9, 1.8, -0.6), V3(1.45, 1.7, 0.1)), (V3(0, 1.55, -2.3), V3(0, 1.55, -2.3)), 'MISSION OVERVIEW',   # stays clear of the globe hologram
      'Four of you, one cargo-rich site in Jezero Crater. Ares V already parked supplies 400 metres from your landing zone.', None),
     (6, (V3(1.5, 1.85, 1.9), V3(1.7, 1.75, 1.3)), (V3(-0.35, 1.45, -0.8), V3(-0.4, 1.45, -0.9)), 'PHASE 1 · LANDING & HABITAT',
      'Phase one. Touchdown, then habitat deployment. You have four hours, and the habitat must hold pressure before the first night.', 0),
@@ -131,12 +131,13 @@ A.key(ring_, 0, scale=(0.0001,) * 3, interp='CONSTANT')
 for k in range(3):
     A.key(ring_, f_td + k * 20, scale=(0.3, 0.3, 0.3), interp='LINEAR'); A.key(ring_, f_td + k * 20 + 18, scale=(2.5, 2.5, 2.5), interp='CONSTANT')
 A.key(ring_, f_td + 60, scale=(0.0001,) * 3, interp='CONSTANT')
-ship = empty('holo_ship', loc=(1.05, 0, 1.5))
+ship = empty('holo_ship', loc=(1.2, 0, 2.05))
 cone = cyl('holo_ship_body', 0.05, 0.18, m=mat('holo_white', (0.9, 0.92, 0.95), emit=(0.8, 0.85, 1.0), strength=1.5), r2=0.0, verts=12, parent=ship)
 cyl('holo_ship_service', 0.05, 0.12, loc=(0, 0, -0.14), m=mat('holo_grey', (0.7, 0.72, 0.76), rough=0.4), verts=12, parent=ship)
 for f in range(0, END + 1, 4):
     T = f / FPS
-    A.key(ship, f, loc=(math.cos(T * 0.6) * 1.05, math.sin(T * 0.6) * 1.05, 1.5 + math.sin(T * 0.6) * 0.3),
+    # orbits above the phase holograms (their tops are ~1.4 m) and outside the globe, so it never passes through them
+    A.key(ship, f, loc=(math.cos(T * 0.6) * 1.2, math.sin(T * 0.6) * 1.2, 2.05 + math.sin(T * 0.6) * 0.12),
           rot=(90, 0, math.degrees(T * 0.6) + 180), interp='LINEAR')
 
 # ---------- the phase holograms: real game models, shown in hologram light
@@ -156,17 +157,18 @@ def show(h, k, f0, f1):
     A.key(h, f0 - 1, scale=(0.0001,) * 3, interp='CONSTANT')
     A.key(h, f0 + 10, scale=(k, k, k)); A.key(h, f1 - 10, scale=(k, k, k)); A.key(h, f1, scale=(0.0001,) * 3)
     A.key(h, f0, rot=(0, 0, 0), interp='LINEAR'); A.key(h, f1, rot=(0, 0, 70), interp='LINEAR')
-P1 = (0.85, -0.55, 0.88); P2 = (-0.85, -0.55, 0.88)
+# Each phase's holograms stand 1.2-1.35 m from the globe's centre (clear of it even at 1.15x) and to either side of it
+# as seen from that shot's camera, so no model passes through, or in front of, the globe hologram.
 lv, _, _, _ = ascent_vehicle('ares_vi_lander', (0, 0, 0))
-h, k = hologram(lv, 0.42, P1); show(h, k, starts[2], starts[3])
+h, k = hologram(lv, 0.42, (1.2, 0.35, 0.88)); show(h, k, starts[2], starts[3])
 hb = hab('holo_habitat', (0, 0, 0))
-h, k = hologram(hb, 0.4, P2); show(h, k, starts[2], starts[3])
+h, k = hologram(hb, 0.4, (-1.05, -0.68, 0.88)); show(h, k, starts[2], starts[3])
 fu = fission_unit('holo_fission', (0, 0, 0))
-h, k = hologram(fu, 0.38, P1); show(h, k, starts[3], starts[4])
+h, k = hologram(fu, 0.38, (0.2, -1.22, 0.88)); show(h, k, starts[3], starts[4])
 tr, _ = solar_tracker('holo_solar', (0, 0, 0))
-h, k = hologram(tr, 0.45, P2); show(h, k, starts[3], starts[4])
+h, k = hologram(tr, 0.45, (-0.25, 1.22, 0.88)); show(h, k, starts[3], starts[4])
 isru, _, _ = isru_plant('holo_isru', (0, 0, 0))
-h, k = hologram(isru, 0.5, (0, -0.8, 0.88)); show(h, k, starts[4], starts[5])
+h, k = hologram(isru, 0.5, (-0.55, -1.25, 0.88)); show(h, k, starts[4], starts[5])
 for i, (_, _, _, _, _, hi) in enumerate(SHOTS):        # the site being talked about pulses on the globe
     if hi is None: continue
     for j, m_ in enumerate(markers):
