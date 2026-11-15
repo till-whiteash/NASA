@@ -6,6 +6,10 @@ ROOT = Path(__file__).resolve().parents[4]          # repo root (holds game/)
 
 class Quiet(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a): pass
+    def copyfile(self, source, output):
+        # Skipping a film closes its streaming HTTP request; that is expected.
+        try: super().copyfile(source, output)
+        except (ConnectionResetError, BrokenPipeError): pass
     def end_headers(self):
         self.send_header('Cache-Control', 'no-store'); super().end_headers()
 

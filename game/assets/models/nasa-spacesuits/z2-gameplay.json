@@ -1,0 +1,17 @@
+{
+  "source": "NASA/LaRC/Advanced Concepts Lab, articulated with Claude astro_kit.py",
+  "rig_source": "source-assets/blender/z2-gameplay/astro_kit.py",
+  "clips": [
+    "Idle",
+    "Walk",
+    "Run",
+    "Jump",
+    "Dig",
+    "Carry",
+    "Repair",
+    "Crouch",
+    "Kneel"
+  ],
+  "height": 1.85,
+  "root_motion": false
+}

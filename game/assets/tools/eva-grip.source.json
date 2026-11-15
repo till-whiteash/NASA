@@ -1,0 +1,10 @@
+{
+  "title": "First-person EVA grip",
+  "source": "Locally authored Blender geometry; not a NASA scan or official suit model",
+  "script": "game/animation/scripts/make_eva_grip.py",
+  "blender": "5.3.0",
+  "connection": "Blender headless MCP",
+  "sha256": "d8b43be7aac73a51554da750f581c97ab6a0bb5a72a8df6430ab00bd19d37e41",
+  "bytes": 349636,
+  "uses": "Pickaxe first-person grip only; approved rock-pick model remains unchanged"
+}

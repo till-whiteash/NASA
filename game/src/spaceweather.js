@@ -51,10 +51,10 @@ export async function loadSpaceWeather() {
   try {
     const archive = await getJSON('data/donki.json', 4000);
     if (archive.mode === 'unavailable') {
-      out.sources.push({ name: 'NASA DONKI space weather database', url: 'https://kauai.ccmc.gsfc.nasa.gov/DONKI/', note: 'NASA archive unavailable; Mars uses the separately labelled NOAA feed or snapshot.' });
+      out.sources.push({ name: 'NASA DONKI space weather database', url: 'https://ccmc.gsfc.nasa.gov/DONKI/', note: 'NASA archive unavailable; Mars uses the separately labelled NOAA feed or snapshot.' });
     } else if (Array.isArray(archive.range)) {
       out.donki = archive;
-      out.sources.push({ name: 'NASA DONKI space weather database', url: 'https://kauai.ccmc.gsfc.nasa.gov/DONKI/', note: `Archived real events, ${archive.range[0]} to ${archive.range[1]}` });
+      out.sources.push({ name: 'NASA DONKI space weather database', url: 'https://ccmc.gsfc.nasa.gov/DONKI/', note: `Archived real events, ${archive.range[0]} to ${archive.range[1]}` });
     }
   } catch { /* DONKI snapshot not available yet */ }
   return out;

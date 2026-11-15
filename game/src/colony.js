@@ -8,6 +8,7 @@ import { heightAt } from './world.js';
 import { loadModel } from './nasamodels.js';
 import { mergeStatic } from './static-merge.js';
 import { createRockContact } from './rock-contact.js';
+import {TOOL_SLOTS,SAMPLE_SLOTS,STACK_SIZE,sampleRoom,transferTool} from './inventory-state.js';
 
 // Five real Mars minerals that Spirit found in Gusev Crater (the 'gypsum' key is sulfate salt; kept for old saves).
 export const ORES = {
@@ -18,12 +19,12 @@ export const ORES = {
   carbonate:{ name: 'Carbonate rock', color: '#9c6b4a', fact: 'carbonate', hits: 3, yield: 1, desc: 'Rock soaked by water that was not acid. Rare, and worth a lot of science.' },
 };
 export const TOOLS = {
-  pickaxe: { name: 'Pickaxe', icon: '⛏', desc: 'A geologist’s rock pick: hammer face on one side, a hard steel pick on the other. Hold it and press Action next to a mineral rock.' },
+  pickaxe: { name: 'Pickaxe', icon: '⛏', desc: 'A geologist’s rock pick: hammer face on one side, a hard steel pick on the other. Equip it and left click / tap Mine while aiming at a rock. E / Inspect examines the rock without damaging it.' },
   builder: { name: 'Builder', icon: '🛠', desc: 'NASA’s Pistol Grip Tool, the power drill astronauts use on spacewalks. Puts kits together into buildings, like a greenhouse.' },
   jug:     { name: 'Water jug', icon: '💧', desc: 'Carries 10 L of water from the base tank to your plants.' },
 };
-export const BELT = 2;          // your suit's tool belt holds 2 tools (game) - the rest wait in the base locker
-export const BAG = 8;           // rock samples you can carry before you must unload at the base (game)
+export const BELT = TOOL_SLOTS; // Six quick tool slots (game capacity).
+export const BAG = SAMPLE_SLOTS*STACK_SIZE; // Maximum samples; partially filled stacks also occupy slots.
 export const JUG_L = 10;        // litres in a full water jug
 // Growing times are shortened for the game; the real times are shown next to them.
 export const CROPS = {
@@ -237,10 +238,10 @@ export function makeTool(kind, forView = false) {
   });
   if (forView) {
     // first person: small and low in the bottom-right corner, like a real hand holding it below your chin
-    const holder = new THREE.Group(); holder.add(g);
-    holder.scale.setScalar(kind === 'pickaxe' ? 0.9 : 0.6);
-    g.rotation.set(-0.15, kind === 'pickaxe' ? Math.PI-.2 : .5, kind === 'pickaxe' ? .25 : .15);
-    if (kind === 'pickaxe') g.position.set(0, -.04, 0);
+    const holder = new THREE.Group(); holder.add(g); holder.userData.toolKind = kind; holder.toolRoot = g;
+    holder.scale.setScalar(kind === 'pickaxe' ? 0.42 : 0.6);
+    g.rotation.set(-0.25, 0.5, kind === 'pickaxe' ? 0.55 : 0.15);
+    if (kind === 'pickaxe') g.position.set(0.05, -0.32, 0);
     return holder;
   }
   // held in the right glove, hanging down and tilted out away from the leg, so you can see it from behind
@@ -280,6 +281,7 @@ export class Colony {
 
   // Older saves lack the newer minerals, and their mined-rock ids point at rocks that moved to their zones (Nov 2026).
   tidy() {
+    this.s.bag??={};this.s.store??={};
     for (const k of ORE_KEYS) { this.s.bag[k] ??= 0; this.s.store[k] ??= 0; }
     this.s.mined = (this.s.mined || []).filter(id => id >= ID_BASE);
     for (const id of Object.keys(this.s.hits || {})) if (Number(id) < ID_BASE) delete this.s.hits[id];
@@ -337,14 +339,8 @@ export class Colony {
     const t = this.tool;
     this.world.holdTool(t ? makeTool(t) : null, t ? makeTool(t, true) : null);
   }
-  take(tool) {   // locker -> belt
-    if (this.s.belt.length >= BELT || !this.s.locker.includes(tool)) return false;
-    this.s.locker.splice(this.s.locker.indexOf(tool), 1); this.s.belt.push(tool); this.s.held = this.s.belt.length - 1; this.equip(); return true;
-  }
-  store(tool) {  // belt -> locker
-    const i = this.s.belt.indexOf(tool); if (i < 0) return false;
-    this.s.belt.splice(i, 1); this.s.locker.push(tool); this.equip(); return true;
-  }
+  take(tool) { if(!transferTool(this.s,tool,false))return false;this.equip();return true; }
+  store(tool) { if(!transferTool(this.s,tool,true))return false;this.equip();return true; }
   has(tool) { return this.s.belt.includes(tool); }
 
   renewOres(sol) {
@@ -359,14 +355,16 @@ export class Colony {
 
   // ---------- mining ----------
   bagCount() { return count(this.s.bag); }
+  sampleRoom(ore) { return sampleRoom(this.s.bag,ore); }
   // One pickaxe strike. Returns { broke, ore, got, full }.
   strike(dep) {
     if(this.s.mined.includes(dep.id))return {broke:false,full:false,left:0};
     const o = ORES[dep.ore];
+    if(this.sampleRoom(dep.ore)<o.yield)return {broke:false,full:true};
     const hits = (this.s.hits[dep.id] || 0) + 1; this.s.hits[dep.id] = hits;
     dep.collider.top -= 0.05; dep.group.position.y -= 0.05; dep.group.rotation.y += 0.04;            // chips fly, the rock settles
     if (hits < o.hits) return { broke: false, left: o.hits - hits };
-    const room = BAG - this.bagCount(), got = Math.min(room, o.yield);
+    const room = this.sampleRoom(dep.ore), got = Math.min(room, o.yield);
     if (got <= 0) { this.s.hits[dep.id] = o.hits - 1; return { broke: false, full: true }; }
     this.s.bag[dep.ore] += got; this.s.mined.push(dep.id); this.world.scene.remove(dep.group);
     const index=this.world.colliders.indexOf(dep.collider);if(index>=0)this.world.colliders.splice(index,1);

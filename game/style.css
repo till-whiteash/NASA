@@ -421,6 +421,15 @@ body.touch #mouse-note { display: none; }
 #hud .meter > div { flex: none; display: flex; flex-direction: column; }
 #hud .meter .bar { width: 46px; height: 4px; margin: 1px 0 2px; }
 #hud .meter small { display: block; font-size: .7rem; color: var(--ink); }
+/* Radiation exposure (exposure.js): a longer bar than oxygen's, and it stays on screen outside in
+   first person (the other chips hide there), because outside is exactly when it matters. */
+#hud .meter.wide .bar { width: 72px; }
+#hud #m-exp.damaging { box-shadow: 0 0 0 1px var(--bad); }
+#hud #m-exp.damaging .icon { animation: exp-pulse 1s ease-in-out infinite; }
+@keyframes exp-pulse { 50% { background: var(--bad); } }
+@media (prefers-reduced-motion: reduce) { #hud #m-exp.damaging .icon { animation: none; background: var(--bad); } }
+body.fp #hud .meters:has(#m-exp:not(.hidden)) { display: flex; }
+body.fp #hud .meters > .meter:not(#m-exp) { display: none; }
 #hud .status { top: 10px; right: 10px; padding: 6px 10px; gap: 2px; background: rgba(28,16,11,.6); border-radius: 12px; max-width: 200px; width: auto; }
 #hud #sol { font-size: .85rem; } #hud #tod { font-size: .68rem; }
 #hud #credits, #hud #link { display: none; font-size: .72rem; }
@@ -441,6 +450,7 @@ body.touch #hud #toolbar { bottom: calc(150px + env(safe-area-inset-bottom)); }
 @media (max-width: 760px) {
   #hud .meters { max-width: calc(100vw - 150px); gap: 4px; }
   #hud .meter .bar { width: 30px; }
+  #hud .meter.wide .bar { width: 46px; }
   #hud .status { max-width: 130px; }
   #hud #tod { display: none; }
   #hud.menu-open #tod { display: block; }

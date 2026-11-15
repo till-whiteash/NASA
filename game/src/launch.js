@@ -47,16 +47,24 @@ export class Launch {
     this.camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 60000);
     this.scene.add(new THREE.HemisphereLight('#dcefff', '#4b6b3a', 1.2));
     const sun = new THREE.DirectionalLight('#fff6e8', 1.8); sun.position.set(60, 120, 40); this.scene.add(sun);
+    sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.normalBias=.08;
+    Object.assign(sun.shadow.camera,{left:-110,right:110,top:135,bottom:-100,near:1,far:450});
 
     const L = (color) => new THREE.MeshLambertMaterial({ color, flatShading: true });
     const at = (m, x, y, z) => { m.position.set(x, y, z); return m; };
     // Launch Complex 39B at Kennedy Space Center, laid out like NASA's Artemis II launch photos:
     // a raised concrete mound, three lightning towers, the sound-suppression water tower, the sea behind.
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), new THREE.MeshLambertMaterial({ color: '#5f8a4a' }));
+    // One inexpensive texture supplies grass variation, service roads and the crawlerway.
+    const groundCanvas=document.createElement('canvas');groundCanvas.width=groundCanvas.height=512;const gx=groundCanvas.getContext('2d');
+    gx.fillStyle='#68775c';gx.fillRect(0,0,512,512);let seed=31;
+    for(let i=0;i<12000;i++){seed=(seed*16807)%2147483647;const x=seed%512;seed=(seed*16807)%2147483647;const y=seed%512;gx.fillStyle=i%2?'#718163':'#5d7056';gx.fillRect(x,y,2,2);}
+    gx.fillStyle='#9d9b8d';gx.fillRect(249,256,14,256);gx.fillStyle='#676c68';gx.fillRect(120,300,310,3);gx.fillRect(186,140,3,260);
+    const groundMap=new THREE.CanvasTexture(groundCanvas);groundMap.colorSpace=THREE.SRGBColorSpace;groundMap.anisotropy=4;
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(2400,2400),new THREE.MeshStandardMaterial({map:groundMap,roughness:1}));ground.receiveShadow=true;
     ground.rotation.x = -Math.PI / 2; this.scene.add(ground);
     this.padTop = 6;
     this.scene.add(at(new THREE.Mesh(new THREE.CylinderGeometry(46, 70, this.padTop, 8), L('#cdb89a')), 0, this.padTop / 2, 0));   // sandy mound
-    this.scene.add(at(new THREE.Mesh(new THREE.BoxGeometry(60, 0.4, 52), L('#a3a29d')), 0, this.padTop + 0.2, 0));                // concrete hardstand
+    const apron=at(new THREE.Mesh(new THREE.BoxGeometry(60,.4,52),L('#a3a29d')),0,this.padTop+.2,0);apron.receiveShadow=true;this.scene.add(apron);                // concrete hardstand
     const sea = new THREE.Mesh(new THREE.PlaneGeometry(2400, 800), new THREE.MeshLambertMaterial({ color: '#3d78b8' }));
     sea.rotation.x = -Math.PI / 2; sea.position.set(0, 0.05, -760); this.scene.add(sea);
     const padWhite = L('#e9e9e6');
@@ -136,9 +144,10 @@ export class Launch {
 
     // smoke puffs
     this.smoke = [];
+    const puffGeo = new THREE.SphereGeometry(1, 8, 6);
     const puffMat = new THREE.MeshLambertMaterial({ color: '#e8e8e8', transparent: true, opacity: 0.8 });
     for (let i = 0; i < 60; i++) {
-      const s = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6), puffMat); s.visible = false; this.scene.add(s);
+      const s = new THREE.Mesh(puffGeo, puffMat); s.visible = false; this.scene.add(s);
       this.smoke.push({ mesh: s, life: 0, vel: new THREE.Vector3() });
     }
     // a soft glow around the engines, so the flames light up the smoke and the pad
@@ -161,6 +170,8 @@ export class Launch {
     this.karmanLabel = textSprite('KÁRMÁN LINE · 100 km');
     this.karmanLabel.scale.set(64, 8, 1); this.karman.add(this.karmanLabel);
 
+    this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.flameList=[...this.flames,this.upperFlame];
     this.t = 0; this.countFrom = 10; this.done = false;
     this.modelsReady=false;this.modelError=false;
     // Own the procedural scenery, but never dispose geometry borrowed from the NASA cache.
@@ -189,6 +200,7 @@ export class Launch {
       m.position.set(0, this.padTop, 0);
       // NASA's file marks the steel as fully metallic, which looks black without reflections - make it painted grey steel
       m.traverse(o => { if (o.isMesh) { const copies = [].concat(o.material).map(mt => { const copy = mt.clone(); copy.metalness = 0; copy.roughness = .85; copy.color?.multiplyScalar(1.6); this.ownedMaterials.add(copy); return copy; }); o.material = Array.isArray(o.material) ? copies : copies[0]; } });
+      m.name='Fixed NASA mobile launcher';this.launcher=m;
       this.scene.add(m); this.tower.visible = false;
       this.baseY = this.padTop + 0.294 * s;  // the rocket stands on the launcher's deck (measured from the model)
       this.rocket.position.y = this.baseY;
@@ -198,8 +210,10 @@ export class Launch {
       for (const g of new Set(Object.values(groups)))
         g.children.forEach(ch => { if (ch.isMesh && !this.flames.includes(ch) && ch !== this.upperFlame) ch.visible = false; });
       for (const [name, g] of Object.entries(groups)) {
-        const part = sls.scene.getObjectByName(name)?.clone(true); if (!part) continue;
+        const source = sls.scene.getObjectByName(name); if (!source) continue;
+        const part = source.clone(true);
         part.removeFromParent(); part.position.set(0, 0, 0); part.scale.setScalar(K);
+        part.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
         g.add(part);
       }
       // move the flames to where NASA's engines and nozzles really are (measured from the parts)
@@ -241,11 +255,12 @@ export class Launch {
     const lift = Math.max(0, -left);
     if (left <= 1.5 && !this.lit) { this.lit = true; this.flames.forEach(f => (f.visible = true)); }
     const km = altitudeKm(lift), thin = Math.min(1, km / 90);   // how high, and how little air is left
-    for (const f of [...this.flames, this.upperFlame]) {
+    for (const [i,f] of this.flameList.entries()) {
       const spread = 1 + thin * 1.8;              // in thin air the exhaust balloons out wide
-      f.scale.set(spread * (1 + Math.random() * 0.12), (1 + thin * 0.6) * (1 + Math.random() * 0.25), spread * (1 + Math.random() * 0.12));
+      const pulse=this.reducedMotion?1:1+.06*Math.sin(this.t*24+i*2);
+      f.scale.set(spread*pulse,(1+thin*.6)*(1+.12*Math.sin(this.t*18+i)),spread*pulse);
     }
-    this.glow.intensity = this.lit ? (this.coreOff ? 2 : 6) * (0.85 + Math.random() * 0.3) : 0;
+    this.glow.intensity = this.lit ? (this.coreOff ? 2 : 6) * (1 + (this.reducedMotion?0:.08*Math.sin(this.t*21))) : 0;
     this.halo.material.opacity = this.lit ? (this.coreOff ? 0.35 : 0.85) : 0;
     // climb: gentle at first, then steadily faster (game units, so the camera can follow)
     this.rocket.position.y = this.baseY + rocketY(lift);
@@ -279,19 +294,23 @@ export class Launch {
     // smoke at the pad
     if (left < 1.5 && lift < 14) {
       for (const s of this.smoke) {
-        if (s.life <= 0 && Math.random() < 0.3) {
+        if (s.life <= 0 && Math.random() < 1-Math.exp(-21*dt)) {
           s.life = 3.2; s.mesh.visible = true;
           s.mesh.position.set((Math.random() - 0.5) * 4, this.padTop + 1 + Math.random() * 3, (Math.random() - 0.5) * 4);
           s.vel.set((Math.random() - 0.5) * 16, Math.random() * 2.5, (Math.random() - 0.5) * 16);
         }
       }
     }
-    for (const s of this.smoke) if (s.life > 0) { s.life -= dt; s.mesh.position.addScaledVector(s.vel, dt); s.vel.multiplyScalar(1 - dt * 0.3); s.mesh.scale.setScalar(1 + (3.2 - s.life) * 2.6); if (s.life <= 0) s.mesh.visible = false; }
+    for (const s of this.smoke) if (s.life > 0) { s.life -= dt; s.mesh.position.addScaledVector(s.vel, dt); s.vel.multiplyScalar(Math.exp(-dt * 0.3)); s.mesh.scale.setScalar(1 + (3.2 - s.life) * 2.6); if (s.life <= 0) s.mesh.visible = false; }
     // camera: close by the pad, then it drifts back so you can see the stages fall and the Earth below
-    const shake = left < 1.5 && lift < 5 ? (Math.random() - 0.5) * 0.35 * (1 - lift / 5) : 0;
-    const back = THREE.MathUtils.smoothstep(lift, 10, 30);
-    this.camera.position.set(62 + shake + p.x + back * 40, 16 + p.y * 0.92 + back * (p.y * 0.08 + 10), 92 + shake + back * 110);
-    this.camera.lookAt(p.x, 34 + p.y - back * 30, 0);
+    // First hold a ground reference: the pad remains stationary as the rocket leaves it.
+    // Then blend continuously into tracking; no camera cut or per-frame random jitter.
+    const track=THREE.MathUtils.smoothstep(lift,4,10);
+    const back=THREE.MathUtils.smoothstep(lift,10,30);
+    const shake=!this.reducedMotion&&this.lit&&lift<5?Math.sin(this.t*29)*.06*(1-lift/5):0;
+    const fixedY=22+this.baseY;
+    this.camera.position.set(90+track*(p.x+back*40)+shake,THREE.MathUtils.lerp(fixedY,16+p.y+back*10,track),145+back*80);
+    this.camera.lookAt(track*p.x,THREE.MathUtils.lerp(this.baseY+43,34+p.y-back*30,track),0);
     this.stars.position.copy(this.camera.position); this.planets.position.copy(this.camera.position);   // the sky is "infinitely" far away
     if (lift > T.end) this.done = true;
     // what the commentator explains at each moment (real Artemis I times)

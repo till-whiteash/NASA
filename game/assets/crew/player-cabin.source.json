@@ -1,0 +1,14 @@
+{
+  "base": "game/assets/crew/ch48.glb",
+  "original_source": "source-assets/crew/Ch48_nonPBR.fbx (Mixamo)",
+  "base_sha256": "4c5e29c5e3def6d0f7718768e5820944892f06f738e20973f6b9c53c30d10cee",
+  "sha256": "e10e9e83c40b1a2969250bad27c64fe9e6c4d47a70a9a160f8bf4a05947dd0ee",
+  "role": "Player cabin avatar; Director Hale uses Ch23",
+  "modified_head_bones": [
+    "mixamorig1Head"
+  ],
+  "modifications": [
+    "Narrower, slightly longer head proportions",
+    "Darker hair material"
+  ]
+}

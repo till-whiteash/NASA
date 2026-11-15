@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex"><base href="../">
+  <title>Zhetalis · Internal model comparison</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="internal/model-lab.css">
+  <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body>
+  <header><a href="./"><img src="assets/zhetalis-badge.png" alt="Zhetalis" width="40" height="40"></a><div><h1>Model comparison</h1><p>Internal experiment · current game versus your UNITY assets</p></div><a href="./">Back to game ↗</a></header>
+  <main>
+    <section class="lab-view"><canvas id="lab-view" tabindex="0" aria-label="Playable model comparison. WASD to walk, drag to look, Space to jump, V to change view."></canvas><p id="view-hint">Loading the existing Mars world…</p><div id="lab-ready" role="status">Preparing comparison…</div></section>
+    <aside>
+      <fieldset><legend>Habitat variant</legend><button data-variant="current" aria-pressed="true">Current game <small>Existing habitat and collisions</small></button><button data-variant="original" aria-pressed="false">Unity base · original <small>30 original textures · unlit materials</small></button><button data-variant="tuned" aria-pressed="false">Unity base · tuned <small>Terrain removed · 512px textures · lit</small></button><button data-variant="open" aria-pressed="false">Unity · open exploration <small>Crew-scale modules · new routes &amp; landmarks</small></button></fieldset>
+      <label class="slider">Unity base footprint <output id="footprint-value">34 m</output><input id="footprint" type="range" min="24" max="60" step="2" value="34"></label>
+      <div class="row"><button id="day">Day</button><button id="night">Night</button><button id="reset-view">Overview</button><button id="walk-view">Walk mode</button></div>
+      <div class="row" id="travel" hidden><button data-travel="base">Habitat camp</button><button data-travel="meteorite">Meteorite field</button><button data-travel="relay">Relay ridge</button><button data-travel="ice">Subsurface survey</button></div>
+      <label class="check"><input type="checkbox" id="meteorite"> Add the UNITY Block Island meteorite</label>
+      <label class="check"><input type="checkbox" id="colliders" checked> Show existing collision footprints</label>
+      <div class="row"><button id="route-test">Test route to the door</button><button id="benchmark">Measure 90 frames</button></div>
+      <dl id="metrics"><dt>Variant</dt><dd>Current game</dd></dl>
+      <p id="route-result" role="status">The test follows the same route and existing collision rules for every variant.</p>
+      <p class="note">Current / original / tuned compare visuals against existing collisions. Open exploration also refits the module collisions and entry target, and adds distant survey sites. Green rings mark the active collisions. Locations and scale fitting are game design, not a surveyed Mars site.</p>
+      <p class="note">Use WASD to walk, drag to look, Space to jump, V for first person, E to inspect the nearest interaction. Experiments do not read or write your saved mission.</p>
+      <p class="credit">Unity base: <a href="https://sketchfab.com/3d-models/mars-one-mission-base-83ced347037f47aba8473147d65df074" target="_blank" rel="noopener">“Mars One” Mission – Base</a> by <a href="https://sketchfab.com/admone" target="_blank" rel="noopener">admone</a>, CC BY 4.0. Meteorite and terrain files supplied in UNITY. Source files remain untouched.</p>
+    </aside>
+  </main>
+  <script type="module" src="internal/model-lab.js"></script>
+</body>
+</html>

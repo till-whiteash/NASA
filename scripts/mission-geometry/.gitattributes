@@ -1,0 +1,2 @@
+# Preserve the exact cached response bytes referenced by SHA-256 in the dataset.
+evidence/*.json -text

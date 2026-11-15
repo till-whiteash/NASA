@@ -4,6 +4,7 @@ export const RECIPES={
  battery:{name:'Extra battery',cost:{hematite:2,gypsum:1,iron:1,parts:3},tier:0,description:'Add storage to the commissioned power field.'},
  panel:{name:'Extra solar panel',cost:{hematite:2,silica:2,parts:4},tier:1,description:'Expand the commissioned solar array. Silica makes the cover glass.'}
 };
+import {canPowerAnotherBase,powerCapacityNote} from './power-tutorial-state.js';
 const NAMES={hematite:'hematite',gypsum:'sulfate salt',iron:'meteorite iron',silica:'silica',carbonate:'carbonate rock'};
 export function builderQuest(o,c){
  const key=c.buildPlan,r=RECIPES[key];if(!r)return null;
@@ -12,6 +13,7 @@ export function builderQuest(o,c){
  if(o.powerStep<6||!o.baseConnected)return null; // Preserve the step-by-step starter mission until power is connected.
  if(key==='panel'&&o.panels>=12)return result('Solar field full (12 panels). Choose another project',null);
  if(key==='greenhouse'&&(c.greenhouses||[]).length>=4)return result('Greenhouse limit reached (4). Choose another project',null);
+ if(key==='greenhouse'&&!canPowerAnotherBase(o,c))return result(powerCapacityNote(o,c),null);   // one battery + one solar array per base
  if(o.tier<r.tier)return result('Use the indoor power console: allocate power to Science and Talk to Earth to unlock tier '+(r.tier+1),'console');
  if(!c.belt.includes('builder'))return result('Take the builder tool from the storage locker','locker');
  for(const [ore,n] of Object.entries(r.cost)){

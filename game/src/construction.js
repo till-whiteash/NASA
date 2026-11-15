@@ -1,8 +1,34 @@
 import * as THREE from 'three';
+import {BatteryBank} from './battery-bank.js';
 import {heightAt} from './world.js';
 import {ASSEMBLIES,buildState,fitPart,assemblyDone,circuitFor,circuitReady,circuitConnected,CIRCUITS,socketPartner,socketFeedback,SOCKET_LABELS,POLE_NAME,leadsOn,nextPole,connectLead,leadLesson,ORDER_LESSON,REVERSE_LESSON} from './construction-state.js';
-import {loadModel} from './nasamodels.js';
+import {powerModel} from './power-models.js';
 
+// A real field cable: plug bodies at both posts, the lead drops to the ground, slack coiled in loops near each end
+// (cables are never laid tight - they expand and contract in the cold), then runs along the ground between them.
+function fieldCable(a,b,side,colour,r){
+ const g=new THREE.Group(),mat=new THREE.MeshStandardMaterial({color:colour,roughness:.65}),pts=[a.clone()];
+ const run=(t,dy=.04)=>{const x=THREE.MathUtils.lerp(a.x,b.x,t)+side.x,z=THREE.MathUtils.lerp(a.z,b.z,t)+Math.sin(t*Math.PI)*.6+side.z;return new THREE.Vector3(x,heightAt(x,z)+dy,z);};
+ const coil=(t,turns=2.5,rad=.17)=>{const c=run(t),dir=run(Math.min(1,t+.02)).sub(run(Math.max(0,t-.02))).setY(0).normalize(),perp=new THREE.Vector3(-dir.z,0,dir.x),start=Math.atan2(-perp.z,-perp.x);
+  for(let k=1;k<=turns*14;k++){const ang=start+k/14*Math.PI*2,x=c.x+perp.x*rad+Math.cos(ang)*rad,z=c.z+perp.z*rad+Math.sin(ang)*rad;pts.push(new THREE.Vector3(x,heightAt(x,z)+.03+k*.0016,z));}};
+ pts.push(new THREE.Vector3(a.x,a.y-.25,a.z));coil(.04);
+ for(let j=2;j<24;j++)pts.push(run(j/24));
+ coil(.96);pts.push(new THREE.Vector3(b.x,b.y-.25,b.z),b.clone());
+ g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts,false,'centripetal'),Math.min(900,pts.length*6),r,8,false),mat));
+ for(const p of [a,b]){const plug=new THREE.Mesh(new THREE.CylinderGeometry(r*1.9,r*1.9,.11,14),mat);plug.position.set(p.x,p.y-.07,p.z);g.add(plug);
+  const nut=new THREE.Mesh(new THREE.CylinderGeometry(r*2.3,r*2.3,.03,6),new THREE.MeshStandardMaterial({color:'#2b2f33',roughness:.5}));nut.position.set(p.x,p.y-.005,p.z);g.add(nut);}
+ return g;
+}
+// Chassis bonding is a continuous metal fault-return path to the protected source.
+// Martian soil is never the fuse-clearing return.
+function groundBond(pack,base){
+ const g=new THREE.Group(),mat=new THREE.MeshStandardMaterial({color:'#d1cf45',roughness:.6});
+ const a=pack.clone().add(new THREE.Vector3(.6,.05,.3)),b=base.clone();
+ const pts=[a,new THREE.Vector3(a.x,heightAt(a.x,a.z)+.08,a.z),new THREE.Vector3(b.x,heightAt(b.x,b.z)+.08,b.z),b];
+ g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),100,.018,8),mat));
+ const bar=new THREE.Mesh(new THREE.BoxGeometry(.5,.08,.14),new THREE.MeshStandardMaterial({color:'#b69148',metalness:.8,roughness:.3}));bar.position.copy(a);g.add(bar);
+ return g;
+}
 // Workbench parts modelled after real hardware (animation/scripts/make_power_kit.py): each shows its red + / black - terminals.
 const PART_MODELS={'Support frame':'support-frame','Solar module':'solar-module','Output connector':'output-connector','Battery module':'battery-module','Charge controller':'charge-controller','Protected output':'protected-output','Charging post':'charging-post','Rover connector':'rover-connector'};
 const POLE_COLOUR={'+':'#c8231c','-':'#141414'};
@@ -23,7 +49,7 @@ export class Construction {
   const capMat={'+':new THREE.MeshStandardMaterial({color:POLE_COLOUR['+'],roughness:.45}),'-':new THREE.MeshStandardMaterial({color:POLE_COLOUR['-'],roughness:.5})},signMat={'+':signMaterial('+'),'-':signMaterial('-')};
   const point=(id,label,v)=>{const mat=new THREE.MeshStandardMaterial({color:'#8be5d1',emissive:'#163a33',roughness:.4});const port=new THREE.Mesh(new THREE.BoxGeometry(.46,.05,.26),mat);port.position.copy(v);port.userData={kind:'socket',id,label,pole:null,posts:{}};this.group.add(port);this.sockets.push(port);
    for(const [pole,x] of [['+',-.12],['-',.12]]){
-    const cap=new THREE.Mesh(new THREE.CylinderGeometry(.045,.052,.08,20),capMat[pole]);cap.position.set(x,.065,-.02);cap.userData={kind:'socket',id,label:`${label} ${pole==='+'?'+ red':'− black'}`,pole};
+    const cap=new THREE.Mesh(new THREE.CylinderGeometry(.045,.052,.08,20),capMat[pole]);cap.position.set(x,.065,-.02);cap.userData={kind:'socket',id,label:`${label} ${pole==='+'?'VCC + (red)':'GND − (black)'}`,pole};
     const stud=new THREE.Mesh(new THREE.CylinderGeometry(.017,.017,.05,10),brass);stud.position.y=.06;cap.add(stud);cap.add(new THREE.Mesh(new THREE.SphereGeometry(.13,12,8),pickMat));
     const sign=new THREE.Mesh(new THREE.PlaneGeometry(.09,.09),signMat[pole]);sign.rotation.x=-Math.PI/2;sign.position.set(x,.027,.08);port.add(sign);
     port.add(cap);port.userData.posts[pole]=cap;}
@@ -31,8 +57,6 @@ export class Construction {
   point('solar-out','Solar array OUT',ground(51.6,-19.5,.75));
   point('battery-in','Battery controller IN',m.pack.position.clone().add(new THREE.Vector3(-.45,.19,.6)));   // on the cabinet's terminal shelf
   point('battery-out','Battery protected OUT',m.pack.position.clone().add(new THREE.Vector3(.45,.19,.6)));
-  // the field battery: an insulated Li-ion cabinet (child of the pack, so the game's show/hide still applies)
-  loadModel('power/battery-cabinet.glb').then(g=>{if(!g)return;const c=g.scene.clone(true);c.position.y=-.45;c.traverse(o=>{o.userData.sharedAsset=true;if(o.isMesh)o.castShadow=o.receiveShadow=true;});m.pack.material=new THREE.MeshBasicMaterial({visible:false});m.pack.add(c);});
   const e=m.entrances[0];point('base-in','Base IN',new THREE.Vector3(e.x+2.7,.77,e.doorZ+1.14));point('base-out','Base charger OUT',new THREE.Vector3(e.x+3.2,.77,e.doorZ+1.14));
   point('charger-in','Rover charger IN',ground(-30.8,26.24,.85));
   // A marked work zone away from camp. Training rubble uses the same rock surface.
@@ -47,6 +71,7 @@ export class Construction {
   this.packGhost=new THREE.Mesh(new THREE.BoxGeometry(1.5,.9,1),new THREE.MeshBasicMaterial({color:'#8be5d1',transparent:true,opacity:.25,depthWrite:false}));this.packGhost.position.copy(m.pack.position);this.packGhost.userData={kind:'battery-place',label:'Place assembled battery'};this.group.add(this.packGhost);
   this.chargerGhost=new THREE.Mesh(new THREE.BoxGeometry(.55,1.35,.5),this.packGhost.material.clone());this.chargerGhost.position.copy(ground(-30.8,26,.675));this.chargerGhost.userData={kind:'charger-place',label:'Place assembled charging post'};this.group.add(this.chargerGhost);
   const lineGeo=new THREE.BufferGeometry();lineGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(19*3),3));this.preview=new THREE.Line(lineGeo,new THREE.LineDashedMaterial({color:'#ffd577',dashSize:.3,gapSize:.15}));world.scene.add(this.preview);this.preview.visible=false;
+  this.bank=new BatteryBank(world,{state,save,guide,cancel:()=>this.cancel(),cable:fieldCable});
   this.cables=new Map();this.removedApplied=new Set();this.notice='';this.noticeUntil=0;
   this.rockSamples=[];const rm=new THREE.Matrix4(),rp=new THREE.Vector3(),rs=new THREE.Vector3();for(let i=0;i<world.rocks.count;i++){world.rocks.getMatrixAt(i,rm);rp.setFromMatrixPosition(rm);rs.setFromMatrixScale(rm);if(rp.y>-1000)this.rockSamples.push({id:i,matrix:rm.clone(),position:rp.clone(),radius:Math.max(rs.x,rs.y,rs.z)*2});}
   this.rockProxy=new THREE.Mesh(world.rocks.geometry,world.rocks.material);this.rockProxy.matrixAutoUpdate=false;
@@ -54,7 +79,7 @@ export class Construction {
   this.placeBatteryButton=document.createElement('button');this.placeBatteryButton.id='construction-place-battery';this.placeBatteryButton.hidden=true;document.getElementById('hud').append(this.placeBatteryButton);this.placeBatteryButton.onclick=()=>this.placeBattery();
   this.heldDisplay=new THREE.Group();world.scene.add(this.heldDisplay);this.heldDisplay.visible=false;
  }
- begin(kind){this.heldDisplay.clear();this.heldDisplay.userData.name=null;document.getElementById('mission-objective').open=false;this.kind=kind;this.held=null;this.bench.traverse(m=>{if(m.isMesh&&!m.userData.sharedAsset){m.geometry.dispose();m.material.dispose();}});this.bench.clear();this.slots=[];this.bench.visible=true;
+ begin(kind){const generation=this.benchGeneration=(this.benchGeneration||0)+1;this.heldDisplay.clear();this.heldDisplay.userData.name=null;document.getElementById('mission-objective').open=false;this.kind=kind;this.held=null;this.bench.traverse(m=>{if(m.isMesh&&!m.userData.sharedAsset){m.geometry.dispose();m.material.dispose();}});this.bench.clear();this.slots=[];this.bench.visible=true;
   ASSEMBLIES[kind].forEach((name,i)=>{
    for(const isSlot of [false,true]){const mat=new THREE.MeshStandardMaterial({color:isSlot?'#6cddbf':i===1?'#234f85':'#c4beb0',transparent:isSlot,opacity:isSlot?.35:1,roughness:.6});let geometry;
    if(/frame/i.test(name)){const shape=new THREE.Shape();shape.moveTo(-.22,-.18);shape.lineTo(.22,-.18);shape.lineTo(.22,.18);shape.lineTo(-.22,.18);shape.closePath();const hole=new THREE.Path();hole.moveTo(-.16,-.12);hole.lineTo(-.16,.12);hole.lineTo(.16,.12);hole.lineTo(.16,-.12);hole.closePath();shape.holes.push(hole);geometry=new THREE.ExtrudeGeometry(shape,{depth:.06,bevelEnabled:false});geometry.rotateX(-Math.PI/2);}
@@ -62,10 +87,23 @@ export class Construction {
    else geometry=new THREE.BoxGeometry(.38,/Battery/.test(name)?.27:.10,.32);
    const mesh=new THREE.Mesh(geometry,mat);
    if(!isSlot&&/Solar module|controller/.test(name)){for(let j=0;j<4;j++){const rib=new THREE.Mesh(new THREE.BoxGeometry(.012,.025,.28),new THREE.MeshStandardMaterial({color:/Solar/.test(name)?'#a5c9db':'#616f72'}));rib.position.set(-.14+j*.09,.065,0);mesh.add(rib);}}mesh.position.set((i-1)*.52,isSlot?.3:.08,isSlot?-.3:.35);mesh.userData={kind:isSlot?'slot':'part',name,label:(isSlot?'Fit into slot: ':'Pick up: ')+name};this.bench.add(mesh);this.slots.push(mesh);
-   if(!isSlot&&PART_MODELS[name])loadModel('power/'+PART_MODELS[name]+'.glb').then(g=>{if(!g||!mesh.parent)return;
-    geometry.computeBoundingBox();const pb=geometry.boundingBox,ps=pb.getSize(new THREE.Vector3()),c=g.scene.clone(true),b=new THREE.Box3().setFromObject(c),sz=b.getSize(new THREE.Vector3());
-    c.scale.setScalar(Math.max(ps.x,ps.z)/Math.max(sz.x,sz.z));const b2=new THREE.Box3().setFromObject(c),ctr=b2.getCenter(new THREE.Vector3());c.position.set(-ctr.x,pb.min.y-b2.min.y,-ctr.z);
-    c.traverse(o=>{o.userData.sharedAsset=true;});for(const child of mesh.children)child.visible=false;mesh.material.visible=false;mesh.add(c);});}
+   if(PART_MODELS[name]){
+    mesh.userData.powerAssetState='loading';
+    mesh.powerModelReady=powerModel(PART_MODELS[name]).then(c=>{
+     if(!c){mesh.userData.powerAssetState='failed';return null;}
+     if(generation!==this.benchGeneration||mesh.parent!==this.bench)return null;
+     geometry.computeBoundingBox();const pb=geometry.boundingBox,ps=pb.getSize(new THREE.Vector3()),b=new THREE.Box3().setFromObject(c),sz=b.getSize(new THREE.Vector3());
+     c.scale.setScalar(Math.min(Math.max(ps.x,ps.z)/Math.max(sz.x,sz.z),.42/sz.y));
+     const b2=new THREE.Box3().setFromObject(c),ctr=b2.getCenter(new THREE.Vector3());c.position.set(-ctr.x,pb.min.y-b2.min.y,-ctr.z);
+     for(const child of mesh.children)child.visible=false;
+     const done=buildState(this.state()).placed[kind]?.includes(name);c.visible=!isSlot||!!done;mesh.material.visible=isSlot&&!done;
+     mesh.add(c);mesh.powerVisual=c;mesh.userData.powerAssetState='ready';
+     // A part may have been picked up before its download finished. Refresh that
+     // held copy immediately rather than keeping the old block until next pickup.
+     if(this.held===name)this.heldDisplay.userData.name=null;
+     return c;
+    });
+   }}
   });this.guide('Pick up a part from the front row, then select its matching highlighted slot. E / Action places it.');
  }
  placeBattery(){
@@ -76,11 +114,11 @@ export class Construction {
   this.guide('Battery placed. Next, connect Solar OUT to Battery controller IN.',true);return true;
  }
  postPosition(id,pole){const s=this.sockets.find(p=>p.userData.id===id);s.updateMatrixWorld(true);return s.userData.posts[pole].getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,.07,0));}
- cancel(){dispatchEvent(new Event('zhetela-dismiss'));this.wire=null;this.pole=null;this.held=null;this.preview.visible=false;this.heldDisplay.visible=false;}
+ cancel(){this.bank?.cancel();dispatchEvent(new Event('zhetela-dismiss'));this.wire=null;this.pole=null;this.held=null;this.preview.visible=false;this.heldDisplay.visible=false;}
  notify(text){this.notice=text;this.noticeUntil=performance.now()+2400;}
  removeRock(id){const w=this.world,m=new THREE.Matrix4(),p=new THREE.Vector3();w.rocks.getMatrixAt(id,m);p.setFromMatrixPosition(m);if(p.y<-1000)return;w.rocks.setMatrixAt(id,new THREE.Matrix4().makeTranslation(p.x,-10000,p.z));w.rocks.instanceMatrix.needsUpdate=true;w.rocks.computeBoundingSphere();w.lowRocks=w.lowRocks.filter(c=>Math.hypot(c.x-p.x,c.z-p.z)>.01);for(let i=w.colliders.length-1;i>=0;i--){const c=w.colliders[i];if(c.rock&&Math.hypot(c.x-p.x,c.z-p.z)<.01)w.colliders.splice(i,1);}}
  update(inside,room,blocked){
-  const o=this.state(),s=buildState(o);this.drop.hidden=!(this.held||this.wire)||blocked;document.body.classList.toggle('construction-active',!!this.kind&&inside);this.inside=inside;this.room=room;this.blocked=blocked||this.world.driving;
+  const o=this.state(),s=buildState(o);this.bank.update(inside,blocked);this.drop.hidden=!(this.held||this.wire||this.bank.held)||blocked;document.body.classList.toggle('construction-active',!!this.kind&&inside);this.inside=inside;this.room=room;this.blocked=blocked||this.world.driving;
   const batteryDistance=Math.hypot(this.world.player.position.x-this.packGhost.position.x,this.world.player.position.z-this.packGhost.position.z);
   this.placeBatteryButton.hidden=o.powerStep!==4||inside||this.blocked;this.placeBatteryButton.disabled=batteryDistance>4||Math.abs(this.world.player.position.y-this.packGhost.position.y)>3;this.placeBatteryButton.textContent=this.placeBatteryButton.disabled?`Battery slot · ${Math.ceil(batteryDistance)} m away`:'Place battery (X)';
   for(const id of s.removed||[])if(!this.removedApplied.has(id)){this.removeRock(id);this.removedApplied.add(id);}
@@ -88,14 +126,17 @@ export class Construction {
   this.ghosts.forEach((g,i)=>{g.material.opacity=s.cleared.length>=4?.3:.08;g.visible=o.powerStep===2&&!s.placed.field?.includes(i);if(o.powerStep===2)this.world.solar.panels[i].visible=!!s.placed.field?.includes(i);});
   this.packGhost.visible=o.powerStep===4;this.chargerGhost.visible=o.chargerStep===1;
   this.bench.visible=!!this.kind&&inside&&room===this.interior;
-  if(this.kind){const placed=s.placed[this.kind]||[];for(const mesh of this.slots){const done=placed.includes(mesh.userData.name);mesh.visible=mesh.userData.kind==='slot'||(!done&&this.held!==mesh.userData.name);if(mesh.userData.kind==='slot'){mesh.material.opacity=done?1:.35;mesh.material.color.set(done?'#bfc4b5':this.held===mesh.userData.name?'#ffd577':'#6cddbf');}}}
+  if(this.kind){const placed=s.placed[this.kind]||[];for(const mesh of this.slots){const done=placed.includes(mesh.userData.name);mesh.visible=mesh.userData.kind==='slot'||(!done&&this.held!==mesh.userData.name);if(mesh.userData.kind==='slot'){if(mesh.powerVisual)mesh.powerVisual.visible=done;mesh.material.visible=!done||!mesh.powerVisual;mesh.material.opacity=done?1:.35;mesh.material.color.set(done?'#bfc4b5':this.held===mesh.userData.name?'#ffd577':'#6cddbf');}}}
   const partner=socketPartner(this.wire);
   this.sockets.forEach(mesh=>{const id=mesh.userData.id,index=CIRCUITS.findIndex(pair=>pair.includes(id)),ready=circuitReady(o,index);mesh.visible=id==='solar-out'?o.powerStep>=5:id.startsWith('battery')?o.powerStep>=5:id==='charger-in'?o.chargerStep>=2:o.powerStep>=6;mesh.material.color.set(circuitConnected(o,index)?'#69d897':this.wire===id?'#ffd577':partner===id&&ready?'#b78cff':ready?'#8be5d1':'#687276');mesh.material.emissive.set(partner===id&&ready?'#47305e':'#101b1c');});
   // one cable per lead: red + and black - laid side by side between the matching posts
   for(let i=0;i<3;i++)for(const pole of leadsOn(o,i)){if(this.cables.has(i+pole))continue;const ids=CIRCUITS[i];
    const a=this.postPosition(ids[0],pole),b=this.postPosition(ids[1],pole),side=new THREE.Vector3(-(b.z-a.z),0,b.x-a.x).normalize().multiplyScalar(pole==='+'?-.08:.08);
-   const pts=[a.clone()];for(let j=1;j<24;j++){const t=j/24,x=THREE.MathUtils.lerp(a.x,b.x,t)+side.x,z=THREE.MathUtils.lerp(a.z,b.z,t)+Math.sin(t*Math.PI)*.6+side.z;pts.push(new THREE.Vector3(x,heightAt(x,z)+.06,z));}pts.push(b.clone());
-   const cable=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),100,i===2?.035:.03,8,false),new THREE.MeshStandardMaterial({color:POLE_COLOUR[pole],roughness:.7}));this.world.scene.add(cable);this.cables.set(i+pole,cable);}
+   const cable=fieldCable(a,b,side,POLE_COLOUR[pole],i===2?.035:.028);this.world.scene.add(cable);this.cables.set(i+pole,cable);}
+  for(const [key,cable] of this.cables) cable.visible=leadsOn(o,+key[0]).includes(key.slice(1));
+  // Once the base is wired, bond its metal frame back to the protected cabinet bus.
+  if(o.baseConnected&&!this.groundRod){const e=this.world.settlement.entrances[0];this.groundRod=groundBond(this.world.settlement.pack.position,new THREE.Vector3(e.x+2.3,.5,e.doorZ+1.14));this.world.scene.add(this.groundRod);}
+  if(this.groundRod)this.groundRod.visible=!!o.baseConnected;
   // Legacy cables ended at the wrong model faces; visible leads now terminate at sockets.
   this.world.settlement.cable.visible=false;this.world.settlement.chargerCable.visible=false;
   this.hit=null;this.hint='';if(this.blocked){this.preview.visible=false;this.heldDisplay.visible=false;return;}
@@ -103,31 +144,49 @@ export class Construction {
   if(inside){camera=camera.clone();camera.position.add(room.scene.position);camera.updateMatrixWorld();}
   this.group.updateMatrixWorld(true);this.interior.scene.updateMatrixWorld(true);
   this.ray.setFromCamera(this.world.aimPoint||new THREE.Vector2(0,0),camera);
-  const objects=inside?(this.bench.visible?this.slots.filter(p=>p.visible):[]):[...this.sockets,...this.rubble,...this.ghosts,this.packGhost,this.chargerGhost,...(this.world.habBuild?.targets()||[])].filter(p=>p.visible);
+  const objects=inside?(this.bench.visible?this.slots.filter(p=>p.visible):[]):[...this.sockets,...this.rubble,...this.ghosts,this.packGhost,this.chargerGhost,...this.bank.targets(),...(this.world.habBuild?.targets()||[])].filter(p=>p.visible);
+  // Layout and habitat changes can hide scenery after rockSamples was captured.
+  // Pick against the live instance transform so removed rubble cannot steal a strike.
   let hit=this.ray.intersectObjects(objects,true)[0];
-  if(!inside&&this.colony().tool==='pickaxe'){const player=this.world.player.position;for(const sample of this.rockSamples){if(this.removedApplied.has(sample.id)||Math.hypot(sample.position.x-player.x,sample.position.z-player.z)>sample.radius+3.3)continue;this.rockProxy.matrixWorld.copy(sample.matrix);const rock=this.ray.intersectObject(this.rockProxy,false)[0];if(rock&&(!hit||rock.distance<hit.distance)){rock.object=this.world.rocks;rock.instanceId=sample.id;hit=rock;}}}
+  if(!inside){const player=this.world.player.position;for(const sample of this.rockSamples){if(this.removedApplied.has(sample.id)||Math.hypot(sample.position.x-player.x,sample.position.z-player.z)>sample.radius+3.3)continue;this.world.rocks.getMatrixAt(sample.id,this.rockProxy.matrixWorld);if(this.rockProxy.matrixWorld.elements[13]<-1000)continue;const rock=this.ray.intersectObject(this.rockProxy,false)[0];if(rock&&(!hit||rock.distance<hit.distance)){rock.object=this.world.rocks;rock.instanceId=sample.id;hit=rock;}}}
   if(hit&&hit.object!==this.world.rocks){while(!hit.object.userData.kind&&hit.object.parent)hit.object=hit.object.parent;}
   const player=inside?room.pos.clone().add(room.scene.position):this.world.player.position;
-  if(hit&&hit.point.distanceTo(player.clone().add(new THREE.Vector3(0,1,0)))<3.3){this.hit=hit;this.hint=hit.object===this.world.rocks?'Left-click / tap Action · break surface rock with pickaxe':`${['hab-rock','rubble'].includes(hit.object.userData.kind)?'Left-click / tap Action':'E / Action'} · ${hit.object.userData.label}`;}
+  if(hit&&hit.point.distanceTo(player.clone().add(new THREE.Vector3(0,1,0)))<3.3){this.hit=hit;this.hint=(hit.object===this.world.rocks||['rubble','hab-rock'].includes(hit.object.userData.kind))?'Left click / Mine: break rock · E / Use: inspect':`E / Action · ${hit.object.userData.label}`;}
   if(this.hit?.object.userData.kind==='socket')this.hint=this.hit.object.userData.label+' - '+socketFeedback(o,this.hit.object.userData.id,this.wire);
   if(this.held)this.hint=`Holding ${this.held} · `+this.hint+' · R to cancel';
   if(this.wire){const target=this.sockets.find(p=>p.userData.id===partner);this.hint=`${this.pole==='-'?'Black − lead':'Red + lead'} → ${target.userData.label} ${this.pole==='-'?'−':'+'} · ${Math.round(target.position.distanceTo(player))} m · E / Action · R to drop. `+this.hint;}
+  if(this.bank.held)this.hint=this.bank.hint()+' · '+this.hint;
   if(this.noticeUntil>performance.now())this.hint=this.notice+' · '+this.hint;
   this.heldDisplay.visible=!!this.held&&inside&&!blocked;
   if(this.heldDisplay.visible){if(this.heldDisplay.userData.name!==this.held){this.heldDisplay.clear();const source=this.slots.find(m=>m.userData.kind==='part'&&m.userData.name===this.held);const copy=source.clone();copy.position.set(0,0,0);copy.visible=true;this.heldDisplay.add(copy);this.heldDisplay.userData.name=this.held;}this.heldDisplay.position.set(.35,-.3,-.8).applyMatrix4(camera.matrixWorld);this.heldDisplay.quaternion.copy(camera.quaternion);}
   this.preview.visible=!!this.wire&&!inside;
   if(this.preview.visible){this.preview.material.color.set(this.pole==='-'?'#b9c0c4':'#ff5a4a');const a=this.postPosition(this.wire,this.pole||'+'),b=this.hit?.point||player.clone().add(new THREE.Vector3(0,1,0));const pts=[a.clone()];for(let j=0;j<=16;j++){const t=j/16,x=THREE.MathUtils.lerp(a.x,b.x,t),z=THREE.MathUtils.lerp(a.z,b.z,t);pts.push(new THREE.Vector3(x,heightAt(x,z)+.1,z));}pts.push(b.clone());const attr=this.preview.geometry.attributes.position;pts.forEach((p,i)=>attr.setXYZ(i,p.x,p.y,p.z));attr.needsUpdate=true;this.preview.geometry.computeBoundingSphere();this.preview.computeLineDistances();}
  }
- use(){
-  if(this.blocked||!this.hit)return false;
-  const o=this.state(),s=buildState(o),mesh=this.hit.object,d=mesh.userData;
-  if(d.kind?.startsWith('hab-'))return this.world.habBuild?.use(mesh)??false;   // habitat construction (habitat-build.js)
-  if(mesh===this.world.rocks||d.kind==='rubble'){
+ liveRockTarget(hit){
+  if(!hit)return false;const mesh=hit.object;
+  if(mesh===this.world.rocks){const id=hit.instanceId;if(!Number.isInteger(id)||id<0||id>=mesh.count)return false;const m=new THREE.Matrix4();mesh.getMatrixAt(id,m);if(m.elements[13]<-1000)return false;}
+  else {for(let p=mesh;p;p=p.parent)if(!p.visible)return false;}
+  return !hit.point||hit.point.distanceTo(this.world.player.position.clone().add(new THREE.Vector3(0,1,0)))<3.3;
+ }
+ mine(){
+  if(this.blocked||!this.hit||!this.liveRockTarget(this.hit))return false;
+  const target=this.hit,mesh=target.object,d=mesh.userData,o=this.state(),s=buildState(o);
+  if(d.kind==='hab-rock')return this.world.habBuild?.mine(mesh)??false;
+  if(mesh!==this.world.rocks&&d.kind!=='rubble')return false;
    if(this.colony().tool!=='pickaxe'){this.guide('Equip the pickaxe from your tool belt before breaking this rock.');return true;}
    let strikes=3;if(mesh===this.world.rocks){const matrix=new THREE.Matrix4(),size=new THREE.Vector3();mesh.getMatrixAt(this.hit.instanceId,matrix);size.setFromMatrixScale(matrix);if(Math.max(size.x,size.z)>6){this.notify('Boulder too large for a hand pickaxe · go around it');return true;}strikes=Math.min(12,3+Math.ceil(Math.max(size.x,size.y,size.z)));}
    const id=mesh===this.world.rocks?'rock-'+this.hit.instanceId:'site-'+d.id,instance=this.hit.instanceId;
    if(this.striking)return true;this.striking=true;
-   const accepted=this.world.swingTool(()=>{this.striking=false;s.rockHits[id]=(s.rockHits[id]||0)+1;if(s.rockHits[id]>=strikes){if(d.kind==='rubble'){if(!s.cleared.includes(d.id))s.cleared.push(d.id);mesh.visible=false;}else if(!s.removed.includes(instance)){s.removed.push(instance);this.removeRock(instance);this.removedApplied.add(instance);}this.notify(d.kind==='rubble'?`Site cleared: ${s.cleared.length}/4 rocks.`:'Rock cleared. Identified mineral deposits give samples; ordinary rubble does not.',true);}else this.notify(`Rock: ${strikes-s.rockHits[id]} more strikes.`);this.save();});if(!accepted)this.striking=false;return true;
+   const accepted=this.world.swingTool(()=>{this.striking=false;if(this.state()!==o||!this.liveRockTarget(target))return;s.rockHits[id]=(s.rockHits[id]||0)+1;if(s.rockHits[id]>=strikes){if(d.kind==='rubble'){if(!s.cleared.includes(d.id))s.cleared.push(d.id);mesh.visible=false;}else if(!s.removed.includes(instance)){s.removed.push(instance);this.removeRock(instance);this.removedApplied.add(instance);}this.notify(d.kind==='rubble'?`Site cleared: ${s.cleared.length}/4 rocks.`:'Rock cleared. Identified mineral deposits give samples; ordinary rubble does not.',true);}else this.notify(`Rock: ${strikes-s.rockHits[id]} more strikes.`);this.save();});if(!accepted)this.striking=false;return true;
+ }
+ use(){
+  if(this.blocked||!this.hit)return false;
+  const o=this.state(),s=buildState(o),mesh=this.hit.object,d=mesh.userData;
+  if(d.kind?.startsWith('bank-'))return this.bank.use(mesh);
+  if(d.kind?.startsWith('hab-'))return this.world.habBuild?.use(mesh)??false;   // habitat construction (habitat-build.js)
+  if(mesh===this.world.rocks||d.kind==='rubble'){
+   if(!this.liveRockTarget(this.hit))return true;
+   this.guide(d.kind==='rubble'?'Small site rock. Clear it with the pickaxe using Left click or Mine. E only inspects.':'Surface rubble. Left click or Mine with the pickaxe clears small rocks. Identified mineral deposits give samples; ordinary rubble does not.');return true;
   }
   if(d.kind==='part'){this.held=d.name;return true;}
   if(d.kind==='slot'){
@@ -138,7 +197,7 @@ export class Construction {
   if(d.kind==='deploy'){if(o.powerStep!==2||s.cleared.length<4)return true;(s.placed.field??=[]);if(!s.placed.field.includes(d.id))s.placed.field.push(d.id);if(s.placed.field.length===3)this.advance(2);this.notify(`Solar panels placed: ${s.placed.field.length}/3.`);this.save();return true;}
   if(d.kind==='battery-place'){this.placeBattery();return true;}
   if(d.kind==='charger-place'){if(o.chargerStep===1){o.chargerStep=2;this.sync();this.save();this.guide('Charger placed. Connect Base charger OUT to Rover charger IN.');}return true;}
-  if(d.kind==='socket'){
+  if(d.kind==='socket'){this.bank.cancel();
    const socketCircuit=CIRCUITS.findIndex(pair=>pair.includes(d.id));
    if(circuitConnected(o,socketCircuit)){
     if(this.wire&&CIRCUITS[socketCircuit]?.includes(this.wire))this.cancel();

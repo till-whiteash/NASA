@@ -1,0 +1,130 @@
+{
+  "reviewed": "2026-11-13",
+  "resources": [
+    {
+      "id": "nasa-api",
+      "name": "NASA Open APIs",
+      "priority": "Supporting",
+      "url": "https://api.nasa.gov/",
+      "use": "Use the portal to discover individual services and their authentication requirements. Prefer the existing imagery connections for mission briefings.",
+      "limit": "This is a directory, not one gameplay dataset. Keep keys out of browser code; cache selected records."
+    },
+    {
+      "id": "donki",
+      "name": "DONKI space weather",
+      "priority": "High",
+      "url": "https://ccmc.gsfc.nasa.gov/tools/DONKI/",
+      "use": "Use historical flare and solar-particle events as dated storm-story prompts.",
+      "limit": "Research-quality events are not a guaranteed Mars forecast. A flare class alone does not determine surface radiation. Official host migrated in September 2026."
+    },
+    {
+      "id": "osdr",
+      "name": "OSDR space biology",
+      "priority": "High",
+      "url": "https://osdr.nasa.gov/bio/repo/",
+      "use": "Use selected plant and microbial studies as evidence cards: organism, flight conditions, controls, study accession and original publication. OSD-37 provides a plant comparison.",
+      "limit": "Earth organisms studied in space are not Martian life. Metadata alone does not establish effect size, causation or crop yields."
+    },
+    {
+      "id": "radlab",
+      "name": "RadLab radiation instruments",
+      "priority": "Medium",
+      "url": "https://visualization.osdr.nasa.gov/radlab/gui/data-api/",
+      "use": "Compare readings from a named instrument, location and time interval. Teach why exposure depends on environment and shielding.",
+      "limit": "Absorbed dose rate is microgray/hour; dose equivalent rate is microsievert/hour. Do not treat them as interchangeable or copy ISS readings onto Mars."
+    },
+    {
+      "id": "trek",
+      "name": "Mars Trek terrain",
+      "priority": "High",
+      "url": "https://trek.nasa.gov/mars/",
+      "use": "Use mapped imagery for mission-site context; the existing game already uses NASA terrain. Consult WMTS layers for a future site-specific map.",
+      "limit": "Image tiles are not elevation grids. Respect layer projection, coverage, resolution and attribution. The current world stays Gusev-based even when another region is selected."
+    },
+    {
+      "id": "csa-stem",
+      "name": "CSA youth and STEM resources",
+      "priority": "Supporting",
+      "url": "https://www.asc-csa.gc.ca/eng/youth-educators/resources-stem-and-youth-organizations.asp",
+      "use": "Use educator activities for debriefs, learning goals and classroom extensions.",
+      "limit": "This is a curated resource directory, not a live API. Link to original activities and check reproduction terms for media."
+    },
+    {
+      "id": "csa-food",
+      "name": "CSA food-production toolkit",
+      "priority": "Highest",
+      "url": "https://www.asc-csa.gc.ca/eng/youth-educators/toolkits/food-production/",
+      "use": "Use food production challenges to connect crop choices with water, light, nutrition, preparation and waste. Keep packaged food in reserve.",
+      "limit": "Real crops grow over days or months. Game seconds and simplified food rewards must stay labelled as training rules."
+    }
+  ],
+  "snapshots": [
+    {
+      "id": "donki",
+      "name": "NASA DONKI flare history",
+      "status": "Downloaded snapshot",
+      "fetched": "2026-11-13T15:04:37.158Z",
+      "period": "10–11 May 2024",
+      "summary": "28 flare records. Historical solar observations; no Mars arrival prediction.",
+      "examples": [
+        "M1.3 flare  /  2024-05-10T00:13Z",
+        "M1.4 flare  /  2024-05-10T03:29Z",
+        "M1.3 flare  /  2024-05-10T06:24Z"
+      ],
+      "source": "https://ccmc.gsfc.nasa.gov/DONKI/WS/get/FLR?startDate=2024-05-10&endDate=2024-05-11",
+      "file": "data/research/donki.json"
+    },
+    {
+      "id": "osdr",
+      "name": "OSDR OSD-37 study metadata",
+      "status": "Downloaded snapshot",
+      "fetched": "2026-11-13T15:04:37.612Z",
+      "period": "BRIC-19 spaceflight plant study",
+      "summary": "Study metadata for an Arabidopsis spaceflight comparison. No alien biology or game crop yields inferred.",
+      "examples": [
+        "OSD-37  /  Arabidopsis thaliana  /  spaceflight versus ground controls"
+      ],
+      "source": "https://osdr.nasa.gov/osdr/data/osd/meta/37",
+      "file": "data/research/osdr.json"
+    },
+    {
+      "id": "radlab",
+      "name": "RadLab instrument comparison",
+      "status": "Downloaded snapshot",
+      "fetched": "2026-11-13T15:04:36.444Z",
+      "period": "1 April 2022, 23:00–23:10 UTC",
+      "summary": "16 instrument readings; absorbed dose rate in microgray/hour. ISS readings are not Mars surface dose or dose equivalent.",
+      "examples": [
+        "DosTel2  /  2022-04-01T23:00:00 UTC  /  10.216 microgray/hour",
+        "DosTel1  /  2022-04-01T23:00:00 UTC  /  9.816 microgray/hour",
+        "DosTel1  /  2022-04-01T23:00:33 UTC  /  9.835 microgray/hour"
+      ],
+      "source": "https://visualization.osdr.nasa.gov/radlab/api/?spacecraft=ISS&instrument=DosTel&timestamp%3E=2022-04-01T23%3A00&timestamp%3C2022-04-01T23%3A10&absorbed_dose_rate&format=json",
+      "file": "data/research/radlab.json"
+    },
+    {
+      "id": "radlab-mars",
+      "name": "Curiosity RAD on Mars",
+      "status": "Downloaded snapshot",
+      "period": "1 April 2022",
+      "summary": "83 archived instrument readings. Mars surface instrument readings; not a personal crew dose prediction.",
+      "examples": [
+        "2022-04-01T00:09:59 UTC / 8.974828 microgray/hour (absorbed dose rate). Dose equivalent is not inferred."
+      ],
+      "source": "https://visualization.osdr.nasa.gov/radlab/gui/data-api/",
+      "file": "data/research/mars-2022-04-01.json"
+    },
+    {
+      "id": "radlab-moon",
+      "name": "LRO CRaTER around the Moon",
+      "status": "Downloaded snapshot",
+      "period": "1 April 2022",
+      "summary": "24 archived instrument readings. Lunar-orbit instrument readings, not measurements at the lunar surface.",
+      "examples": [
+        "2022-04-01T00:59:59 UTC / 49.2625 microgray/hour (absorbed dose rate). Dose equivalent is not inferred."
+      ],
+      "source": "https://visualization.osdr.nasa.gov/radlab/gui/data-api/",
+      "file": "data/research/moon-2022-04-01.json"
+    }
+  ]
+}

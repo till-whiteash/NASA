@@ -1,4 +1,5 @@
-// The player's astronaut: NASA's own "Astronaut" 3D model (NASA 3D Resources), given a skeleton so it can walk.
+// Gameplay loads the articulated NASA Z-2 from Claude's rig and animation export.
+// The earlier astronaut skinning implementation below remains as legacy source.
 // NASA's file is one solid statue standing with its arms out. When it loads we add bones (pelvis, spine,
 // thighs, shins, upper arms, forearms) and "skin" the surface to them: every point of the suit follows the
 // bones near it, blending smoothly around each joint, so the suit bends like fabric instead of breaking
@@ -6,6 +7,7 @@
 // a little Mars dust low down, darker creases) and add our team patch.
 import * as THREE from 'three';
 import { loadModel } from './nasamodels.js';
+import { loadZ2Astronaut, poseZ2Astronaut } from './z2-suit.js';
 
 const H = 1.85;   // suit height in metres (game units)
 // joint positions as a share of the suit's height, measured from NASA's model
@@ -81,75 +83,11 @@ function tint(x, y, z) {
 // of NASA 3D Resources' "Z2 Spacesuit", NASA/LaRC/Advanced Concepts Lab), otherwise NASA's "Astronaut" model below.
 // Both resolve to the same { root, torso, hips, knees, arms, elbows, pelvis }, so poseAstronaut() drives either.
 export async function loadNasaAstronaut() {
-  try { const z = await loadZ2Astronaut(); if (z) return z; } catch (e) { console.warn('Z-2 suit unavailable, using the classic suit:', e); }
-  return loadEmuAstronaut();
+  return loadZ2Astronaut();
 }
 
-// Z-2 joints (metres, feet at 0, facing +z), measured from front and side views of NASA's model (1.94 m tall).
-const Z2 = { h: 1.936, hip: 0.86, knee: 0.494, waist: 1.05, legX: 0.106, shoulder: [0.27, 1.45, 0.04], elbow: [0.30, 1.24, 0.26], wrist: [0.27, 1.13, 0.47] };
-// thickness of each bone's capsule (m, before scaling): skin follows the nearest capsule, blending softly at joints
-const Z2_RADII = [0.20, 0.23, 0.10, 0.10, 0.08, 0.08, 0.075, 0.075, 0.065, 0.065];
-
-async function loadZ2Astronaut() {
-  const gltf = await loadModel('models/nasa-spacesuits/z2-suit-web.glb'); if (!gltf) return null;
-  const src = gltf.scene; src.updateMatrixWorld(true);
-  const meshes = []; src.traverse(o => { if (o.isMesh) meshes.push(o); });
-  if (!meshes.length) return null;
-  const box = new THREE.Box3().setFromObject(src), s = H / (box.max.y - box.min.y), mid = box.getCenter(new THREE.Vector3());
-  const fix = new THREE.Matrix4().makeScale(s, s, s).multiply(new THREE.Matrix4().makeTranslation(-mid.x, -box.min.y, -mid.z));
-  const k = H / Z2.h, V = a => new THREE.Vector3(a[0] * k, a[1] * k, a[2] * k);
-  const hipY = Z2.hip * k, kneeY = Z2.knee * k, waistY = Z2.waist * k, legX = Z2.legX * k;
-  const bone = (parent, x, y, z) => { const b = new THREE.Bone(); b.position.set(x, y, z); parent?.add(b); return b; };
-  const pelvis = bone(null, 0, hipY, 0), spine = bone(pelvis, 0, waistY - hipY, 0);
-  const thighs = [-1, 1].map(sx => bone(pelvis, sx * legX, 0, 0));
-  const shins = thighs.map(t => bone(t, 0, kneeY - hipY, 0.02));
-  // Arms: like the classic suit, an arm bone's child sits along its local x, so rotation 0 means "arm held out".
-  // The Z-2's arms hang forward at rest, so each arm bone is bound already turned from "out" to that direction -
-  // the walk, run, jump and pickaxe poses written for the classic suit then drive the Z-2 the same way.
-  const uppers = [], fores = [], segs = [];
-  [-1, 1].forEach((sx, i) => {
-    const sh = V(Z2.shoulder), el = V(Z2.elbow), wr = V(Z2.wrist); sh.x *= sx; el.x *= sx; wr.x *= sx;
-    const up = bone(spine, sh.x, sh.y - waistY, sh.z);
-    const dUp = el.clone().sub(sh), lenUp = dUp.length();
-    up.quaternion.setFromUnitVectors(new THREE.Vector3(sx, 0, 0), dUp.clone().normalize());
-    const fo = bone(up, sx * lenUp, 0, 0);
-    up.updateMatrixWorld(true);
-    const dFo = wr.clone().sub(el), inUp = dFo.clone().applyQuaternion(up.getWorldQuaternion(new THREE.Quaternion()).invert()).normalize();
-    fo.quaternion.setFromUnitVectors(new THREE.Vector3(sx, 0, 0), inUp);
-    uppers.push(up); fores.push(fo); segs.push([sh, el], [el, wr]);
-  });
-  const bones = [pelvis, spine, ...thighs, ...shins, ...uppers, ...fores];
-  const root = new THREE.Group(); root.add(pelvis); root.updateMatrixWorld(true);
-  const skeleton = new THREE.Skeleton(bones);
-  // capsules in the bind pose, in the same order as `bones`
-  const P = (x, y, z) => new THREE.Vector3(x, y, z);
-  const caps = [[P(0, hipY, 0), P(0, waistY, 0)], [P(0, waistY, 0), P(0, V(Z2.shoulder).y + 0.45 * k, 0)],
-    [P(-legX, hipY, 0), P(-legX, kneeY, 0.02)], [P(legX, hipY, 0), P(legX, kneeY, 0.02)],
-    [P(-legX, kneeY, 0.02), P(-legX, 0.07, 0.04)], [P(legX, kneeY, 0.02), P(legX, 0.07, 0.04)],
-    segs[0], segs[2], segs[1], segs[3]];
-  const closest = new THREE.Vector3(), seg = new THREE.Line3(), d = new Float32Array(10);
-  for (const m of meshes) {
-    const geo = m.geometry.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(fix, m.matrixWorld));
-    const pos = geo.attributes.position, n = pos.count, idx = new Uint16Array(n * 4), wt = new Float32Array(n * 4), v = new THREE.Vector3();
-    for (let i = 0; i < n; i++) {
-      v.fromBufferAttribute(pos, i); let dmin = 1e9;
-      for (let b = 0; b < 10; b++) { seg.set(caps[b][0], caps[b][1]); seg.closestPointToPoint(v, true, closest); d[b] = v.distanceTo(closest) - Z2_RADII[b] * k; dmin = Math.min(dmin, d[b]); }
-      const w = []; for (let b = 0; b < 10; b++) if (d[b] - dmin < 0.07) w.push([b, Math.exp(-(d[b] - dmin) / 0.03)]);
-      w.sort((a, c) => c[1] - a[1]); const top = w.slice(0, 4), sum = top.reduce((a, [, x]) => a + x, 0);
-      top.forEach(([b, x], j) => { idx[i * 4 + j] = b; wt[i * 4 + j] = x / sum; });
-    }
-    geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(idx, 4));
-    geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(wt, 4));
-    const mats = [].concat(m.material).map(mt => { const c = mt.clone(); c.roughness = Math.max(0.6, c.roughness ?? 0.8); c.metalness = 0; return c; });
-    const sm = new THREE.SkinnedMesh(geo, mats.length > 1 ? mats : mats[0]);
-    sm.castShadow = true; sm.receiveShadow = true; sm.frustumCulled = false;
-    root.add(sm); sm.bind(skeleton);
-  }
-  return { root, pelvis, torso: spine, hips: thighs, knees: shins, arms: uppers, elbows: fores, model: 'z2' };
-}
-
-// Builds the skinned NASA astronaut (the classic suit). Resolves to { root, torso, hips, knees, arms, elbows, pelvis } or null.
-async function loadEmuAstronaut() {
+// Legacy source retained for the existing geometry helpers; gameplay uses Z-2 above.
+async function loadLegacyAstronaut() {
   const gltf = await loadModel('nasa-astronaut.glb'); if (!gltf) return null;
   const src = gltf.scene; src.updateMatrixWorld(true);
   const meshes = []; src.traverse(o => { if (o.isMesh) meshes.push(o); });
@@ -236,6 +174,7 @@ export function swingCurve(k) {
   return { lift, crouch, lean, twist };
 }
 export function poseAstronaut(a, { phase, pace, run, air, t, vy = 0, swing = -1, crouch = 0 }) {
+  if(a.model==='Z2')return poseZ2Astronaut(a,{phase,pace,run,air,t,vy,swing,crouch});
   const s = Math.sin(phase), c = Math.cos(phase);
   const ground = 1 - air;
   const hipAmp = (0.48 * pace + 0.15 * run) * ground, kneeAmp = (0.75 * pace + 0.3 * run) * ground, armAmp = (0.3 * pace + 0.18 * run) * ground;

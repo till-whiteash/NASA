@@ -2,50 +2,109 @@
  "clips": [
   {
    "name": "launch_earth",
-   "start": 0.0,
-   "end": 30.611
-  },
-  {
-   "name": "launch_pad",
    "start": 0,
-   "end": 23.5
+   "end": 56.0
   }
  ],
  "captions": [
   {
-   "t0": 0.0,
-   "t1": 2.21,
-   "text": "Pad 39B, Kennedy Space Center: SLS, 98 m tall"
+   "t0": 0,
+   "t1": 2.3,
+   "text": "SLS: 98 m tall. Mobile Launcher: 116 m. Kennedy Space Center, Pad 39B.",
+   "phase": "LEAVING EARTH"
   },
   {
-   "t0": 2.21,
+   "t0": 2.3,
    "t1": 5.33,
-   "text": "T-6 s: the four RS-25 engines start"
+   "text": "Four RS-25 engines start, burning liquid hydrogen and liquid oxygen.",
+   "phase": "MAIN ENGINE IGNITION"
   },
   {
    "t0": 5.33,
    "t1": 11.12,
-   "text": "T-0: both solid rocket boosters light - liftoff!"
+   "text": "The two solid boosters ignite. They supply over 75% of the 8.8 million pounds of liftoff thrust.",
+   "phase": "LIFTOFF"
   },
   {
    "t0": 11.12,
    "t1": 14.67,
-   "text": "Clearing the 116 m launch tower"
+   "text": "The rocket climbs clear. The mobile launcher stays on the ground.",
+   "phase": "TOWER CLEAR"
   },
   {
    "t0": 14.67,
+   "t1": 19,
+   "text": "Max-Q: the strongest aerodynamic load. The structure must withstand the pressure and vibration.",
+   "phase": "MAX-Q"
+  },
+  {
+   "t0": 19,
    "t1": 23.5,
-   "text": "Supersonic after about a minute (shown 13x faster)"
+   "text": "About two minutes after liftoff, the boosters run out of fuel. Time is compressed here.",
+   "phase": "CLIMBING"
   },
   {
    "t0": 23.5,
-   "t1": 27.62,
-   "text": "T+2 min 12 s: boosters drop away, about 47 km up"
+   "t1": 27,
+   "text": "The empty side boosters separate and drift away. The four core engines keep firing.",
+   "phase": "BOOSTER SEPARATION"
   },
   {
-   "t0": 27.62,
-   "t1": 30.67,
-   "text": "T+3 min 11 s: the launch abort tower is jettisoned"
+   "t0": 27,
+   "t1": 30,
+   "text": "Crossing the K\u00e1rm\u00e1n line: 100 km, the conventional edge of space. Reaching orbit also needs sideways speed.",
+   "phase": "K\u00c1RM\u00c1N LINE \u00b7 100 KM"
+  },
+  {
+   "t0": 30,
+   "t1": 34,
+   "text": "The escape tower could pull Orion away in an emergency. Now its motor carries it clear.",
+   "phase": "ESCAPE TOWER RELEASE"
+  },
+  {
+   "t0": 34,
+   "t1": 38,
+   "text": "The core stage keeps accelerating the spacecraft. This climb takes several minutes in real flight.",
+   "phase": "POWERED ASCENT"
+  },
+  {
+   "t0": 38,
+   "t1": 39,
+   "text": "Main engine cutoff: the core stage has finished its job.",
+   "phase": "ENGINES OFF"
+  },
+  {
+   "t0": 39,
+   "t1": 44,
+   "text": "The orange core separates. Orion remains attached to the upper stage.",
+   "phase": "CORE STAGE SEPARATION"
+  },
+  {
+   "t0": 44,
+   "t1": 47,
+   "text": "Coasting above Earth. The upper stage waits for the right place to burn. Time is shortened here.",
+   "phase": "ORBITAL COAST"
+  },
+  {
+   "t0": 47,
+   "t1": 53,
+   "text": "Later, the upper-stage engine raises the low part of the orbit.",
+   "phase": "UPPER-STAGE BURN"
+  },
+  {
+   "t0": 53,
+   "t1": 56,
+   "text": "Orbit! About 28,000 km/h in low Earth orbit. Next: our fictional Mars journey.",
+   "phase": "EARTH ORBIT"
   }
- ]
+ ],
+ "telemetry": {
+  "karman": {
+   "start": 27,
+   "crossing": 28,
+   "end": 29.5,
+   "altitudeKm": 100
+  },
+  "note": "Illustrated ascent. Time compressed."
+ }
 }

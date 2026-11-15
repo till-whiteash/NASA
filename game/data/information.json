@@ -188,16 +188,6 @@
     "url": "https://api.nasa.gov/"
   },
   {
-    "id": "nasa-donki",
-    "title": "Explore NASA space-weather events",
-    "category": "Data sources",
-    "destination": "Both",
-    "short": "DONKI records solar flares, coronal mass ejections and other space-weather events.",
-    "body": "NASA’s DONKI (Database Of Notifications, Knowledge, Information) lets you explore recorded space-weather events and their links to observations. The outpost’s radiation scenario is a simplified training simulation; archived solar events are not a live radiation reading at this base.",
-    "source": "NASA Community Coordinated Modeling Center — DONKI",
-    "url": "https://ccmc.gsfc.nasa.gov/tools/DONKI/"
-  },
-  {
     "id": "mars-mola-data",
     "title": "How scientists map Mars heights",
     "category": "Data sources",
@@ -206,6 +196,86 @@
     "body": "The terrain now samples NASA MOLA MEGDR product MEGT00N090HB.IMG: 512 × 512 native signed elevation samples around Gusev Crater, at 128 pixels per degree (about 463 metres between north-south samples). This is archived altimetry, including interpolated bins supplied by NASA, not new live observations. A 4-degree region (about 230 × 237 km) is compressed into a 640 × 640 game-metre map. Height differences are multiplied by 0.015, giving roughly 5.5 times vertical exaggeration relative to the horizontal compression. The central 70 game metres are flattened and blend into the measurements by radius 115 metres. Procedural hills have been removed; rocks and sand are decorative. Every landing scenario currently shares this Gusev training terrain. Source product dates to March 2003; downloaded 8 November 2026.",
     "source": "NASA PDS Geosciences Node — MOLA",
     "url": "https://pds-geosciences.wustl.edu/missions/mgs/mola.html"
+  },
+  {
+    "id": "research-nasa-api",
+    "title": "NASA Open APIs",
+    "category": "Research",
+    "destination": "Both",
+    "short": "Use the portal to discover individual services and their authentication requirements. Prefer the existing imagery connections for mission briefings.",
+    "body": "Use the portal to discover individual services and their authentication requirements. Prefer the existing imagery connections for mission briefings. This is a directory, not one gameplay dataset. Keep keys out of browser code; cache selected records.",
+    "source": "NASA Open APIs",
+    "url": "https://api.nasa.gov/"
+  },
+  {
+    "id": "research-donki",
+    "title": "DONKI space weather",
+    "category": "Research",
+    "destination": "Both",
+    "short": "Use historical flare and solar-particle events as dated storm-story prompts.",
+    "body": "Use historical flare and solar-particle events as dated storm-story prompts. Research-quality events are not a guaranteed Mars forecast. A flare class alone does not determine surface radiation. Official host migrated in September 2026.",
+    "source": "DONKI space weather",
+    "url": "https://ccmc.gsfc.nasa.gov/tools/DONKI/"
+  },
+  {
+    "id": "research-osdr",
+    "title": "OSDR space biology",
+    "category": "Research",
+    "destination": "Both",
+    "short": "Use selected plant and microbial studies as evidence cards: organism, flight conditions, controls, study accession and original publication. OSD-37 provides a plant comparison.",
+    "body": "Use selected plant and microbial studies as evidence cards: organism, flight conditions, controls, study accession and original publication. OSD-37 provides a plant comparison. Earth organisms studied in space are not Martian life. Metadata alone does not establish effect size, causation or crop yields.",
+    "source": "OSDR space biology",
+    "url": "https://osdr.nasa.gov/bio/repo/"
+  },
+  {
+    "id": "research-radlab",
+    "title": "RadLab radiation instruments",
+    "category": "Research",
+    "destination": "Both",
+    "short": "Compare readings from a named instrument, location and time interval. Teach why exposure depends on environment and shielding.",
+    "body": "Compare readings from a named instrument, location and time interval. Teach why exposure depends on environment and shielding. Absorbed dose rate is microgray/hour; dose equivalent rate is microsievert/hour. Do not treat them as interchangeable or copy ISS readings onto Mars.",
+    "source": "RadLab radiation instruments",
+    "url": "https://visualization.osdr.nasa.gov/radlab/gui/data-api/"
+  },
+  {
+    "id": "research-trek",
+    "title": "Mars Trek terrain",
+    "category": "Research",
+    "destination": "Both",
+    "short": "Use mapped imagery for mission-site context; the existing game already uses NASA terrain. Consult WMTS layers for a future site-specific map.",
+    "body": "Use mapped imagery for mission-site context; the existing game already uses NASA terrain. Consult WMTS layers for a future site-specific map. Image tiles are not elevation grids. Respect layer projection, coverage, resolution and attribution. The current world stays Gusev-based even when another region is selected.",
+    "source": "Mars Trek terrain",
+    "url": "https://trek.nasa.gov/mars/"
+  },
+  {
+    "id": "research-csa-stem",
+    "title": "CSA youth and STEM resources",
+    "category": "Research",
+    "destination": "Both",
+    "short": "Use educator activities for debriefs, learning goals and classroom extensions.",
+    "body": "Use educator activities for debriefs, learning goals and classroom extensions. This is a curated resource directory, not a live API. Link to original activities and check reproduction terms for media.",
+    "source": "CSA youth and STEM resources",
+    "url": "https://www.asc-csa.gc.ca/eng/youth-educators/resources-stem-and-youth-organizations.asp"
+  },
+  {
+    "id": "research-csa-food",
+    "title": "CSA food-production toolkit",
+    "category": "Research",
+    "destination": "Both",
+    "short": "Use food production challenges to connect crop choices with water, light, nutrition, preparation and waste. Keep packaged food in reserve.",
+    "body": "Use food production challenges to connect crop choices with water, light, nutrition, preparation and waste. Keep packaged food in reserve. Real crops grow over days or months. Game seconds and simplified food rewards must stay labelled as training rules.",
+    "source": "CSA food-production toolkit",
+    "url": "https://www.asc-csa.gc.ca/eng/youth-educators/toolkits/food-production/"
+  },
+  {
+    "id": "nasa-donki",
+    "title": "Explore NASA space-weather events",
+    "category": "Data sources",
+    "destination": "Both",
+    "short": "DONKI records solar flares, coronal mass ejections and other space-weather events.",
+    "body": "NASA’s DONKI (Database Of Notifications, Knowledge, Information) lets you explore recorded space-weather events and their links to observations. The outpost’s radiation scenario is a simplified training simulation; archived solar events are not a live radiation reading at this base.",
+    "source": "NASA Community Coordinated Modeling Center — DONKI",
+    "url": "https://ccmc.gsfc.nasa.gov/tools/DONKI/"
   },
   {
     "id": "mars-trek",

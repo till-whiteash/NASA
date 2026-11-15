@@ -1,0 +1,1 @@
+<!doctype html><button id="on">Enable voice</button><pre id="status"></pre><script type="module">import {setZhetelaVoice,voiceStatus} from '../src/zhetela-voice.js';document.querySelector('#on').onclick=()=>setZhetelaVoice(true);setInterval(()=>document.querySelector('#status').textContent=voiceStatus(),500);</script>

@@ -1,0 +1,45 @@
+/* Zhetalis flight academy: shared menu and instrument surfaces. */
+@font-face{font-family:Barlow Flight;src:url('assets/fonts/BarlowCondensed-SemiBold.ttf') format('truetype');font-weight:600;font-display:swap}
+:root{--flight-blue:#244cba;--flight-navy:#101e3b;--flight-white:#f5f7fb;--flight-muted:#b7c6e1;--flight-line:#405577}
+::selection{background:#bcd6ff;color:#101e3b}
+#title{--menu-ground:#101e3b;--menu-surface:#21365c;--menu-ink:#f5f7fb;--menu-muted:#b7c6e1;--menu-rule:#405577;background:#101e3b url('assets/menu-stars.svg') repeat;color:var(--menu-ink)}
+#title .mission-shell{max-width:1680px;padding:26px 4vw 20px}
+#title .mission-header{padding-bottom:20px;border-bottom:1px solid #405577}
+#title .mission-brand>span{font-family:Barlow Flight,Poppins,sans-serif;font-size:32px;letter-spacing:.01em}
+#title .mission-brand img{width:60px;height:60px}
+#title .mission-brand small{font:12px/1.5 Poppins,sans-serif}
+#title .mission-header button{min-height:44px;color:#d9e5fc}
+#title .mission-main{grid-template-columns:43% 57%;gap:0;padding:28px 0;max-height:none}
+#title .mission-copy{padding:28px 42px 30px 0}
+#title h1{font:600 clamp(64px,6.5vw,96px)/.98 Barlow Flight,Poppins,sans-serif;letter-spacing:-.02em;max-width:8em;text-wrap:balance}
+#title .mission-series{display:none}
+#title .mission-intro{font-size:15px;line-height:1.8;color:#d1ddf4;margin:25px 0}
+#title .mission-level legend{font-size:13px;color:#d1ddf4}
+#title #difficulties{padding:0;background:transparent;gap:8px}
+#title #difficulties .card{border:1px solid #536b93;border-radius:4px;padding:12px 6px;min-height:46px}
+#title #difficulties .selected{background:#dae7ff;color:#122650;border-color:#dae7ff}
+#title #difficulties b{font-size:13px;font-weight:600}
+#title .launch-actions{margin-top:22px;gap:10px}
+#title #start.primary,#title #resume.primary{background:#f5f7fb;color:#173571;border-radius:4px;min-height:58px;font-weight:600;padding:16px 20px}
+#title #start.primary:hover,#title #resume.primary:hover{background:#dbe8ff}
+#title #moon-mission{border:1px solid #7188b0;background:#20385f;min-height:50px;padding:14px 20px;text-align:left;font-size:14px;border-radius:4px}
+#title #moon-mission:hover{background:#304e7c}
+#title .journey-link{font-size:12px;color:#c5d5f1}
+#title .planet-explorer{padding:24px 26px;background:#15284a;border-radius:8px;border:1px solid #405577}
+#title .planet-heading{font-size:12px}
+#title .planet-stage{height:clamp(270px,27vw,390px)}
+#title .planet-caption h2{font:600 48px/1 Barlow Flight,Poppins,sans-serif;letter-spacing:0}
+#title .planet-caption p{font-size:12px;line-height:1.6;max-width:36em}
+#title .planet-tabs{gap:12px}
+#title .planet-tabs button{padding:16px 8px;min-height:70px}
+#title .planet-tabs button[aria-pressed=true]{background:#244375;border-color:#aecbff}
+#title .planet-tabs span{font-size:15px;font-weight:600}
+#title .mission-footer{padding-top:16px}
+#title .mission-settings button{min-height:44px;padding:8px 12px}
+#title button{transition:background-color 140ms ease,color 140ms ease}
+#title button:focus-visible,#title a:focus-visible{outline:3px solid #f0c16c;outline-offset:4px}
+#hud .meter{background:#101e3bed;border:1px solid #536b93;border-radius:6px;color:#f5f7fb}
+#hud .meter label{color:#d4e2f8}#hud .meter .bar{background:#354969}
+@media(max-width:900px){#title .mission-main{grid-template-columns:1fr 1.1fr}#title .mission-copy{padding-right:24px}#title h1{font-size:66px}#title .planet-explorer{padding:20px}#title .mission-header nav{flex-wrap:wrap;justify-content:flex-end}}
+@media(max-width:720px){#title .mission-shell{padding:16px 20px 24px}#title .mission-main{display:flex;padding:20px 0}#title .mission-copy{padding:8px 0 20px}#title h1{font-size:64px;max-width:9em}#title .mission-intro{font-size:14px;margin:20px 0}#title .planet-explorer{margin-top:8px;padding:18px}#title .planet-stage{height:270px}#title .mission-brand small{display:none}#title .mission-brand img{width:42px;height:42px}#title .mission-brand>span{font-size:26px}#title .mission-header{gap:8px}#title .mission-header button{font-size:11px;padding:8px}#title .mission-header nav{gap:0}#title .mission-weather{max-width:100%}}
+@media(prefers-reduced-motion:reduce){#title button{transition:none}}

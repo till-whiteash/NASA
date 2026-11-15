@@ -15,6 +15,7 @@ export function initTouch({ keys, look, press }) {
     <div class="t-stick" id="t-stick"><i></i></div>
     <div class="t-buttons">
       <button id="t-use" class="t-big" aria-label="Action">✋<span>Action</span></button>
+      <button id="t-mine" class="hidden" aria-label="Mine rock"><span>Mine</span></button>
       <button id="t-jump">⤒<span>Jump</span></button>
       <button id="t-view">👁<span>View</span></button>
       <button id="t-power">⚡<span>Power</span></button>
@@ -84,6 +85,7 @@ export function initTouch({ keys, look, press }) {
     b.addEventListener('contextmenu', e => e.preventDefault());
   };
   btn('#t-use', () => press('KeyE'));
+  btn('#t-mine', () => press('PrimaryAction'));
   btn('#t-jump', () => { const k = keys(); if (k) k.Space = true; }, () => { const k = keys(); if (k) k.Space = false; });
   btn('#t-view', () => press('KeyV'));
   btn('#t-power', () => press('KeyP'));
@@ -94,7 +96,7 @@ export function initTouch({ keys, look, press }) {
   return {
     // main.js calls this every frame: hide the controls while a pop-up is open, light up the action button when
     // something is near and name what it will do (Sleep, Open, Mine...), so the button reads like the hint
-    sync({ active, canUse, inside, canEat, useLabel }) {
+    sync({ active, canUse, inside, canEat, canMine, useLabel }) {
       if (on && !document.body.classList.contains('touch')) document.body.classList.add('touch');   // the thumb layout (tool belt above the stick) must match the controls on screen
       const show = on && active;
       if (show !== shown) {
@@ -104,6 +106,8 @@ export function initTouch({ keys, look, press }) {
       const use = root.querySelector('#t-use'), label = (canUse && useLabel) || 'Action';
       use.classList.toggle('ready', !!canUse);
       if (use.lastChild.textContent !== label) { use.lastChild.textContent = label; use.setAttribute('aria-label', label); use.classList.toggle('long', label.length > 6); }
+      root.querySelector('#t-mine').classList.toggle('hidden', !canMine);
+      root.querySelector('#t-power').classList.toggle('hidden', !!canMine);
       root.querySelector('#t-view').classList.toggle('hidden', !!inside);
       root.querySelector('#t-eat').classList.toggle('hidden', !canEat);
     },

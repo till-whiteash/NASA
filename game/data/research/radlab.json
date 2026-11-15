@@ -1,0 +1,118 @@
+{
+  "source": "https://visualization.osdr.nasa.gov/radlab/api/?spacecraft=ISS&instrument=DosTel&timestamp%3E=2022-04-01T23%3A00&timestamp%3C2022-04-01T23%3A10&absorbed_dose_rate&format=json",
+  "fetched": "2026-11-13T15:04:36.441Z",
+  "data": [
+    {
+      "timestamp": "2022-04-01T23:00:00",
+      "instrument_id": "DosTel2",
+      "absorbed_dose_rate": 10.2160856666667,
+      "instrument": "DosTel2",
+      "spacecraft": "ISS"
+    },
+    {
+      "timestamp": "2022-04-01T23:00:00",
+      "instrument_id": "DosTel1",
+      "absorbed_dose_rate": 9.815504,
+      "instrument": "DosTel1",
+      "spacecraft": "ISS"
+    },
+    {
+      "timestamp": "2022-04-01T23:00:33",
+      "instrument_id": "DosTel1",
+      "absorbed_dose_rate": 9.835079,
+      "instrument": "DosTel1",
+      "spacecraft": "ISS"
+    },
+    {
+      "timestamp": "2022-04-01T23:00:35",
+      "instrument_id": "DosTel2",
+      "absorbed_dose_rate": 11.088263,
+      "instrument": "DosTel2",
+      "spacecraft": "ISS"
+    },
+    {
+      "timestamp": "2022-04-01T23:02:13",
+      "instrument_id": "DosTel1",
+      "absorbed_dose_rate": 7.949537,
+      "instrument": "DosTel1",
+      "spacecraft": "ISS"
+    },
+    {
+      "timestamp": "2022-04-01T23:02:15",
+      "instrument_id": "DosTel2",
+      "absorbed_dose_rate": 8.210985,
+      "instrument": "DosTel2",
+      "spacecraft": "ISS"
+    },
+    {
+      "timestamp": "2022-04-01T23:03:53",
+      "instrument_id": "DosTel1",
+      "absorbed_dose_rate": 6.228811,
+      "instrument": "DosTel1",
+      "spacecraft": "ISS"
+    },
+    {
+      "timestamp": "2022-04-01T23:03:55",
+      "instrument_id": "DosTel2",
+      "absorbed_dose_rate": 6.067535,
+      "instrument": "DosTel2",
+      "spacecraft": "ISS"
+    },
+    {
+      "timestamp": "2022-04-01T23:05:00",
+      "instrument_id": "DosTel2",
+      "absorbed_dose_rate": 4.72532794871795,
+      "instrument": "DosTel2",
+      "spacecraft": "ISS"
+    },
+    {
+      "timestamp": "2022-04-01T23:05:00",
+      "instrument_id": "DosTel1",
+      "absorbed_dose_rate": 5.26644315384615,
+      "instrument": "DosTel1",
+      "spacecraft": "ISS"
+    },
+    {
+      "timestamp": "2022-04-01T23:05:33",
+      "instrument_id": "DosTel1",
+      "absorbed_dose_rate": 5.935572,
+      "instrument": "DosTel1",
+      "spacecraft": "ISS"
+    },
+    {
+      "timestamp": "2022-04-01T23:05:47",
+      "instrument_id": "DosTel2",
+      "absorbed_dose_rate": 4.441754,
+      "instrument": "DosTel2",
+      "spacecraft": "ISS"
+    },
+    {
+      "timestamp": "2022-04-01T23:07:25",
+      "instrument_id": "DosTel1",
+      "absorbed_dose_rate": 3.554651,
+      "instrument": "DosTel1",
+      "spacecraft": "ISS"
+    },
+    {
+      "timestamp": "2022-04-01T23:07:27",
+      "instrument_id": "DosTel2",
+      "absorbed_dose_rate": 3.50563,
+      "instrument": "DosTel2",
+      "spacecraft": "ISS"
+    },
+    {
+      "timestamp": "2022-04-01T23:09:05",
+      "instrument_id": "DosTel1",
+      "absorbed_dose_rate": 2.907824,
+      "instrument": "DosTel1",
+      "spacecraft": "ISS"
+    },
+    {
+      "timestamp": "2022-04-01T23:09:07",
+      "instrument_id": "DosTel2",
+      "absorbed_dose_rate": 2.458224,
+      "instrument": "DosTel2",
+      "spacecraft": "ISS"
+    }
+  ]
+}

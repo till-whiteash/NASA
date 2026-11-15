@@ -9,7 +9,7 @@ import { loadAssetWithRetry } from './asset-loading.js';
 //                                 camera, covers); the salvage rover on laptops/tablets. Phones keep perseverance.glb
 //   assets/pistol-grip-tool.glb - Pistol Grip Tool, the ISS spacewalk power tool (on the outpost workbench)
 //   assets/wrench.glb           - Wrench (on the outpost workbench)
-//   assets/nasa-astronaut.glb   - NASA's "Astronaut" model: the player (logo painted over, cut into joints in suit.js)
+//   assets/models/nasa-spacesuits/z2-gameplay.glb - articulated NASA Z-2 player and suit-rack model
 //   assets/gusev-height.bin     - heights sampled from NASA's 3D model of Spirit's landing site (Gusev Crater):
 //                                 https://science.nasa.gov/3d-resources/mars-spirit-landing-site/
 //   assets/mars-map.jpg         - Mars map from https://science.nasa.gov/3d-resources/mars/ (arrival globe)
@@ -31,7 +31,7 @@ criticalDraco.setWorkerLimit(2);
 criticalDraco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/gltf/');
 const criticalLoader = new GLTFLoader();
 criticalLoader.setDRACOLoader(criticalDraco);
-const gameplayModels = new Set(['greenhouse-walkway.glb']);
+const gameplayModels = new Set(['greenhouse-walkway.glb','models/nasa-spacesuits/z2-gameplay.glb']);
 
 // Space Apps rules: no NASA logo in the game. Some NASA models have it printed on their texture, so we paint
 // our Zhetalis badge over it. spots: [{ x, y, r }] as fractions of the texture (0..1); `plain` spots are just

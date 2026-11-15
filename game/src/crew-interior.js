@@ -3,7 +3,8 @@ import { Bunks } from './bunks.js';
 // Reuse the existing working stations inside six linked pressure modules.
 import * as THREE from 'three';
 import { Interior } from './interior.js';
-import {loadNasaAstronaut} from './suit.js';
+import {loadNasaAstronaut,poseAstronaut} from './suit.js';
+import {CabinMirror} from './cabin-mirror.js';
 import { dressHab } from './hab-dressing.js';
 
 const SPACING=10.2,RADIUS=4;
@@ -65,13 +66,18 @@ export class CrewInterior extends Interior {
     const tag=document.createElement('canvas');tag.width=512;tag.height=96;const ink=tag.getContext('2d');ink.fillStyle='#20343b';ink.fillRect(0,0,512,96);ink.fillStyle='#b7f2d3';ink.font='bold 36px sans-serif';ink.textAlign='center';ink.fillText('EVA SUIT RACK',256,60);
     const tagTexture=new THREE.CanvasTexture(tag);tagTexture.colorSpace=THREE.SRGBColorSpace;const sign=new THREE.Mesh(new THREE.PlaneGeometry(1.65,.31),new THREE.MeshBasicMaterial({map:tagTexture}));sign.position.set(0,2.7,.1);rack.add(sign);
     this.rackedSuit=new THREE.Group();rack.add(this.rackedSuit);
-    loadNasaAstronaut().then(a=>{if(a){a.arms[0].rotation.z=1.36;a.arms[1].rotation.z=-1.36;this.rackedSuit.add(a.root);}});
+    loadNasaAstronaut().then(a=>{if(a){poseAstronaut(a,{phase:0,pace:0,run:0,air:0,t:0});this.rackedSuit.add(a.root);}});
     this.stations.push({type:'suit-rack',label:'store / wear EVA suit',x:-2.7,z:0});
     rack.updateWorldMatrix(true,true);this.obstacles??=[];this.obstacles.push(new THREE.Box3().setFromObject(rack));
     dressHab(this);   // lived-in fit-out: cabins, wardroom, racks, circadian lighting (hab-dressing.js)
+    this.mirror=new CabinMirror(this);
+    this.setSuitEquipped(true);
+    this.stations.push({type:'mirror',label:'look in the full-length mirror',x:-3.35,z:1.65});
     this.bunks=new Bunks(this);   // walk-in cabins and bunks to sleep in (bunks.js)
     this.enter();
   }
+  setSuitEquipped(equipped){this.rackedSuit.visible=!equipped;this.mirror?.setEquipped(equipped);}
+  lookInMirror(){this.placeAt(-1.65,1.65);this.yaw=-Math.PI/2;this.pitch=-.12;}
   enter(){this.pos.set(0,0,1.25);this.yaw=Math.PI;this.pitch=0;this.vel={x:0,z:0};}
   // Put the player at (x,z), or on the nearest clear floor when furniture stands there. Arriving through an
   // airlock must never drop you inside a table: from inside a solid you cannot walk out again.
@@ -108,6 +114,7 @@ export class CrewInterior extends Interior {
     if(this.walkable(nx,nz)){this.pos.x=nx;this.pos.z=nz;}else{if(this.walkable(nx,this.pos.z))this.pos.x=nx;if(this.walkable(this.pos.x,nz))this.pos.z=nz;}
     this.step=(this.step||0)+Math.hypot(this.vel.x,this.vel.z)*dt;if(this.step>.8){this.step=0;this.onStep?.();}
     this.camera.position.set(this.pos.x,1.65-crouchDrop,this.pos.z);this.camera.lookAt(this.pos.x+Math.sin(this.yaw)*Math.cos(this.pitch),1.65-crouchDrop+Math.sin(this.pitch),this.pos.z+Math.cos(this.yaw)*Math.cos(this.pitch));
+    this.mirror?.update(dt);
   }
   nearest(){let best;for(const s of this.stations){const dx=s.x-this.pos.x,dz=s.z-this.pos.z,d=Math.hypot(dx,dz);const facing=d>.01?(dx*Math.sin(this.yaw)+dz*Math.cos(this.yaw))/d:1;const score=d-(s.priority||0);if(d<(['workbench','locker'].includes(s.type)?2.5:2)&&facing>-.1&&(!best||score<best.score))best={...s,d,score};}return best||null;}
 }

@@ -1,5 +1,8 @@
+import {commissionObjective} from './habitat-commission.js';
+import {bankObjective} from './battery-bank-state.js';
 import {isruObjective,ISRU_COMPLETE} from './isru-state.js';
 import {habBuildObjective,habBuildLog} from './habitat-build-state.js';
+import {powerLearnObjective,labDone,missingPrints} from './power-tutorial-state.js';
 // Pure progression: saved simulation fields are the single source of truth.
 export const POWER_TASKS=[
  ['Collect the power kits','Go inside to the storage locker. Take the landed array and battery kits.','locker'],
@@ -11,11 +14,14 @@ export const POWER_TASKS=[
 ];
 export function marsObjective(o,c){
  const hab=habBuildObjective(o,o.habBuild?.modules);if(hab)return hab;
+ const commissioning=commissionObjective(o);if(commissioning)return commissioning;
  if(o.safetyChecks&&!o.safetyChecks.reserves)return {id:"safety-reserves",title:"Check your emergency supplies",detail:"Go inside to the power console. Check stored air, meals and the finite emergency battery before building permanent power.",target:"console"};
  if(o.safetyChecks&&!o.safetyChecks.shelter)return {id:"safety-shelter",title:"Find the storm shelter",detail:"Go inside to the shelter bunks and press E / Action. Know where to shelter before your first construction trip.",target:"safety-shelter"};
- if(o.powerStep===2){const b=o.construction||{},cleared=b.cleared?.length||0,placed=b.placed?.field?.length||0;return {id:'power-2',title:cleared<4?'Clear the remote power site':'Place the solar panels',step:cleared<4?`${cleared}/4 rocks cleared · equip pickaxe from belt`:`${placed}/3 panels placed`,detail:cleared<4?'Walk to the marked field away from camp. Aim at each site rock and strike it with your pickaxe using left-click / tap Action.':'Aim at each highlighted panel footprint and press E / Action to place an assembled panel.',target:'power'};}
+ {const learn=powerLearnObjective(o);if(learn)return learn;}
+ if(o.powerStep===2){const b=o.construction||{},cleared=b.cleared?.length||0,placed=b.placed?.field?.length||0;return {id:'power-2',title:cleared<4?'Clear the remote power site':'Place the solar panels',step:cleared<4?`${cleared}/4 rocks cleared · equip pickaxe from belt`:`${placed}/3 panels placed`,detail:cleared<4?'Walk to the marked field away from camp. Aim at each site rock and left click / tap Mine with your pickaxe. E / Inspect examines the rock without damage.':'Aim at each highlighted panel footprint and press E / Action to place an assembled panel.',target:'power'};}
  if(o.powerStep<6){const [title,detail,target]=POWER_TASKS[o.powerStep];return {id:'power-'+o.powerStep,title,detail,target};}
  if(!o.baseConnected)return {id:'base',title:'Connect battery to base',detail:'Select Battery protected OUT at the field, then walk to Base IN beside Airlock 01 and select it.',target:'base'};
+ const bank=bankObjective(o);if(bank)return bank;
  if(!(o.research?.relay>=3))return {id:'relay',title:'Commission the Mars relay terminal',detail:'Go inside to the monitoring station. Request service, await acknowledgement, install the terminal and acquire the relay. This is a training network, not Starlink at Mars.',target:'monitor'};
  if(!c?.farmQuest?.rewarded)return firstMealObjective(o,c);
  const isru=isruObjective(o,c);if(isru)return isru;
@@ -31,6 +37,8 @@ export function missionLog(o,c){return [
  ...habBuildLog(o,o.habBuild?.modules),
  {title:"Check emergency supplies",done:o.safetyChecks?.reserves!==false},
  {title:"Locate the storm shelter",done:o.safetyChecks?.shelter!==false},
+ {title:'Print the power parts on the 3D printer',done:o.powerStep>3||(!missingPrints(o,'array').length&&!missingPrints(o,'battery').length)},
+ {title:'Circuit training: series, parallel, grounding',done:o.powerStep>1||labDone(o)},
  ...POWER_TASKS.map(([title],i)=>({title,done:o.powerStep>i})),
  {title:'Connect battery to base',done:!!o.baseConnected},
  {title:'Request and commission a Mars relay terminal',done:o.research?.relay>=3},

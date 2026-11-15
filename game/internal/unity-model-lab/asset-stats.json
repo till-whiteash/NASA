@@ -1,0 +1,24 @@
+{
+  "geometryBytes": 9375140,
+  "sourceFolder": "C:\\Users\\Lenovo\\Downloads\\UNITY",
+  "sourceTextureRGBABytesWithMipmaps": 549453824,
+  "note": "Texture memory is an RGBA8+mipmap estimate. Tuned model removes export terrain and uses lit 512px textures. Source files untouched.",
+  "tunedTextureBytes": 643815,
+  "sourceTextureBytes": 27187285,
+  "tunedTextureRGBABytesWithMipmaps": 26563925,
+  "tunedGeometryBytes": 6440752,
+  "removedEnvironmentNodes": [
+    "Object_10",
+    "Object_11",
+    "Object_12",
+    "Object_2",
+    "Object_3",
+    "Object_4",
+    "Object_5",
+    "Object_6",
+    "Object_7",
+    "Object_8",
+    "Object_9"
+  ],
+  "tunedTriangles": 144172
+}

@@ -1,0 +1,193 @@
+{
+  "description": "User-approved original Zhetela standing artwork and its existing Blender wrist-wave frames. Copied without edits.",
+  "fps": 24,
+  "frames": 36,
+  "files": [
+    {
+      "file": "standing.png",
+      "source": "C:\\Zhetela\\assets\\standard-models\\standard-upright.png",
+      "sha256": "591862009d8db5f55a63b7d06b3169a68382ca27eceefdd3cdc30e7efc49be70"
+    },
+    {
+      "file": "wave/001.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\001.png",
+      "sha256": "d1c5464c006cbb937cf5907956b510a644045fb90da98fce52752ad376a3a00e"
+    },
+    {
+      "file": "wave/002.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\002.png",
+      "sha256": "0cda432c7519a286154ed595d50e8f4c8ca752f1b91b34b20a73aef61fe60cad"
+    },
+    {
+      "file": "wave/003.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\003.png",
+      "sha256": "6a4f22e08aa2e6b785b3230bf9be72298d5c900e1b67463529b99682af150d5d"
+    },
+    {
+      "file": "wave/004.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\004.png",
+      "sha256": "00fd64a02746aa2b49fb4d67c4d483c7035601af387abb7193ad966d535c73d8"
+    },
+    {
+      "file": "wave/005.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\005.png",
+      "sha256": "fa378a6824aa1e004d1352c708682b61494ba56cbd74381af3f8ed17bea67e39"
+    },
+    {
+      "file": "wave/006.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\006.png",
+      "sha256": "e90cbe8e6ce721ed228ccffc22859b28f9d863260f43f4d096f24dd8d6d0cb29"
+    },
+    {
+      "file": "wave/007.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\007.png",
+      "sha256": "bd91c0fc8d5360be142f5d5a3a10489d5d119b241a8f2a7b75f6414e6d89780a"
+    },
+    {
+      "file": "wave/008.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\008.png",
+      "sha256": "ef3f62664dd548c8bc922ce38a45b750a0a9730893e8775b26b694e2e17b3956"
+    },
+    {
+      "file": "wave/009.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\009.png",
+      "sha256": "cfba2c5ee9c895ef1970be9a0c82ad4885860c5529ea06430735640714dfaf53"
+    },
+    {
+      "file": "wave/010.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\010.png",
+      "sha256": "978f3aabf77e44d94293b3bb5ceb8acfdb7fdc18e54a1dd1e8a2567028996b54"
+    },
+    {
+      "file": "wave/011.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\011.png",
+      "sha256": "8aef816b31801386819747cb8fc9e80de5495956e26eab44f13c6d3f2e0ee69f"
+    },
+    {
+      "file": "wave/012.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\012.png",
+      "sha256": "47cb112959e4ebc21da318a3f0ee102992777327e5b4bc7e8c28cb0e570368de"
+    },
+    {
+      "file": "wave/013.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\013.png",
+      "sha256": "e2a4a516bd1c100ddd198b59028c6543fa5e3f3f38977b73e70d3dced57adcb9"
+    },
+    {
+      "file": "wave/014.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\014.png",
+      "sha256": "83ab6ec36d69e3a9bc9e6832c9ff86c6f75d9845b54ea535c12af85812d62bef"
+    },
+    {
+      "file": "wave/015.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\015.png",
+      "sha256": "8be9de537c8ac772fb2d9e221de03b507d5ed317061446bc3ad7f624264a8ed3"
+    },
+    {
+      "file": "wave/016.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\016.png",
+      "sha256": "df4c19fd22ce9711b92e2d5d4e5eec65886c859e54eb554ab5611464ee79372a"
+    },
+    {
+      "file": "wave/017.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\017.png",
+      "sha256": "e1ea05943d23009d87553cd417310b6a203887e195ef1b9bbf92817eb2b1882a"
+    },
+    {
+      "file": "wave/018.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\018.png",
+      "sha256": "7b201fd73a2a03ce6ea863f37f573fdaef88d7caa2f91e789e8ce2f8b290a475"
+    },
+    {
+      "file": "wave/019.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\019.png",
+      "sha256": "e35079af968848e13237d864bfa26c0843c0238cb1bd0d1001ccc4de5fd5e871"
+    },
+    {
+      "file": "wave/020.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\020.png",
+      "sha256": "cab8b0850fe87f71b7485cc40a1edea5a637f2d3c6cf78d03c408fbddda6ae94"
+    },
+    {
+      "file": "wave/021.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\021.png",
+      "sha256": "1d4a71c7dc22e59097eb8414f551dedcea3f94156a27f693c88a74aff2cb3bbe"
+    },
+    {
+      "file": "wave/022.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\022.png",
+      "sha256": "10000732daa31fe3168a2c9f70c793e671b51fed01e47a7dc25839b6bca0b39d"
+    },
+    {
+      "file": "wave/023.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\023.png",
+      "sha256": "fe637ec843b1ed1e458786a2e053cd1294af5b6d74da7cd871e327cb8bf1f100"
+    },
+    {
+      "file": "wave/024.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\024.png",
+      "sha256": "dfb636319b3036c780b26ae38cf8f48f41f88d5586a5728cac826e6a7bb5769f"
+    },
+    {
+      "file": "wave/025.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\025.png",
+      "sha256": "359496490aa2cb2f7010e40bd66b832dbcc118c66297167452d70de180a46922"
+    },
+    {
+      "file": "wave/026.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\026.png",
+      "sha256": "873331498b037c42614ae4b624fc7dba119c3ce6e6ef98b8999b4f66622189fb"
+    },
+    {
+      "file": "wave/027.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\027.png",
+      "sha256": "f5fa6492698e399f494cda331033029546af015272019bfbffe7488c5b5b9651"
+    },
+    {
+      "file": "wave/028.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\028.png",
+      "sha256": "0cfb66efafcd752939dda81e44d16ce101163bf3f4cff7797cf2f615418a48d4"
+    },
+    {
+      "file": "wave/029.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\029.png",
+      "sha256": "2fb8bd51759f1620db3ce5c286d4a13b73aae7c9898469cfd37b2b85de0bec1d"
+    },
+    {
+      "file": "wave/030.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\030.png",
+      "sha256": "9be4df6ad4cac7fb282c84c2ba3380ee82132db123c14b0d4683431767efeb1d"
+    },
+    {
+      "file": "wave/031.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\031.png",
+      "sha256": "20d43e94910ee718f81c8effdd7a6f682dec7822e1fbf126f542e67af298ebf8"
+    },
+    {
+      "file": "wave/032.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\032.png",
+      "sha256": "b20795c65ed511ae35730806c14db32f849705f98f7ec79cc7c523b9ddf8420f"
+    },
+    {
+      "file": "wave/033.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\033.png",
+      "sha256": "829177685aaebebac6f03bf003b941507ba356b9a3fed070c769efe9f739bf2b"
+    },
+    {
+      "file": "wave/034.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\034.png",
+      "sha256": "c3ad33c6cd3fa6cd5fe4c5793ac445b95c8df9eddd625f2ad61355db64c218f4"
+    },
+    {
+      "file": "wave/035.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\035.png",
+      "sha256": "54f09de66ed4a3ccd04fd36b3b8085859a8f3d31c046df8ce5494508af721ce8"
+    },
+    {
+      "file": "wave/036.png",
+      "source": "C:\\Zhetela\\animation\\standard-blender\\wave\\036.png",
+      "sha256": "dff1b0d3cfddf4747abab2425b50707cee50dfd415867f198178bb9bb35b6c91"
+    }
+  ],
+  "display": "Upper-body viewport matches C:/Zhetela/character_art.py portrait_crop: x=18%..82%, y=0..45.5%; a CSS fade softens its lower edge. No source pixels changed."
+}

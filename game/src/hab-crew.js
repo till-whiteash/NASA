@@ -26,7 +26,7 @@ function std(c, r = .85) { return new THREE.MeshStandardMaterial({ color: c, rou
 function capsule(r, len, m) { const g = new THREE.CapsuleGeometry(r, len, 4, 10); const o = new THREE.Mesh(g, m); return o; }
 
 // A jointed figure about 1.7 m tall, facing +z. Limbs hang from pivots so poses are just rotations.
-function figure(p) {
+export function figure(p) {
   const skin = std(skinTones[p.id] ?? '#c99a7a', .7), shirt = std(p.colour, .9), pants = std('#2b3447', .95), shoe = std('#e9ecef', .7), hairM = std(p.id === 'meilin' ? '#14110f' : '#1e1612', 1);
   const root = new THREE.Group(), hips = new THREE.Group(); root.rotation.order = 'YXZ'; hips.position.y = .93; root.add(hips);
   const torso = new THREE.Group(); hips.add(torso);

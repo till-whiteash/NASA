@@ -1,3 +1,4 @@
+import { Launch } from '../../src/launch.js';
 import { zhetela } from '../../src/zhetela.js';
 // Moon mission: boot, menu, Orion flyby, lander descent, surface play, cabin, saving and the HUD.
 // Shared (read-only) modules: src/settings.js (Settings + Information wiki), src/ui.js (modal),
@@ -73,6 +74,7 @@ colliders.push(world.apolloSample.collider);
 const flyby = new Flyby(renderer);
 
 // ---------- game state ----------
+let earthLaunch=null,launchComplete=null;
 let mode = 'menu';             // menu | flyby | descent | surface
 let state = null;              // sim state (surface)
 let place = 'outside';         // outside | hab | rover | lift
@@ -116,10 +118,10 @@ const meter = (label, v, warnAt = 30) => `<div class="meter ${v < warnAt / 2 ? '
 function caption(text, tag = '') { const c = $('#caption'); if (!text) { c.hidden = true; return; } c.innerHTML = (tag ? `<small>${esc(tag)}</small>` : '') + esc(text); c.hidden = false; }
 function setMode(m) {
   mode = m; document.body.classList.toggle('surface', m === 'surface' || m === 'descent'); document.body.classList.toggle('flyby', m === 'flyby');
-  document.body.classList.toggle('cinematic', m === 'descent');
+  document.body.classList.toggle('cinematic', m === 'descent' || m === 'launch');
   $('#menu').hidden = m !== 'menu'; $('#hud').hidden = m === 'menu';
   $('#flyby-hud').hidden = m !== 'flyby'; $('#window-frame').hidden = !(m === 'flyby' && flyby.m?.view === 'window');
-  $('#skip').hidden = m !== 'descent'; if (m !== 'descent') caption('');
+  $('#skip').hidden = m !== 'descent'; if(m==='descent')$('#skip').textContent='Skip descent'; if (m !== 'descent') caption('');
   $('#cabin').hidden = true; $('#alert').hidden = true; $('#prompt').hidden = true;
   if (m !== 'surface') { closeQuestLog(); document.body.classList.remove('alert-on'); }
   if (m === 'menu') { $('#fact-pop').hidden = true; dispatchEvent(new Event('zhetela-dismiss')); refreshMenu(); document.exitPointerLock?.(); }
@@ -146,7 +148,7 @@ $('#sources-btn').onclick = () => showSources();
 $('#gear-btn').onclick = () => openSettings({ tab: 'audio' });
 $('#pause-btn').onclick = () => pause();
 $('#info-btn').onclick = () => info(mode === 'flyby' ? flyby.m.fact : (objective?.fact || 'moon-gravity'));
-$('#skip').onclick = () => { if (mode === 'descent') descentT = DESCENT_T + 3; };
+$('#skip').onclick = () => { if (mode === 'descent') descentT = DESCENT_T + 3;else if(mode==='launch'&&earthLaunch)earthLaunch.done=true; };
 
 function showSources() {
   const img = IMAGES.items || [];
@@ -166,8 +168,11 @@ function showSources() {
   });
 }
 
+// Earth departure is an illustrative compressed SLS sequence, not a reconstruction of a selected flight.
+function earthDeparture(){setMode('launch');$('#hud').hidden=false;earthLaunch=new Launch();$('#skip').hidden=false;$('#skip').textContent='Skip launch film';return new Promise(resolve=>launchComplete=resolve);}
 // ---------- flyby ----------
-function startFlyby(id) {
+async function startFlyby(id, cleared=false) {
+  if(!cleared){if(mode==='launch')return;await earthDeparture();return startFlyby(id,true);}
   flyby.start(id, flybyPhotos[id] || {}); flyby.warp = 1;
   setMode('flyby'); buildFlybyHud(); showFact(MISSIONS[id].fact);
   toast(MISSIONS[id].crew ? 'Crew window view: drag to look around.' : 'Wing camera view: drag to aim the camera.');
@@ -216,7 +221,8 @@ function finishFlyby() {
 }
 
 // ---------- surface ----------
-function startSurface(resume) {
+async function startSurface(resume, cleared=false) {
+  if(!cleared && !(resume && readSave()?.state)){if(mode==='launch')return;await earthDeparture();return startSurface(false,true);}
   const s = resume ? readSave() : null;
   if (s?.state) {
     state = s.state; prints.load(s.prints);
@@ -306,6 +312,7 @@ function exitRover() { const p = rover.exitPoint(); astro.pos.set(p.x, heightAt(
 function toggleView() { view = view === 'third' ? 'first' : 'third'; astro.group.visible = place === 'outside' && view === 'third'; toast(view === 'first' ? 'Helmet view' : 'Follow camera'); }
 
 function pause() {
+  if(mode==='launch')return;
   if (mode === 'menu') return; saveNow();
   modal({ title: 'Paused', html: '<p>Your mission is saved.</p>', choices: [
     { label: 'Resume', primary: true }, { label: 'Settings', onPick: () => openSettings({ tab: 'audio' }) },
@@ -366,6 +373,12 @@ const clock = new THREE.Clock(); let hudT = 0, flyHudT = 0;
 const tmp = new THREE.Vector3();
 function frame() { requestAnimationFrame(frame); step(Math.min(0.05, clock.getDelta())); }
 function step(dt) {
+  if(mode==='launch'){
+    const f=earthLaunch.update(dt);earthLaunch.resize();renderer.render(earthLaunch.scene,earthLaunch.camera);
+    caption(earthLaunch.modelsReady?`${f.left>0?'T−'+f.left:f.title||'Ascent'} · ${f.caption}`:earthLaunch.modelError?'Launch model unavailable. You can skip the film.':'Loading NASA launch models…','Illustrative Earth departure · time compressed');
+    if(earthLaunch.done){const done=launchComplete;launchComplete=null;$('#skip').hidden=true;caption('');done?.();}
+    consume();return;
+  }
   const paused = !!document.querySelector('#modal:not(.hidden)');
   tickMusic(); readKeys();
   if (mode === 'menu') { flyby.backdrop(performance.now() / 1000); consume(); return; }

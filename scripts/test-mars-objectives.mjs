@@ -2,20 +2,32 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {Outpost} from '../game/src/sim.js';
 import {marsObjective,missionLog} from '../game/src/mars-objectives.js';
+import {advanceISRU,ISRU_COMPLETE} from '../game/src/isru-state.js';
+import {printPart,completeLab} from '../game/src/power-tutorial-state.js';
 const facts=JSON.parse(readFileSync(new URL('../game/data/mars-facts.json',import.meta.url))).facts;
 const o=new Outpost('normal',facts),c={farmQuest:{rewarded:false}};
 // A new crew builds its habitat first (habitat-build-state.js), then the safety checks begin.
+assert.equal(marsObjective(o,c).id,'hab-exit');
+o.habBuild.pioneer.exitedPod=true;o.habBuild.pioneer.collected=[0,1,2,3,4,5];o.habBuild.pioneer.surveyed=[0,1,2];
 for(let i=0;i<6;i++){o.habBuild.step=i;assert.equal(marsObjective(o,c).id,'hab-'+i);}
 o.habBuild.step=6;
 assert.equal(marsObjective(o,c).id,'safety-reserves');
 o.safetyChecks.reserves=true;assert.equal(marsObjective(o,c).id,'safety-shelter');
 o.safetyChecks.shelter=true;
 assert.equal(o.panels,0);assert.equal(o.solar(),0);
-for(let i=0;i<6;i++){o.powerStep=i;assert.equal(marsObjective(o,c).id,'power-'+i);assert.equal(o.solar(),0);}
+for(let i=0;i<6;i++){o.powerStep=i;
+ if(i===1){   // the learning steps before the first assembly: print the parts, then circuit training (power-tutorial-state.js)
+  assert.equal(marsObjective(o,c).id,'print-array');
+  for(const p of ['Support frame','Output connector','Battery module','Protected output'])printPart(o,p);
+  for(const s of ['series','parallel','ground']){assert.equal(marsObjective(o,c).id,'lab-'+s);completeLab(o,s);}
+ }
+ assert.equal(marsObjective(o,c).id,'power-'+i);assert.equal(o.solar(),0);}
 o.panels=3;o.powerStep=6;assert.equal(o.solar(),0);assert.equal(marsObjective(o,c).id,'base');
 o.baseConnected=true;assert.ok(o.solar()>0);
 assert.equal(marsObjective(o,c).id,'relay');o.research={relay:3,harvests:0};
 assert.equal(marsObjective(o,c).id,'harvest');c.farmQuest.rewarded=true;
+for(let i=0;i<ISRU_COMPLETE;i++){assert.equal(marsObjective(o,c).id,'isru-'+i);assert.ok(advanceISRU(o,c,'builder'));}
+assert.equal(advanceISRU(o,c,'builder'),false);
 for(let i=0;i<3;i++){o.chargerStep=i;assert.equal(marsObjective(o,c).id,'charger-'+i);}
 o.chargerStep=3;assert.equal(marsObjective(o,c).id,'charge');
 assert.ok(o.chargerAllocation()>0);assert.equal(o.forecast().total+o.chargerAllocation(),o.energy());

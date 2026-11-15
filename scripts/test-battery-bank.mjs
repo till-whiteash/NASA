@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {Outpost,TUNED} from '../game/src/sim.js';
+import {queueBattery,wiredBatteries,placeBank,checkBank,connectBank,bankObjective} from '../game/src/battery-bank-state.js';
+import {powerSets,canPowerAnotherBase} from '../game/src/power-tutorial-state.js';
+const facts=JSON.parse(readFileSync(new URL('../game/data/mars-facts.json',import.meta.url))).facts;
+const o=new Outpost('normal',facts);o.powerStep=6;o.baseConnected=true;o.parts=30;o.panels=6;
+const before=o.battery;assert.ok(o.buy('battery'));assert.equal(o.battery,before);assert.equal(wiredBatteries(o),0);
+assert.equal(powerSets(o),1);assert.equal(canPowerAnotherBase(o,{greenhouses:[]}),false);
+assert.equal(checkBank(o,0),false);assert.ok(placeBank(o,0));assert.equal(placeBank(o,0),false);assert.ok(checkBank(o,0));
+assert.equal(connectBank(o,0,'+','-',4).ok,false);assert.equal(o.battery,before);
+assert.deepEqual(connectBank(o,0,'+','+',TUNED.batteryUpgrade),{ok:true,complete:false});assert.equal(o.battery,before);
+assert.deepEqual(connectBank(o,0,'-','-',TUNED.batteryUpgrade),{ok:true,complete:true});assert.equal(o.battery,before+4);
+assert.equal(connectBank(o,0,'-','-',4).ok,false);assert.equal(o.battery,before+4);assert.equal(bankObjective(o),null);
+assert.equal(powerSets(o),2);assert.ok(canPowerAnotherBase(o,{greenhouses:[]}));
+const save=JSON.parse(JSON.stringify(o));assert.equal(wiredBatteries(save),1);queueBattery(save);assert.equal(wiredBatteries(save),1);
+const legacy={upgrades:{battery:2},battery:16};assert.equal(wiredBatteries(legacy),2);queueBattery(legacy);assert.equal(wiredBatteries(legacy),2);assert.deepEqual(legacy.batteryBank.connected,[0,1]);
+console.log('Parallel bank: purchase/placement/inspection/wiring gates, polarity, one-time capacity, expansion budget and legacy saves passed.');

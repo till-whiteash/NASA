@@ -41,9 +41,9 @@ export function nextWiringSocket(o,kind,held=null){
 }
 
 // ---- Polarity: every cable is a pair of leads, red + (positive) and black − (negative).
-// Red goes on first and black last (the safe order on a real battery), colours must match, and power flows only
+// These training connectors are isolated before fitting leads. Colours must match, and power flows only
 // once both are on: electricity needs a closed loop out of +, through the load and back into −.
-export const POLE_NAME={'+':'red + (positive)','-':'black − (negative)'};
+export const POLE_NAME={'+':'red VCC + (positive)','-':'black GND − (DC return)'};
 export function leadsOn(o,index){if(circuitConnected(o,index))return ['+','-'];return buildState(o).leads?.[index]||[];}
 export function nextPole(o,index){const on=leadsOn(o,index);return !on.includes('+')?'+':!on.includes('-')?'-':null;}
 export function connectLead(o,index,heldPole,targetPole){
@@ -58,7 +58,7 @@ export const CIRCUIT_FACTS=[
  {volts:48,watts:1000,load:'habitat',fact:'The habitat draws about 1,000 W at 48 V: I = P ÷ V ≈ 21 A. The 60 A fuse in the protected output opens if a fault ever pulls far more.'},
  {volts:48,watts:1500,load:'rover',fact:'The rover charges at about 1,500 W at 48 V: I = P ÷ V ≈ 31 A, so this lead is thicker to keep it cool.'}
 ];
-export const ORDER_LESSON='Connect the red + lead first and the black − lead last. That is the safe order on a real battery: if a tool slips while you make the last connection, it cannot short + to the metal frame.';
+export const ORDER_LESSON='This training branch is isolated while you fit its touch-safe connectors. Fit red + to +, then black − to −. Inspect the circuit before energizing. This game order is not a universal real-battery procedure. Black DC return and the separate green-yellow chassis bond have different jobs.';
 export const REVERSE_LESSON='Stop: that is + to −. Red + must meet red +, and black − must meet black −. Reversed polarity drives current the wrong way and can destroy a charge controller. Joining + straight to − with nothing in between would be a short circuit.';
 export function leadLesson(index,pole,complete){
  const f=CIRCUIT_FACTS[index];

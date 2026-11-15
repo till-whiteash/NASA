@@ -48,7 +48,7 @@ export const LOOKS = {                                        // background, hem
   earth: { bg: '#9db8dc', sky: '#cfe2ff', ground: '#5d6b45', sun: '#fff4e2', hemi: 1.2, sunI: 3.0 },
   mars: { bg: '#c49a78', sky: '#f2d2b4', ground: '#6b3d26', sun: '#ffe6c8', hemi: 1.1, sunI: 2.6, fog: [160, 1400] },
 };
-// Films with a clean 1080p movie (previews/<name>-hd.mp4) get captions drawn by the page; the rest still play their
+// Films with a clean HD movie (previews/<name>-hd.mp4) get captions drawn by the page; the rest still play their
 // legacy movie with baked captions until their HD render is added here.
 const HD_FILMS = new Set(['ares_vi_briefing', 'ares_vi_briefing_moon', 'launch_moon', 'briefing_mission', 'briefing_moon', 'cruise_loop', 'mars_approach', 'launch_earth',
   'outpost_26_months', 'ascent_mars', 'dust_storm', 'failure_rover_stuck', 'failure_solar_panel', 'failure_air_leak']);
@@ -83,7 +83,7 @@ export function preloadCinematic(name) {
     if (preloaded.get(name) === v) { preloaded.delete(name); releaseVideo(v); }
   }, 60000); // release unused look-ahead buffers during long gameplay sessions
 }
-const VIDEO = name => new URL(`previews/${name}${CLEAN_VIDEO(name) ? '-hd' : ''}.mp4`, ANIMATION_ROOT).href;
+const VIDEO = name => new URL(`previews/${name}${CLEAN_VIDEO(name) ? '-hd' : ''}.mp4${name === 'launch_earth' ? '?v=complete-launch-1' : ''}`, ANIMATION_ROOT).href;
 const POSTER = name => new URL(`previews/posters/${name}.jpg`, ANIMATION_ROOT).href;
 // What the loading screen calls each film.
 const FILM_TITLES = {
@@ -133,7 +133,7 @@ function filmLoader(box, name) {
 }
 const captionsCache = new Map();
 function captionsFor(name) {
-  if (!captionsCache.has(name)) captionsCache.set(name, fetch(new URL(`glb/${name}.captions.json`, ANIMATION_ROOT), { signal: AbortSignal.timeout(5000) }).then(r => r.ok ? r.json() : null).catch(() => null));
+  if (!captionsCache.has(name)) captionsCache.set(name, fetch(new URL(`glb/${name}.captions.json${name === 'launch_earth' ? '?v=complete-launch-1' : ''}`, ANIMATION_ROOT), { signal: AbortSignal.timeout(5000) }).then(r => r.ok ? r.json() : null).catch(() => null));
   return captionsCache.get(name);
 }
 

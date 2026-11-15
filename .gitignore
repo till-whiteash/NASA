@@ -2,3 +2,12 @@ node_modules/
 .env
 .env.local
 dist/
+
+# Local downloaded source archive; promote selected derivatives to game/assets.
+/pull/
+
+# Local agent settings, render scratch files and Python bytecode.
+/.claude/
+/.playwright-mcp/
+__pycache__/
+*.py[cod]

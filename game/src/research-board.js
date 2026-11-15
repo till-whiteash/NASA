@@ -1,0 +1,19 @@
+import {modal,toast} from './ui.js';
+import {storyState,startJob,chooseEnding,JOBS,ENDINGS} from './story-state.js';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let data;
+const ready=fetch(new URL('../data/research-resources.json',import.meta.url)).then(r=>{if(!r.ok)throw Error();return r.json();}).then(d=>data=d).catch(()=>{});
+export function openEvidence(){
+  const draw=()=>modal({title:'NASA & CSA research desk',html:data?`<p>Real sources for a fictional outpost. Downloaded records are historical snapshots, not forecasts for your landing site.</p>${data.resources.map(r=>`<details><summary>${esc(r.name)} · ${esc(r.priority)}</summary><p>${esc(r.use)}</p><p>${esc(r.limit)}</p><a class="research-link" href="${esc(r.url)}" target="_blank" rel="noopener">Open original source</a></details>`).join('')}<h4>Downloaded evidence</h4>${(data.snapshots||[]).map(s=>`<p><b>${esc(s.name)}</b> — ${esc(s.status)}<br>${esc(s.summary)}${(s.examples||[]).map(v=>`<br>${esc(v)}`).join('')}<br><small>${esc(s.fetched||'No successful download')} · ${esc(s.period||'')}</small>${s.refreshError?'<br>Refresh failed; retaining last successful snapshot.':''}${s.file?`<br><a class="research-link" href="${esc(new URL('../'+s.file,import.meta.url).href)}" target="_blank" rel="noopener">Inspect downloaded record</a>`:''}</p>`).join('')}`:'<p>The research catalogue could not load. The mission still works offline; try opening this desk again when the local data file is available.</p>'});
+  if(data)draw();else {modal({title:'NASA & CSA research desk',html:'<p>Loading the saved research catalogue…</p>'});ready.then(()=>{if(document.querySelector('#modal h3')?.textContent==='NASA & CSA research desk')draw();});}
+}
+export function openCampaign(o,save){
+  const s=storyState(o),job=s.job&&JOBS[s.job.id];
+  const reopen=()=>{save();openCampaign(o,save);};
+  const next=Object.keys(JOBS).find(k=>!s.evidence.includes(k));
+  modal({title:'The silent rover',html:`<p>You are the final crew commissioning a pre-positioned Mars outpost. After securing power, air, water and food, investigate a rover that stopped reporting.</p><p><b>Fictional story.</b> These sources do not establish living, deadly Martian microbes. Samples stay sealed; transmit findings to Earth, not unapproved biological cargo.</p><h4>${s.ending?esc(ENDINGS[s.ending].name):job?esc(job.crew+' · '+job.name):'Crew assignments'}</h4><p>${s.ending?esc(ENDINGS[s.ending].text):job?`${Math.ceil(s.job.remaining)} training seconds remaining. Close this panel to continue time. Work pauses without base power and at least 1 kWh/sol allocated to life support.`:'First commission base power and charge your rover. Each assignment uses one salvaged part. Your crew will report their findings here.'}</p>${s.evidence.map(id=>`<p><b>${esc(JOBS[id].name)}</b><br>${esc(JOBS[id].evidence)}</p>`).join('')}<details><summary>What happens after the investigation?</summary><p>Choose preservation, recommend withdrawal, or continue development. This records a narrative outcome; the existing building sandbox remains available for replay in every ending. No alien energy source is presented as a real discovery.</p></details>`,choices:[
+    ...(!s.ending&&!job&&next?[{label:`Assign ${JOBS[next].crew}: ${JOBS[next].name}`,cost:`1 part · ${JOBS[next].seconds} training seconds`,onPick:()=>{const error=startJob(o,next);if(error)toast(error);reopen();}}]:[]),
+    ...(!s.ending&&!next&&!job?Object.entries(ENDINGS).map(([id,e])=>({label:e.name,onPick:()=>modal({title:'Confirm mission recommendation',html:`<p>${esc(e.text)}</p><p>This decision is stored with this save.</p>`,choices:[{label:'Record this decision',onPick:()=>{chooseEnding(o,id);reopen();}},{label:'Keep reviewing',onPick:()=>openCampaign(o,save)}]})})):[]),
+    {label:'Read NASA & CSA evidence',onPick:openEvidence},{label:'Return to mission'}
+  ]});
+}

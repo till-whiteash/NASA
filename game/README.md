@@ -152,3 +152,7 @@ Click Listen (speaker icon) below a Zhetela message. She never narrates automati
 The button becomes Stop while preparing or speaking. Closing the message, dropping a cable, a new message, mute or turning voice off cancels the old speech. Settings → Sound & music includes the voice toggle, volume and Stop speaking. Failures show in voice status and leave text/gameplay available.
 
 Source/runtime: https://github.com/hexgrad/kokoro/tree/main/kokoro.js (Apache-2.0); model: https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX . Browser validation generated non-silent 24 kHz speech only after clicking Listen, and checked cancellation during generation.
+
+## Power tutorial and mining compatibility
+
+The power tutorial includes the workshop 3D printer, series/parallel/grounding circuit lab, staged assembly and coiled field leads. Habitat site stones, power-field clearance stones and mineral deposits retain their separate interactions. See [POWER-TUTORIAL.md](POWER-TUTORIAL.md) for progression, integration guards, validation commands and remaining follow-ups.
