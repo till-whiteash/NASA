@@ -139,14 +139,12 @@ export function playCinematic(name, { clip, world } = {}) {
       if (world) world.cinematic = false;
       resolve(played);
     };
-    const key = e => { if (e.code === 'Escape') { e.preventDefault(); e.stopPropagation(); end(true); } else if (['Space', 'Enter'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); } };
+    const isBriefing = name === 'ares_vi_briefing' || name === 'ares_vi_briefing_moon';
+    const advance = () => isBriefing && !video ? playVideo('3D briefing complete') : end(true);
+    const key = e => { if (e.code === 'Escape') { e.preventDefault(); e.stopPropagation(); advance(); } else if (['Space', 'Enter'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); } };
     addEventListener('keydown', key, true);
-    box.querySelector('.cine-skip').onclick = () => end(true);
-    // The briefing is a rendered film; play it directly instead of the GLB preview.
-    if (name === 'ares_vi_briefing' || name === 'ares_vi_briefing_moon') {
-      playVideo('briefing film');
-      return;
-    }
+    // Finish or skip the 3D briefing, then watch the rendered film.
+    box.querySelector('.cine-skip').onclick = advance;
     if (!hasWebGL()) playVideo('no WebGL on this device');
     else slow = setTimeout(() => { if (!st) playVideo('the 3D version is slow to load'); }, 12000);
     stage(name, box, { clip }).then(s => {
@@ -165,7 +163,7 @@ export function playCinematic(name, { clip, world } = {}) {
           if (l) cap.append(l.text);
           phase.textContent = l?.phase || '';
         }
-        if (t >= st.duration - 1e-3) return end(true);
+        if (t >= st.duration - 1e-3) return advance();
         raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);
