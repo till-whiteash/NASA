@@ -1,7 +1,10 @@
+import { GRAPHICS_MODE } from './surface-detail.js';
+import { effectiveQuality } from './device-profile.js';
+const litePortrait = effectiveQuality(GRAPHICS_MODE) === 'low';
 import {speakZhetela,stopZhetelaVoice,voiceEnabled,voiceStatus,voiceBusy,setZhetelaVoice} from './zhetela-voice.js';
 // Original Zhetela artwork, shared by Mars and Moon. No microphone or AI service required.
 let card, timer, animation, activeStep, stepDismissed;
-const standing = new Image(); standing.src = new URL('../assets/zhetela/standing.png', import.meta.url).href;
+const standing = new Image(); standing.src = new URL(litePortrait ? '../assets/zhetela-app/portrait.webp' : '../assets/zhetela/standing.png', import.meta.url).href;
 const wave = []; // Load the existing animation only when the guide first appears.
 function loadWave(){if(wave.length)return;for(let n=1;n<=36;n++){const img=new Image();img.src=new URL('../assets/zhetela/wave/'+String(n).padStart(3,'0')+'.png',import.meta.url).href;wave.push(img);}}
 
@@ -30,7 +33,7 @@ export function zhetela(message, success = false, {step, action} = {}) {
   actionButton.textContent = action?.label || '';
   actionButton.onclick = action?.run || null;
   card.querySelector('p').textContent = message; card.hidden = false;stopZhetelaVoice();
-  const since=performance.now(), reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const since=performance.now(), reduced=litePortrait || matchMedia('(prefers-reduced-motion: reduce)').matches;
   if(!reduced)loadWave();
   const paint = () => {
     const seconds=(performance.now()-since)/1000, waving=!reduced&&(seconds%7)<1.5;
@@ -38,7 +41,7 @@ export function zhetela(message, success = false, {step, action} = {}) {
     const art=waving&&candidate?.complete&&candidate.naturalWidth?candidate:standing;
     const c=card.querySelector('canvas'),g=c.getContext('2d');g.clearRect(0,0,c.width,c.height);
     // Match the app's portrait_crop framing in the viewport; source PNGs stay untouched.
-    if(art.complete&&art.naturalWidth)g.drawImage(art,art.naturalWidth*.18,0,art.naturalWidth*.64,art.naturalHeight*.455,0,0,c.width,c.height);
+    if(art.complete&&art.naturalWidth){if(litePortrait)g.drawImage(art,0,0,art.naturalWidth,art.naturalHeight,0,6,c.width,c.width);else g.drawImage(art,art.naturalWidth*.18,0,art.naturalWidth*.64,art.naturalHeight*.455,0,0,c.width,c.height);}
     // Independent twinkles keep the approved face, dress and hair completely unchanged.
     for(let n=0;n<9;n++){
       const x=10+((n*67)%174),y=12+((n*83)%174);
@@ -58,7 +61,7 @@ export function finishZhetelaStep(step) {
   stepDismissed = false;
   dismiss();
 }
-export function zhetelaPortraitHTML(){return '<div class="zhetela-speaker"><span aria-hidden="true"><i></i></span><b>Zhetela · Mission guide</b></div>';}
+export function zhetelaPortraitHTML(){if(litePortrait)return '<div class="zhetela-speaker"><img class="zhetela-lite-portrait" src="'+standing.src+'" alt="" width="72" height="72"><b>Zhetela · Mission guide</b></div>';return '<div class="zhetela-speaker"><span aria-hidden="true"><i></i></span><b>Zhetela · Mission guide</b></div>';}
 
 addEventListener('zhetela-dismiss', () => { if (!activeStep) dismiss(); });
 

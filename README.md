@@ -36,3 +36,9 @@ from outcomes. One sol takes **300 seconds** at normal simulation speed.
 
 For local play, serve this repository with `python -m http.server 8160`, then open
 `http://127.0.0.1:8160/game/`. Use a separate port if 8160 is already in use.
+
+## Lite release — 15 November 2026
+
+Use `game/?graphics=low&chunks=1` on less powerful PCs. Lite uses matching 720p films, no movie look-ahead download, no antialiasing or shadows, and a small static Zhetela portrait instead of 36 large PNG frames. The complete launch and captions are preserved. Guided Start skips the films and begins at the landing pod.
+
+The reviewed inventory, mining, power models, construction, first-build practice and decision debrief are included. Unfinished Earth-return drafts and the still-in-progress cinematic launch revision remain local and are not part of this release.

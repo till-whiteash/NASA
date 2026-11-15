@@ -93,11 +93,11 @@ import { openCircuitLab } from './circuit-lab.js';
 import { openFabricator } from './fabricator.js';
 import { powerLearn, missingPrints, labDone, completeLab, LAB_STEPS, canPowerAnotherBase, powerCapacityNote } from './power-tutorial-state.js';
 import { playCinematic, preloadCinematic, isCinematicActive } from './cinematic.js';   // Blender movies in animation/previews/
-loadModel('sls.glb'); loadModel('mobile-launcher.glb');   // NASA's 3D models start downloading on the title screen
+if (effectiveQuality(GRAPHICS_MODE) !== 'low') { loadModel('sls.glb'); loadModel('mobile-launcher.glb'); }   // NASA's 3D models start downloading on the title screen
 
 // Phones and tablets: draw fewer pixels, and skip shadows on small screens, so the game stays smooth
 const coarse = matchMedia('(pointer: coarse)').matches, smallScreen = Math.min(screen.width, screen.height) < 600;
-const renderer = new THREE.WebGLRenderer({ canvas: $('#view'), antialias: true, powerPreference: 'high-performance' });
+const renderer = new THREE.WebGLRenderer({ canvas: $('#view'), antialias: effectiveQuality(GRAPHICS_MODE) !== 'low', powerPreference: 'high-performance' });
 // Pixel count is the biggest cost: only an explicit High setting goes past 1.5x, and never past 2x (4K/retina screens).
 const targetRatio = () => renderRatio(innerWidth,innerHeight,devicePixelRatio,effectiveQuality(GRAPHICS_MODE));
 renderer.setPixelRatio(targetRatio());

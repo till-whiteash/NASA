@@ -49,3 +49,5 @@
 .learning-entry [aria-pressed=true]{outline:2px solid #99ddc1}
 .learning-feedback{min-height:1.5em;color:#b3e8d2}
 .launch-actions{flex-wrap:wrap}#guided-start{white-space:normal}
+
+.zhetela-lite-portrait{display:block;flex:none;width:72px;height:72px;object-fit:contain}

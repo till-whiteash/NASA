@@ -1,3 +1,6 @@
+import { GRAPHICS_MODE } from './surface-detail.js';
+import { effectiveQuality } from './device-profile.js';
+const liteFilms = effectiveQuality(GRAPHICS_MODE) === 'low';
 // Full-screen playback of the authored Blender movies in animation/previews/.
 // Clip ranges and responsive captions come from animation/glb/<name>.captions.json.
 //   playCinematic('briefing_mission')                        -> Promise that resolves when it ends or is skipped
@@ -75,7 +78,7 @@ function filmVideo(name) {
 }
 // Start downloading a film before it is needed (call it a scene early). Safe to call more than once.
 export function preloadCinematic(name) {
-  if (!name || preloaded.has(name)) return;
+  if (liteFilms || !name || preloaded.has(name)) return;
   for (const video of preloaded.values()) releaseVideo(video);
   preloaded.clear(); clearTimeout(preloadExpiry); // at most one upcoming film
   const v = filmVideo(name); v.load(); preloaded.set(name, v); captionsFor(name);
@@ -83,7 +86,7 @@ export function preloadCinematic(name) {
     if (preloaded.get(name) === v) { preloaded.delete(name); releaseVideo(v); }
   }, 60000); // release unused look-ahead buffers during long gameplay sessions
 }
-const VIDEO = name => new URL(`previews/${name}${CLEAN_VIDEO(name) ? '-hd' : ''}.mp4${name === 'launch_earth' ? '?v=complete-launch-1' : ''}`, ANIMATION_ROOT).href;
+const VIDEO = name => new URL(`previews/${name}${CLEAN_VIDEO(name) ? (liteFilms ? '-lite' : '-hd') : ''}.mp4${name === 'launch_earth' ? '?v=complete-launch-1' : ''}`, ANIMATION_ROOT).href;
 const POSTER = name => new URL(`previews/posters/${name}.jpg`, ANIMATION_ROOT).href;
 // What the loading screen calls each film.
 const FILM_TITLES = {
