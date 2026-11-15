@@ -63,7 +63,7 @@ Use Skip or Esc to advance. The Mars and Moon 3D briefings advance to their rend
 | First dust storm | `dust_storm` film; later storms use the in-world storm in your own base |
 | Random failures (new) | `panel_failure`, `rover_stuck` or `air_leak`, then a pop-up. The fixes play `panel_repair` (press E at the solar panels, 1 part), `rover_freed` (press E at the rover) and `leak_patched` (patch from the pop-up or at an airlock door, 1 part). Unfixed panels and leaks get fixed by the rest of the crew after 8 and 5 sols. |
 | Winning the mission | `ascent_mars`, then the mission-complete screen |
-| Moon departure | `launch_earth` after Ready for launch, before the Moon page |
+| Moon departure | `launch_moon`: separate historical Saturn V model and real-time ascent after Ready for launch, before the Moon page (no MP4 fallback) |
 | Cutscenes menu | every film, including all three repair animations, to watch again |
 
 ## Outpost layout (every Mars film)

@@ -6,6 +6,7 @@
 // Only the Skip button or Esc skips (a stray click or key press no longer ends the film). With reduced motion, or if the file can't load, it resolves at once so the
 // game always carries on.
 import * as THREE from 'three';
+import { moonLaunchStage } from './moon-launch.js';
 import { loadModel } from './nasamodels.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
@@ -62,6 +63,7 @@ function captionsFor(name) {
 
 // One stage: its own canvas and renderer, so the game's renderer and scene are never touched.
 async function stage(name, parent, { clip, loop = false } = {}) {
+  if (name === 'launch_moon') return moonLaunchStage(parent);
   const [gltf, caps] = await Promise.all([loadModel(BASE + name + '.glb'), captionsFor(name)]);
   if (!gltf) throw new Error('could not load ' + name);
   const look = LOOKS[LOOK_OF[name] || 'mars'];
@@ -113,6 +115,8 @@ export function playCinematic(name, { clip, world } = {}) {
     const perf = { n: 0, sum: 0 };
     const playVideo = async (why, at = 0) => {
       if (done || video) return;
+      // This real-time Moon sequence has no pre-rendered movie yet.
+      if (name === 'launch_moon') { end(false); return; }
       console.warn(`Playing the video version of ${name}: ${why}`);
       clearTimeout(slow); cancelAnimationFrame(raf); st?.dispose(); st = null;
       const range = clip ? (await captionsFor(name))?.clips?.find(c => c.name === clip) : null;   // one clip of a longer film
@@ -155,7 +159,7 @@ export function playCinematic(name, { clip, world } = {}) {
       const tick = now => {
         const dt = Math.min(.1, (now - last) / 1000); last = now;
         const t = st.frame(dt);
-        if (++perf.n > 20 && perf.n <= 140) { perf.sum += dt; if (perf.n === 140 && perf.sum / 120 > .09) return playVideo('the 3D version runs too slowly here', t); }   // under ~11 fps
+        if (++perf.n > 20 && perf.n <= 140) { perf.sum += dt; if (name !== 'launch_moon' && perf.n === 140 && perf.sum / 120 > .09) return playVideo('the 3D version runs too slowly here', t); }   // under ~11 fps
         const l = st.lines.find(l => t >= l.t0 && t < l.t1), key = l ? l.t0 + l.text : '';
         if (cap.dataset.key !== key) {              // speaker on its own line, then the words
           cap.dataset.key = key; cap.textContent = '';
