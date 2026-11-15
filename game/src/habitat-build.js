@@ -127,6 +127,21 @@ export class HabitatBuild {
     return this.valve.position;
   }
   advance(text) { this.b.step++; this.b.pressure = 0; this.apply(); if (text) this.guide(text, true); }
+  mine(mesh) {
+    const b=this.b,d=mesh?.userData;if(!b||d?.kind!=='hab-rock'||!mesh.visible||b.cleared.includes(d.id))return false;
+      if (this.colony().tool !== 'pickaxe') { this.guide('Equip the pickaxe from your tool belt before breaking site rocks.'); return true; }
+      if (this.striking || this.world.toolSwing >= 0) return true; this.striking = true;
+      const accepted = this.world.swingTool(() => {
+        this.striking = false;if(this.b!==b||!mesh.visible||b.cleared.includes(d.id))return; b.rockHits[d.id] = (b.rockHits[d.id] || 0) + 1;
+        this.world.mineImpact?.(mesh.position, '#9b7657');
+        if (b.rockHits[d.id] < 3) { this.apply(); this.notify(`Rock cracking · ${b.rockHits[d.id]}/3`); return; }
+        if (!b.cleared.includes(d.id)) b.cleared.push(d.id);
+        mesh.visible = false; this.notify(`Site cleared: ${b.cleared.length}/${ROCKS}`);
+        if (b.cleared.length >= ROCKS) this.advance('Site clear. Now lay a foundation and raise a frame on each glowing footprint.'); else this.apply();
+      });
+      if (!accepted) this.striking = false; // a rejected swing must never lock the rock permanently
+      return true;
+  }
   use(mesh) {
     const b = this.b, d = mesh.userData; if (!b) return false;
     if(!mesh.visible)return true;
@@ -137,20 +152,7 @@ export class HabitatBuild {
       if(!b.pioneer?.calibrator)return true;
       if(!this.measuring){this.measuring={mesh,t:0};this.guide('Calibrator running: '+d.label+'. Stay within 3 metres for 3 seconds.');}return true;
     }
-    if (d.kind === 'hab-rock') {
-      if (this.colony().tool !== 'pickaxe') { this.guide('Equip the pickaxe from your tool belt (1 or 2) before breaking site rocks.'); return true; }
-      if (this.striking || this.world.toolSwing >= 0) return true; this.striking = true;
-      const accepted = this.world.swingTool(() => {
-        this.striking = false; b.rockHits[d.id] = (b.rockHits[d.id] || 0) + 1;
-        this.world.mineImpact?.(mesh.position, '#9b7657');
-        if (b.rockHits[d.id] < 3) { this.apply(); this.notify(`Rock cracking · ${b.rockHits[d.id]}/3`); return; }
-        if (!b.cleared.includes(d.id)) b.cleared.push(d.id);
-        mesh.visible = false; this.notify(`Site cleared: ${b.cleared.length}/${ROCKS}`);
-        if (b.cleared.length >= ROCKS) this.advance('Site clear. Now lay a foundation and raise a frame on each glowing footprint.'); else this.apply();
-      });
-      if (!accepted) this.striking = false; // a rejected swing must never lock the rock permanently
-      return true;
-    }
+    if (d.kind === 'hab-rock') { this.guide('Site rock: '+(b.rockHits[d.id]||0)+'/3 hits. Left click or Mine with the pickaxe to clear it. E only inspects.');return true; }
     if (d.kind === 'hab-pad') {
       if (b.frames.includes(d.id)) return true;
       const cost=spendFor(b,'frame',d.id);if(!cost.ok){this.guide(cost.why);return true;}

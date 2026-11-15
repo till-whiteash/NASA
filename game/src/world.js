@@ -17,6 +17,8 @@ import { createRockContact } from './rock-contact.js';
 import { createDriveProps } from './drive-props.js';
 import { addMarsRockField } from './mars-rock-field.js';
 import { mergeStatic } from './static-merge.js';
+import {installSolarModels} from './power-models.js';
+import {fitViewGlove,alignViewGlove} from './eva-grip.js';
 import { SURFACE_DETAIL, GRAPHICS_MODE, regolithMaps, rockMaterial, makeGroundDust, makeStormDust } from './surface-detail.js';
 import { effectiveQuality } from './device-profile.js';
 import { solarPanel, makeCellMat } from './models.js';
@@ -508,7 +510,7 @@ function makeSolarField() {
     mergeStatic(p.children[0]);
     mergeStatic(p, { exclude: [p.children[0], ...p.userData.feet] });
   }
-  return { group: g, panels };
+  const solar={group:g,panels};g.userData.powerAssetState='loading';solar.modelsReady=installSolarModels(solar);return solar;
 }
 
 // Glowing pickups with a tall beam, like the beacon in No Man's Sky, so kids can find them.
@@ -776,6 +778,7 @@ export class World {
     material.roughness=.3+.6*dust;
     material.metalness=.5*(1-dust);
     material.emissiveIntensity=.55*(1-dust);
+    for(const cell of this.solar.group.userData.fieldCellMaterials||[]){cell.roughness=.18+.72*dust;cell.metalness=.3*(1-dust);}
   }
   setWall(level) { if(this.settlement)return this.settlement.setWall(level);this.outpost.wall.visible = level > 0; }
   setRegolith(on) {
@@ -885,7 +888,7 @@ export class World {
   holdTool(hand, view) {
     this.handSlot.clear(); this.viewSlot.clear();
     if (hand) this.handSlot.add(hand);
-    if (view) { view.traverse(o => { if (o.material) { o.material = o.material.clone(); o.material.depthTest = false; o.material.fog = false; } o.renderOrder = 10; }); this.viewSlot.add(view); }
+    if (view) { view.traverse(o => { if (o.material) { o.material = o.material.clone(); o.material.depthTest = false; o.material.fog = false; } o.renderOrder = 10; }); this.viewSlot.add(view);this.viewGloveReady=fitViewGlove(view); }
   }
   // One pickaxe swing. `onStrike` is called at the moment the point hits the rock.
   swingTool(onStrike) {
@@ -894,7 +897,8 @@ export class World {
   }
   updateSwing(dt) {
     this.updateImpacts(dt);
-    if (this.toolSwing < 0) { this.viewSlot.rotation.set(0, 0, 0); this.viewSlot.position.set(0, 0, 0); return; }
+    for(const holder of this.viewSlot.children)alignViewGlove(holder);
+    if (this.toolSwing < 0) { this.viewSlot.rotation.set(0, 0, 0); this.viewSlot.position.copy(this.viewHome); return; }
     if (this.hitStop > 0) { this.hitStop -= dt; dt *= 0.08; }        // a split-second pause as the pick bites the rock
     const before = this.toolSwing;
     this.toolSwing += dt / 0.8;
@@ -903,7 +907,7 @@ export class World {
     // first person: the pick comes up past your view, chops down, jolts on the rock and settles back
     const jolt = this.toolSwing > 0.55 && this.toolSwing < 0.62 ? Math.sin((this.toolSwing - 0.55) / 0.07 * Math.PI) * 0.03 : 0;
     this.viewSlot.rotation.set(lift * 1.1, lift * 0.12, -lift * 0.25);
-    this.viewSlot.position.set(0, -crouch * 0.12 - jolt, 0);
+    this.viewSlot.position.copy(this.viewHome).add(new THREE.Vector3(0,-crouch*.12-jolt,0));
     if (this.toolSwing >= 1) this.toolSwing = -1;
   }
 
@@ -1207,5 +1211,5 @@ export class World {
 
   resize() { this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); this.placeViewSlot(); }
   // the first-person tool sits in the bottom-right corner - closer to the middle on tall, narrow screens
-  placeViewSlot() { this.viewSlot.position.set(Math.min(0.36, 0.25 * this.camera.aspect), -0.34, -0.7); }
+  placeViewSlot() { this.viewHome??=new THREE.Vector3();this.viewHome.set(Math.min(0.36, 0.25 * this.camera.aspect), -0.29, -0.7);this.viewSlot.position.copy(this.viewHome); }
 }

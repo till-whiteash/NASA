@@ -37,7 +37,7 @@ with sync_playwright() as p:
     # 1 -> break four rocks (3 pickaxe strikes each)
     page.evaluate("""async () => { const w = game.world, hb = w.habBuild; game.colony.s.tool = 'pickaxe'; game.colony.tool = 'pickaxe';
       for (const rock of hb.rocks) for (let k = 0; k < 3; k++) { w.player.position.set(rock.position.x - 1.2, w.player.position.y, rock.position.z);
-        hb.striking = false; hb.use(rock); for (let i = 0; i < 40 && w.toolSwing >= 0; i++) { w.updateSwing(1/30); } } }""")
+        hb.striking = false; hb.mine(rock); for (let i = 0; i < 40 && w.toolSwing >= 0; i++) { w.updateSwing(1/30); } } }""")
     o = page.evaluate(STEP, 1); print('AFTER ROCKS', o['id'], o.get('step'))
     assert o['id'] == 'hab-2', o
     # 2 -> frame every module

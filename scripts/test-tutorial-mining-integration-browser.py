@@ -1,6 +1,6 @@
 """Guard tutorial mining against habitat/layout changes and stale scenery picks.
 
-Exercises the normal Construction ray/Use path, not HabitatBuild.use directly.
+Exercises the normal Construction ray/Mine path, not HabitatBuild.mine directly.
 Requires the committed tutorial build; screenshots and JSON go to --out.
 """
 from pathlib import Path
@@ -33,7 +33,7 @@ SCRIPT="""async () => {
  function hitRock(rock){
    const hit=aim(rock);
    if(hit?.object!==rock)return {ok:false,kind:hit?.object?.userData?.kind||'scenery',instance:hit?.instanceId};
-   const used=c.use();drain();return {ok:used,kind:hit.object.userData.kind};
+   const used=c.mine();drain();return {ok:used,kind:hit.object.userData.kind};
  }
  o.habBuild.step=1;hb.apply();
  result.habitatPhoto=photo(hb.rocks[0].position);

@@ -1,0 +1,61 @@
+{
+  "source": "Existing Claude-authored Blender power kit; no new downloads",
+  "generator": "game/animation/scripts/make_power_kit.py",
+  "compared_checkout": "C:\\NASA\\Zhetalis-Nasa-anim\\game\\assets\\power",
+  "models": [
+    {
+      "file": "battery-cabinet.glb",
+      "bytes": 476652,
+      "sha256": "7ddf090382c91e0528db3f79949b92b4c38e714543f2fcc6e45d24a983dbf40e",
+      "matches_animation_checkout": true
+    },
+    {
+      "file": "battery-module.glb",
+      "bytes": 362600,
+      "sha256": "8702fa92138751d5072dcefa74801736f908d0b2817f9ff13dd3166e7d5aada8",
+      "matches_animation_checkout": true
+    },
+    {
+      "file": "charge-controller.glb",
+      "bytes": 186632,
+      "sha256": "e0a8ef23e67b9e1835fbc38f10cc1cc3a2f4e04087c853c25337e14bb468e264",
+      "matches_animation_checkout": true
+    },
+    {
+      "file": "charging-post.glb",
+      "bytes": 33032,
+      "sha256": "66706331dd1e60acfa02038a0ffdb26ef5073ecc67bffb41235a0b9eabd38583",
+      "matches_animation_checkout": true
+    },
+    {
+      "file": "output-connector.glb",
+      "bytes": 45356,
+      "sha256": "d61dbdbdd1e28fce1d26436169c5759101f30e0ed60aad87c54ffa4a6a45a066",
+      "matches_animation_checkout": true
+    },
+    {
+      "file": "protected-output.glb",
+      "bytes": 86392,
+      "sha256": "0131cf339cdf2cc0d9641b87602184d54d68017a84504204b88630ae46981db5",
+      "matches_animation_checkout": true
+    },
+    {
+      "file": "rover-connector.glb",
+      "bytes": 173056,
+      "sha256": "e6343ca260f869a1d6469a437d2d7b27e0a63cae77212250a07206ae9910337b",
+      "matches_animation_checkout": true
+    },
+    {
+      "file": "solar-module.glb",
+      "bytes": 97416,
+      "sha256": "b08aabf240fa88d49af32bada90173bfe0d42359c22a6130220f3049f5be3399",
+      "matches_animation_checkout": true
+    },
+    {
+      "file": "support-frame.glb",
+      "bytes": 52956,
+      "sha256": "eb3ec1c8e5e43f5983ddd63a75c60057fbfebe8fa80ded2f2c8d64084a965099",
+      "matches_animation_checkout": true
+    }
+  ]
+}

@@ -8,6 +8,7 @@ import { createOpenLayout } from './exploration-layout.js';
 import { installHabitatAccess } from './access.js';
 import { mergeStatic } from './static-merge.js';
 import { loadModel } from './nasamodels.js';
+import {installPowerModel,powerModel} from './power-models.js';
 import { GREENHOUSE } from './colony.js';
 import { GH, heightAt } from './world.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -163,6 +164,8 @@ export async function installSettlement(world){
   const applySoil=n=>{soilLevel=Math.max(0,Math.min(3,Number(n)||0));berms.visible=soilLevel>0;soilCourses.forEach((course,i)=>course.visible=i<soilLevel);finishes.forEach(f=>f(soilLevel));mission.greenhouseRoom?.setRegolith(soilLevel);};
   const pack=new THREE.Mesh(new THREE.BoxGeometry(1.5,.9,1),waterMat);
   pack.position.set(53.4,heightAt(53.4,-17)+.45,-17);world.scene.add(pack);
+  // Clone the placeholder material: hiding it must not hide other waterMat props.
+  pack.material=pack.material.clone();installPowerModel(pack,'battery-cabinet',{y:-.45});
   world.colliders.push({x:pack.position.x,z:pack.position.z,r:.8,object:pack});
   for(const panel of world.solar.panels){
     const position=panel.getWorldPosition(new THREE.Vector3());
@@ -188,6 +191,10 @@ export async function installSettlement(world){
   const cyan=new THREE.MeshStandardMaterial({color:'#5bc8cd',roughness:.5,emissive:'#073a40',emissiveIntensity:.4});
   for(const x of[-2.4,2.4]){const stripe=new THREE.Mesh(new THREE.BoxGeometry(.12,.035,7),cyan);stripe.position.set(x,.025,0);charging.add(stripe);}
   const post=new THREE.Mesh(new THREE.BoxGeometry(.5,1.35,.45),waterMat);post.position.set(3.2,.675,0);charging.add(post);
+  post.material=post.material.clone();
+  installPowerModel(post,'charging-post',{scale:3.1,y:-.675});
+  // The approved coiled plug is holstered on the post, using its real kit mesh.
+  post.connectorReady=powerModel('rover-connector').then(model=>{if(!model)return null;model.scale.setScalar(2);model.rotation.x=-Math.PI/2;model.position.set(.22,-.04,.20);post.add(model);return model;});
   const chargerLamp=new THREE.Mesh(new THREE.SphereGeometry(.13,16,12),cyan);chargerLamp.position.set(3.2,1.45,0);charging.add(chargerLamp);
   const chargerCable=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([pack.position.clone(),new THREE.Vector3(34,.08,24),new THREE.Vector3(-30,.08,26),new THREE.Vector3(-30.8,.6,26)]),64,.055,8,false),new THREE.MeshStandardMaterial({color:'#30393e'}));
   world.scene.add(chargerCable);charging.visible=chargerCable.visible=false;
@@ -201,7 +208,7 @@ export async function installSettlement(world){
   const equipmentBlock=equipmentContact(model);
   const objectiveBeacon=new THREE.Mesh(new THREE.RingGeometry(.8,1,64),new THREE.MeshBasicMaterial({color:'#c78aff',side:THREE.DoubleSide,transparent:true,opacity:.85,depthWrite:false}));objectiveBeacon.rotation.x=-Math.PI/2;world.scene.add(objectiveBeacon);
   const inlet=new THREE.Mesh(new THREE.BoxGeometry(.42,.7,.22),cyan);inlet.position.set(access.entrances[0].x+2.7,.65,access.entrances[0].doorZ+1);world.scene.add(inlet);
-  const mission={objectiveBeacon,charging,chargerCable,chargerSite:{x:-30.8,z:26},chargingBay:{x:-34,z:26},shelterSite,soilSite,crossings,serviceCables,glassTunnel,blockEquipment:pos=>{const top=world.panelHeight(pos.x,pos.z);if(Number.isFinite(top)&&pos.y>=top-.18)return;equipmentBlock(pos);},pack,cable,powerSite,...access,model,layout,greenhouse,bindGreenhouse:room=>{mission.greenhouseRoom=room;room.setRegolith(soilLevel);},updateGreenhouse:(beds,powered=true)=>{
+  const mission={objectiveBeacon,charging,chargerPost:post,chargerCable,chargerSite:{x:-30.8,z:26},chargingBay:{x:-34,z:26},shelterSite,soilSite,crossings,serviceCables,glassTunnel,blockEquipment:pos=>{const top=world.panelHeight(pos.x,pos.z);if(Number.isFinite(top)&&pos.y>=top-.18)return;equipmentBlock(pos);},pack,cable,powerSite,...access,model,layout,greenhouse,bindGreenhouse:room=>{mission.greenhouseRoom=room;room.setRegolith(soilLevel);},updateGreenhouse:(beds,powered=true)=>{
     // The racks seen through the dome are a few pixels from beyond 40 m: skip their ~100 draws out there.
     if(mission.visibleFurnishings){const c=world.camera.position;mission.visibleFurnishings.visible=Math.hypot(c.x-greenhouse.position.x,c.z-greenhouse.position.z)<40;}
     const room=mission.greenhouseRoom;if(!room)return;

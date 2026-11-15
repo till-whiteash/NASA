@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {BatteryBank} from './battery-bank.js';
 import {heightAt} from './world.js';
 import {ASSEMBLIES,buildState,fitPart,assemblyDone,circuitFor,circuitReady,circuitConnected,CIRCUITS,socketPartner,socketFeedback,SOCKET_LABELS,POLE_NAME,leadsOn,nextPole,connectLead,leadLesson,ORDER_LESSON,REVERSE_LESSON} from './construction-state.js';
-import {loadModel} from './nasamodels.js';
+import {powerModel} from './power-models.js';
 
 // A real field cable: plug bodies at both posts, the lead drops to the ground, slack coiled in loops near each end
 // (cables are never laid tight - they expand and contract in the cold), then runs along the ground between them.
@@ -57,8 +57,6 @@ export class Construction {
   point('solar-out','Solar array OUT',ground(51.6,-19.5,.75));
   point('battery-in','Battery controller IN',m.pack.position.clone().add(new THREE.Vector3(-.45,.19,.6)));   // on the cabinet's terminal shelf
   point('battery-out','Battery protected OUT',m.pack.position.clone().add(new THREE.Vector3(.45,.19,.6)));
-  // the field battery: an insulated Li-ion cabinet (child of the pack, so the game's show/hide still applies)
-  loadModel('power/battery-cabinet.glb').then(g=>{if(!g)return;const c=g.scene.clone(true);c.position.y=-.45;c.traverse(o=>{o.userData.sharedAsset=true;if(o.isMesh)o.castShadow=o.receiveShadow=true;});m.pack.material=new THREE.MeshBasicMaterial({visible:false});m.pack.add(c);});
   const e=m.entrances[0];point('base-in','Base IN',new THREE.Vector3(e.x+2.7,.77,e.doorZ+1.14));point('base-out','Base charger OUT',new THREE.Vector3(e.x+3.2,.77,e.doorZ+1.14));
   point('charger-in','Rover charger IN',ground(-30.8,26.24,.85));
   // A marked work zone away from camp. Training rubble uses the same rock surface.
@@ -81,7 +79,7 @@ export class Construction {
   this.placeBatteryButton=document.createElement('button');this.placeBatteryButton.id='construction-place-battery';this.placeBatteryButton.hidden=true;document.getElementById('hud').append(this.placeBatteryButton);this.placeBatteryButton.onclick=()=>this.placeBattery();
   this.heldDisplay=new THREE.Group();world.scene.add(this.heldDisplay);this.heldDisplay.visible=false;
  }
- begin(kind){this.heldDisplay.clear();this.heldDisplay.userData.name=null;document.getElementById('mission-objective').open=false;this.kind=kind;this.held=null;this.bench.traverse(m=>{if(m.isMesh&&!m.userData.sharedAsset){m.geometry.dispose();m.material.dispose();}});this.bench.clear();this.slots=[];this.bench.visible=true;
+ begin(kind){const generation=this.benchGeneration=(this.benchGeneration||0)+1;this.heldDisplay.clear();this.heldDisplay.userData.name=null;document.getElementById('mission-objective').open=false;this.kind=kind;this.held=null;this.bench.traverse(m=>{if(m.isMesh&&!m.userData.sharedAsset){m.geometry.dispose();m.material.dispose();}});this.bench.clear();this.slots=[];this.bench.visible=true;
   ASSEMBLIES[kind].forEach((name,i)=>{
    for(const isSlot of [false,true]){const mat=new THREE.MeshStandardMaterial({color:isSlot?'#6cddbf':i===1?'#234f85':'#c4beb0',transparent:isSlot,opacity:isSlot?.35:1,roughness:.6});let geometry;
    if(/frame/i.test(name)){const shape=new THREE.Shape();shape.moveTo(-.22,-.18);shape.lineTo(.22,-.18);shape.lineTo(.22,.18);shape.lineTo(-.22,.18);shape.closePath();const hole=new THREE.Path();hole.moveTo(-.16,-.12);hole.lineTo(-.16,.12);hole.lineTo(.16,.12);hole.lineTo(.16,-.12);hole.closePath();shape.holes.push(hole);geometry=new THREE.ExtrudeGeometry(shape,{depth:.06,bevelEnabled:false});geometry.rotateX(-Math.PI/2);}
@@ -89,10 +87,23 @@ export class Construction {
    else geometry=new THREE.BoxGeometry(.38,/Battery/.test(name)?.27:.10,.32);
    const mesh=new THREE.Mesh(geometry,mat);
    if(!isSlot&&/Solar module|controller/.test(name)){for(let j=0;j<4;j++){const rib=new THREE.Mesh(new THREE.BoxGeometry(.012,.025,.28),new THREE.MeshStandardMaterial({color:/Solar/.test(name)?'#a5c9db':'#616f72'}));rib.position.set(-.14+j*.09,.065,0);mesh.add(rib);}}mesh.position.set((i-1)*.52,isSlot?.3:.08,isSlot?-.3:.35);mesh.userData={kind:isSlot?'slot':'part',name,label:(isSlot?'Fit into slot: ':'Pick up: ')+name};this.bench.add(mesh);this.slots.push(mesh);
-   if(!isSlot&&PART_MODELS[name])loadModel('power/'+PART_MODELS[name]+'.glb').then(g=>{if(!g||!mesh.parent)return;
-    geometry.computeBoundingBox();const pb=geometry.boundingBox,ps=pb.getSize(new THREE.Vector3()),c=g.scene.clone(true),b=new THREE.Box3().setFromObject(c),sz=b.getSize(new THREE.Vector3());
-    c.scale.setScalar(Math.max(ps.x,ps.z)/Math.max(sz.x,sz.z));const b2=new THREE.Box3().setFromObject(c),ctr=b2.getCenter(new THREE.Vector3());c.position.set(-ctr.x,pb.min.y-b2.min.y,-ctr.z);
-    c.traverse(o=>{o.userData.sharedAsset=true;});for(const child of mesh.children)child.visible=false;mesh.material.visible=false;mesh.add(c);});}
+   if(PART_MODELS[name]){
+    mesh.userData.powerAssetState='loading';
+    mesh.powerModelReady=powerModel(PART_MODELS[name]).then(c=>{
+     if(!c){mesh.userData.powerAssetState='failed';return null;}
+     if(generation!==this.benchGeneration||mesh.parent!==this.bench)return null;
+     geometry.computeBoundingBox();const pb=geometry.boundingBox,ps=pb.getSize(new THREE.Vector3()),b=new THREE.Box3().setFromObject(c),sz=b.getSize(new THREE.Vector3());
+     c.scale.setScalar(Math.min(Math.max(ps.x,ps.z)/Math.max(sz.x,sz.z),.42/sz.y));
+     const b2=new THREE.Box3().setFromObject(c),ctr=b2.getCenter(new THREE.Vector3());c.position.set(-ctr.x,pb.min.y-b2.min.y,-ctr.z);
+     for(const child of mesh.children)child.visible=false;
+     const done=buildState(this.state()).placed[kind]?.includes(name);c.visible=!isSlot||!!done;mesh.material.visible=isSlot&&!done;
+     mesh.add(c);mesh.powerVisual=c;mesh.userData.powerAssetState='ready';
+     // A part may have been picked up before its download finished. Refresh that
+     // held copy immediately rather than keeping the old block until next pickup.
+     if(this.held===name)this.heldDisplay.userData.name=null;
+     return c;
+    });
+   }}
   });this.guide('Pick up a part from the front row, then select its matching highlighted slot. E / Action places it.');
  }
  placeBattery(){
@@ -115,15 +126,17 @@ export class Construction {
   this.ghosts.forEach((g,i)=>{g.material.opacity=s.cleared.length>=4?.3:.08;g.visible=o.powerStep===2&&!s.placed.field?.includes(i);if(o.powerStep===2)this.world.solar.panels[i].visible=!!s.placed.field?.includes(i);});
   this.packGhost.visible=o.powerStep===4;this.chargerGhost.visible=o.chargerStep===1;
   this.bench.visible=!!this.kind&&inside&&room===this.interior;
-  if(this.kind){const placed=s.placed[this.kind]||[];for(const mesh of this.slots){const done=placed.includes(mesh.userData.name);mesh.visible=mesh.userData.kind==='slot'||(!done&&this.held!==mesh.userData.name);if(mesh.userData.kind==='slot'){mesh.material.opacity=done?1:.35;mesh.material.color.set(done?'#bfc4b5':this.held===mesh.userData.name?'#ffd577':'#6cddbf');}}}
+  if(this.kind){const placed=s.placed[this.kind]||[];for(const mesh of this.slots){const done=placed.includes(mesh.userData.name);mesh.visible=mesh.userData.kind==='slot'||(!done&&this.held!==mesh.userData.name);if(mesh.userData.kind==='slot'){if(mesh.powerVisual)mesh.powerVisual.visible=done;mesh.material.visible=!done||!mesh.powerVisual;mesh.material.opacity=done?1:.35;mesh.material.color.set(done?'#bfc4b5':this.held===mesh.userData.name?'#ffd577':'#6cddbf');}}}
   const partner=socketPartner(this.wire);
   this.sockets.forEach(mesh=>{const id=mesh.userData.id,index=CIRCUITS.findIndex(pair=>pair.includes(id)),ready=circuitReady(o,index);mesh.visible=id==='solar-out'?o.powerStep>=5:id.startsWith('battery')?o.powerStep>=5:id==='charger-in'?o.chargerStep>=2:o.powerStep>=6;mesh.material.color.set(circuitConnected(o,index)?'#69d897':this.wire===id?'#ffd577':partner===id&&ready?'#b78cff':ready?'#8be5d1':'#687276');mesh.material.emissive.set(partner===id&&ready?'#47305e':'#101b1c');});
   // one cable per lead: red + and black - laid side by side between the matching posts
   for(let i=0;i<3;i++)for(const pole of leadsOn(o,i)){if(this.cables.has(i+pole))continue;const ids=CIRCUITS[i];
    const a=this.postPosition(ids[0],pole),b=this.postPosition(ids[1],pole),side=new THREE.Vector3(-(b.z-a.z),0,b.x-a.x).normalize().multiplyScalar(pole==='+'?-.08:.08);
    const cable=fieldCable(a,b,side,POLE_COLOUR[pole],i===2?.035:.028);this.world.scene.add(cable);this.cables.set(i+pole,cable);}
+  for(const [key,cable] of this.cables) cable.visible=leadsOn(o,+key[0]).includes(key.slice(1));
   // Once the base is wired, bond its metal frame back to the protected cabinet bus.
   if(o.baseConnected&&!this.groundRod){const e=this.world.settlement.entrances[0];this.groundRod=groundBond(this.world.settlement.pack.position,new THREE.Vector3(e.x+2.3,.5,e.doorZ+1.14));this.world.scene.add(this.groundRod);}
+  if(this.groundRod)this.groundRod.visible=!!o.baseConnected;
   // Legacy cables ended at the wrong model faces; visible leads now terminate at sockets.
   this.world.settlement.cable.visible=false;this.world.settlement.chargerCable.visible=false;
   this.hit=null;this.hint='';if(this.blocked){this.preview.visible=false;this.heldDisplay.visible=false;return;}
@@ -135,10 +148,10 @@ export class Construction {
   // Layout and habitat changes can hide scenery after rockSamples was captured.
   // Pick against the live instance transform so removed rubble cannot steal a strike.
   let hit=this.ray.intersectObjects(objects,true)[0];
-  if(!inside&&this.colony().tool==='pickaxe'){const player=this.world.player.position;for(const sample of this.rockSamples){if(this.removedApplied.has(sample.id)||Math.hypot(sample.position.x-player.x,sample.position.z-player.z)>sample.radius+3.3)continue;this.world.rocks.getMatrixAt(sample.id,this.rockProxy.matrixWorld);if(this.rockProxy.matrixWorld.elements[13]<-1000)continue;const rock=this.ray.intersectObject(this.rockProxy,false)[0];if(rock&&(!hit||rock.distance<hit.distance)){rock.object=this.world.rocks;rock.instanceId=sample.id;hit=rock;}}}
+  if(!inside){const player=this.world.player.position;for(const sample of this.rockSamples){if(this.removedApplied.has(sample.id)||Math.hypot(sample.position.x-player.x,sample.position.z-player.z)>sample.radius+3.3)continue;this.world.rocks.getMatrixAt(sample.id,this.rockProxy.matrixWorld);if(this.rockProxy.matrixWorld.elements[13]<-1000)continue;const rock=this.ray.intersectObject(this.rockProxy,false)[0];if(rock&&(!hit||rock.distance<hit.distance)){rock.object=this.world.rocks;rock.instanceId=sample.id;hit=rock;}}}
   if(hit&&hit.object!==this.world.rocks){while(!hit.object.userData.kind&&hit.object.parent)hit.object=hit.object.parent;}
   const player=inside?room.pos.clone().add(room.scene.position):this.world.player.position;
-  if(hit&&hit.point.distanceTo(player.clone().add(new THREE.Vector3(0,1,0)))<3.3){this.hit=hit;this.hint=hit.object===this.world.rocks?'E / Action · break surface rock with pickaxe':`E / Action · ${hit.object.userData.label}`;}
+  if(hit&&hit.point.distanceTo(player.clone().add(new THREE.Vector3(0,1,0)))<3.3){this.hit=hit;this.hint=(hit.object===this.world.rocks||['rubble','hab-rock'].includes(hit.object.userData.kind))?'Left click / Mine: break rock · E / Use: inspect':`E / Action · ${hit.object.userData.label}`;}
   if(this.hit?.object.userData.kind==='socket')this.hint=this.hit.object.userData.label+' - '+socketFeedback(o,this.hit.object.userData.id,this.wire);
   if(this.held)this.hint=`Holding ${this.held} · `+this.hint+' · R to cancel';
   if(this.wire){const target=this.sockets.find(p=>p.userData.id===partner);this.hint=`${this.pole==='-'?'Black − lead':'Red + lead'} → ${target.userData.label} ${this.pole==='-'?'−':'+'} · ${Math.round(target.position.distanceTo(player))} m · E / Action · R to drop. `+this.hint;}
@@ -149,18 +162,31 @@ export class Construction {
   this.preview.visible=!!this.wire&&!inside;
   if(this.preview.visible){this.preview.material.color.set(this.pole==='-'?'#b9c0c4':'#ff5a4a');const a=this.postPosition(this.wire,this.pole||'+'),b=this.hit?.point||player.clone().add(new THREE.Vector3(0,1,0));const pts=[a.clone()];for(let j=0;j<=16;j++){const t=j/16,x=THREE.MathUtils.lerp(a.x,b.x,t),z=THREE.MathUtils.lerp(a.z,b.z,t);pts.push(new THREE.Vector3(x,heightAt(x,z)+.1,z));}pts.push(b.clone());const attr=this.preview.geometry.attributes.position;pts.forEach((p,i)=>attr.setXYZ(i,p.x,p.y,p.z));attr.needsUpdate=true;this.preview.geometry.computeBoundingSphere();this.preview.computeLineDistances();}
  }
+ liveRockTarget(hit){
+  if(!hit)return false;const mesh=hit.object;
+  if(mesh===this.world.rocks){const id=hit.instanceId;if(!Number.isInteger(id)||id<0||id>=mesh.count)return false;const m=new THREE.Matrix4();mesh.getMatrixAt(id,m);if(m.elements[13]<-1000)return false;}
+  else {for(let p=mesh;p;p=p.parent)if(!p.visible)return false;}
+  return !hit.point||hit.point.distanceTo(this.world.player.position.clone().add(new THREE.Vector3(0,1,0)))<3.3;
+ }
+ mine(){
+  if(this.blocked||!this.hit||!this.liveRockTarget(this.hit))return false;
+  const target=this.hit,mesh=target.object,d=mesh.userData,o=this.state(),s=buildState(o);
+  if(d.kind==='hab-rock')return this.world.habBuild?.mine(mesh)??false;
+  if(mesh!==this.world.rocks&&d.kind!=='rubble')return false;
+   if(this.colony().tool!=='pickaxe'){this.guide('Equip the pickaxe from your tool belt before breaking this rock.');return true;}
+   let strikes=3;if(mesh===this.world.rocks){const matrix=new THREE.Matrix4(),size=new THREE.Vector3();mesh.getMatrixAt(this.hit.instanceId,matrix);size.setFromMatrixScale(matrix);if(Math.max(size.x,size.z)>6){this.notify('Boulder too large for a hand pickaxe · go around it');return true;}strikes=Math.min(12,3+Math.ceil(Math.max(size.x,size.y,size.z)));}
+   const id=mesh===this.world.rocks?'rock-'+this.hit.instanceId:'site-'+d.id,instance=this.hit.instanceId;
+   if(this.striking)return true;this.striking=true;
+   const accepted=this.world.swingTool(()=>{this.striking=false;if(this.state()!==o||!this.liveRockTarget(target))return;s.rockHits[id]=(s.rockHits[id]||0)+1;if(s.rockHits[id]>=strikes){if(d.kind==='rubble'){if(!s.cleared.includes(d.id))s.cleared.push(d.id);mesh.visible=false;}else if(!s.removed.includes(instance)){s.removed.push(instance);this.removeRock(instance);this.removedApplied.add(instance);}this.notify(d.kind==='rubble'?`Site cleared: ${s.cleared.length}/4 rocks.`:'Rock cleared. Identified mineral deposits give samples; ordinary rubble does not.',true);}else this.notify(`Rock: ${strikes-s.rockHits[id]} more strikes.`);this.save();});if(!accepted)this.striking=false;return true;
+ }
  use(){
   if(this.blocked||!this.hit)return false;
   const o=this.state(),s=buildState(o),mesh=this.hit.object,d=mesh.userData;
   if(d.kind?.startsWith('bank-'))return this.bank.use(mesh);
   if(d.kind?.startsWith('hab-'))return this.world.habBuild?.use(mesh)??false;   // habitat construction (habitat-build.js)
   if(mesh===this.world.rocks||d.kind==='rubble'){
-   if(this.colony().tool!=='pickaxe'){this.guide('Equip the pickaxe from your tool belt before breaking this rock.');return true;}
-   if(mesh===this.world.rocks){const near=this.world.nearest();if(near&&['ore','ice','pod','panels','door'].includes(near.type)&&near.d<1.8)return false;}
-   let strikes=3;if(mesh===this.world.rocks){const matrix=new THREE.Matrix4(),size=new THREE.Vector3();mesh.getMatrixAt(this.hit.instanceId,matrix);size.setFromMatrixScale(matrix);if(Math.max(size.x,size.z)>6){this.notify('Boulder too large for a hand pickaxe · go around it');return true;}strikes=Math.min(12,3+Math.ceil(Math.max(size.x,size.y,size.z)));}
-   const id=mesh===this.world.rocks?'rock-'+this.hit.instanceId:'site-'+d.id,instance=this.hit.instanceId;
-   if(this.striking)return true;this.striking=true;
-   const accepted=this.world.swingTool(()=>{this.striking=false;s.rockHits[id]=(s.rockHits[id]||0)+1;if(s.rockHits[id]>=strikes){if(d.kind==='rubble'){if(!s.cleared.includes(d.id))s.cleared.push(d.id);mesh.visible=false;}else if(!s.removed.includes(instance)){s.removed.push(instance);this.removeRock(instance);this.removedApplied.add(instance);}this.notify(d.kind==='rubble'?`Site cleared: ${s.cleared.length}/4 rocks.`:'Rock cleared. Identified mineral deposits give samples; ordinary rubble does not.',true);}else this.notify(`Rock: ${strikes-s.rockHits[id]} more strikes.`);this.save();});if(!accepted)this.striking=false;return true;
+   if(!this.liveRockTarget(this.hit))return true;
+   this.guide(d.kind==='rubble'?'Small site rock. Clear it with the pickaxe using Left click or Mine. E only inspects.':'Surface rubble. Left click or Mine with the pickaxe clears small rocks. Identified mineral deposits give samples; ordinary rubble does not.');return true;
   }
   if(d.kind==='part'){this.held=d.name;return true;}
   if(d.kind==='slot'){

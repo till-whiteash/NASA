@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {heightAt} from './world.js';
+import {installPowerModel} from './power-models.js';
 import {TUNED} from './sim.js';
 import {placeBank,checkBank,connectBank} from './battery-bank-state.js';
 
@@ -13,22 +14,22 @@ export class BatteryBank{
  cancel(){this.held=null;this.preview.visible=false;}
  make(i){
   const pack=this.world.settlement.pack.position,x=pack.x+3+(i%3)*2.5,z=pack.z-2-Math.floor(i/3)*2.5,y=heightAt(x,z),g=new THREE.Group();g.position.set(x,y,z);this.group.add(g);this.world.clearRocksAround?.(x,z,1.3);
-  const body=new THREE.Mesh(new THREE.BoxGeometry(1.35,1.3,.9),new THREE.MeshStandardMaterial({color:'#a3aeb1',metalness:.45,roughness:.5}));body.position.y=.65;g.add(body);
+  const body=new THREE.Mesh(new THREE.BoxGeometry(1.5,.9,1),new THREE.MeshStandardMaterial({color:'#a3aeb1',metalness:.45,roughness:.5}));body.position.y=.575;g.add(body);installPowerModel(body,'battery-cabinet',{y:-.45});
   const canvas=document.createElement('canvas');canvas.width=512;canvas.height=256;const ctx=canvas.getContext('2d');ctx.fillStyle='#13242c';ctx.fillRect(0,0,512,256);ctx.fillStyle='#f3d07b';ctx.font='bold 36px system-ui';ctx.fillText('PACK '+(i+2)+'  |  48 V',24,55);ctx.fillStyle='#e7f4f4';ctx.font='27px system-ui';ctx.fillText('FUSE + BMS + ISOLATOR',24,108);ctx.fillText('PARALLEL SERVICE',24,151);ctx.fillText('E / Action: inspect',24,204);
   const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
-  const check=new THREE.Mesh(new THREE.PlaneGeometry(1.18,.59),new THREE.MeshBasicMaterial({map:texture}));check.position.set(0,.86,.456);check.userData={kind:'bank-check',index:i,label:'Inspect 48 V matching, mounts and branch isolators'};g.add(check);
-  const ghost=new THREE.Mesh(new THREE.BoxGeometry(1.4,1.3,1),new THREE.MeshBasicMaterial({color:'#72ddd6',transparent:true,opacity:.3}));ghost.position.set(x,y+.65,z);ghost.userData={kind:'bank-place',index:i,label:'Place extra battery on its anchored mounting pad'};this.group.add(ghost);
+  const check=new THREE.Mesh(new THREE.PlaneGeometry(1.1,.32),new THREE.MeshBasicMaterial({map:texture}));check.position.set(0,.39,.516);check.userData={kind:'bank-check',index:i,label:'Inspect 48 V matching, mounts and branch isolators'};g.add(check);
+  const ghost=new THREE.Mesh(new THREE.BoxGeometry(1.5,.9,1),new THREE.MeshBasicMaterial({color:'#72ddd6',transparent:true,opacity:.3}));ghost.position.set(x,y+.575,z);ghost.userData={kind:'bank-place',index:i,label:'Place extra battery on its anchored mounting pad'};this.group.add(ghost);
   const rail=new THREE.Mesh(new THREE.BoxGeometry(.85,.1,.28),new THREE.MeshStandardMaterial({color:'#818d91',metalness:.65,roughness:.45}));rail.position.set(pack.x+1.05,pack.y+.07,pack.z+.4+i*.32);this.group.add(rail);
   const ports=[];
   for(const side of ['bus','pack'])for(const [pole,dx] of [['+',-.22],['-',.22]]){
    const port=new THREE.Mesh(new THREE.CylinderGeometry(.09,.1,.12,16),new THREE.MeshStandardMaterial({color:pole==='+'?'#cf342c':'#20272c',emissive:'#071416',roughness:.5}));
-   port.position.copy(side==='pack'?new THREE.Vector3(x+dx,y+1.4,z+.26):new THREE.Vector3(pack.x+1.05+dx,pack.y+.18,pack.z+.4+i*.32));
+   port.position.copy(side==='pack'?new THREE.Vector3(x+dx,y+.815,z+.6):new THREE.Vector3(pack.x+1.05+dx,pack.y+.18,pack.z+.4+i*.32));
    const ring=new THREE.Mesh(new THREE.TorusGeometry(.12,.018,6,20),new THREE.MeshBasicMaterial({color:'#ccece4'}));ring.rotation.x=-Math.PI/2;port.add(ring);
    port.userData={kind:'bank-socket',index:i,side,pole,label:`${side==='bus'?'Protected bus':'Extra pack '+(i+2)} ${pole} · parallel branch`};this.group.add(port);ports.push(port);
   }
   const support=new THREE.Mesh(new THREE.BoxGeometry(1.7,.15,1.2),new THREE.MeshStandardMaterial({color:'#5d696b',roughness:.7}));support.position.set(x,y+.05,z);this.group.add(support);
   const collider={x,z,r:.9};this.world.colliders.push(collider);
-  const node={g,ghost,check,ports,support,rail,collider};this.nodes.push(node);return node;
+  const node={g,body,ghost,check,ports,support,rail,collider};this.nodes.push(node);return node;
  }
  update(inside,blocked){
   const o=this.state(),bank=o.batteryBank,count=o.upgrades.battery||0;while(this.nodes.length<count)this.make(this.nodes.length);
