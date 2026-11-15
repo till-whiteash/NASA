@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {newHabBuild,habBuildObjective} from '../game/src/habitat-build-state.js';
-import {collectSalvage,recordSurvey,pioneerReady,spendFor} from '../game/src/pioneer-state.js';
+import {buildStarter,collectSalvage,recordSurvey,pioneerReady,spendFor} from '../game/src/pioneer-state.js';
 const b=newHabBuild();assert.equal(habBuildObjective({habBuild:b}).id,'hab-exit');
 assert.equal(collectSalvage(b,0),false);b.pioneer.exitedPod=true;
 assert.equal(habBuildObjective({habBuild:b}).id,'hab-salvage');
@@ -8,6 +8,8 @@ assert.equal(spendFor(b,'frame',0).ok,false);assert.equal(recordSurvey(b,0),fals
 for(let i=0;i<6;i++)assert.ok(collectSalvage(b,i));
 assert.equal(collectSalvage(b,0),false);assert.equal(collectSalvage(b,6),false);
 assert.deepEqual(b.pioneer.stock,{alloy:18,membrane:12,seals:6});
+assert.equal(habBuildObjective({habBuild:b}).id,'hab-starter');
+assert.equal(pioneerReady(b),false);assert.equal(buildStarter(b),true);assert.equal(buildStarter(b),false);
 assert.equal(habBuildObjective({habBuild:b}).id,'hab-survey');
 for(let i=0;i<3;i++)assert.ok(recordSurvey(b,i));assert.equal(recordSurvey(b,0),false);
 assert.ok(pioneerReady(b));assert.equal(habBuildObjective({habBuild:b}).id,'hab-0');

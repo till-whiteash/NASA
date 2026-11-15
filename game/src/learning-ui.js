@@ -1,0 +1,12 @@
+import {$,modal} from './ui.js';
+import {answerReflection} from './learning-state.js';
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+export function learningSummary(o){
+ const entries=o.learning?.entries||[];
+ return `<section class="learning-review"><h4>Your decisions and results</h4>${entries.length?entries.slice(-3).reverse().map(e=>`<p><b>Sol ${e.sol}: ${esc(e.title)}</b><br>${esc(e.cause)}<br>${esc(e.effect)}</p>`).join(''):'<p>Your first build, power choices and observed base problems will appear here. Nothing is credited just for opening this page.</p>'}<p>Use Mission debrief to explain a result and choose what you would try next.</p></section>`;
+}
+export function openLearning(o,save=()=>{},back){
+ const entries=o.learning?.entries||[];
+ modal({title:'Mission debrief · your decisions',html:`<p>What did you do? What changed? What would you try next? These examples come from this saved mission, not a fact-recall score.</p>${entries.length?'':'<p>No decisions recorded yet. Build the supply rack or adjust the power console, then return here.</p>'}${entries.slice().reverse().map(e=>`<article class="learning-entry" data-entry="${e.id}"><h4>Sol ${e.sol} · ${esc(e.title)}</h4><p><b>Cause:</b> ${esc(e.cause)}</p><p><b>Result:</b> ${esc(e.effect)}</p><p><b>Try next:</b> ${esc(e.next)}</p><fieldset><legend>${esc(e.question)}</legend>${e.options.map((label,i)=>`<button type="button" data-answer="${i}" aria-pressed="${e.reflection?.choice===i}">${esc(label)}</button>`).join('')}</fieldset><p class="learning-feedback" role="status">${e.reflection?esc((e.reflection.correct?'You connected the cause and result. ':'Try another explanation. ')+e.explanation):''}</p></article>`).join('')}<p class="source">Budgets, timings and growth rules are simplified simulation values. An allocation forecast is not proof of a later outcome.</p>`,onClose:back,choices:[{label:'Back to mission',primary:true}]});
+ $('#modal').querySelectorAll('[data-answer]').forEach(button=>button.onclick=()=>{const article=button.closest('[data-entry]'),result=answerReflection(o,Number(article.dataset.entry),Number(button.dataset.answer));if(!result)return;article.querySelectorAll('[data-answer]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));article.querySelector('.learning-feedback').textContent=(result.correct?'You connected the cause and result. ':'Try another explanation. ')+result.text;save();});
+}

@@ -36,3 +36,16 @@
 @media(max-width:600px){#zhetela-message canvas{width:64px;height:68px}}
 
 #zhetela-message canvas,.zhetela-speaker span{mask-image:linear-gradient(to bottom,#000 78%,transparent 100%)}
+
+/* Feedback stays beside the current task; deeper reflection is optional. */
+#mission-objective .mission-cause{margin-top:8px;border-top:1px solid #46535b;padding-top:8px}
+#mission-objective .mission-cause[hidden]{display:none}
+#mission-objective .mission-cause summary{font-size:12px;color:#a9dfd2}
+#mission-objective .mission-cause div{font-size:12px;line-height:1.5;margin:8px 0}
+.learning-review,.learning-entry{padding:14px;border:1px solid #526474;border-radius:10px;margin:12px 0;background:#152b39}
+.learning-entry p{line-height:1.55}.learning-entry fieldset{border:0;padding:0;min-width:0}
+.learning-entry legend{font-weight:600;margin-bottom:8px}
+.learning-entry [data-answer]{display:block;text-align:left;width:100%;min-height:44px;white-space:normal;margin:6px 0}
+.learning-entry [aria-pressed=true]{outline:2px solid #99ddc1}
+.learning-feedback{min-height:1.5em;color:#b3e8d2}
+.launch-actions{flex-wrap:wrap}#guided-start{white-space:normal}

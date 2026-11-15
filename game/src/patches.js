@@ -33,11 +33,11 @@ function next() {
 // Earn a patch (does nothing if you already have it). onEarn lets the game react (the sound is played by the award itself).
 export let onEarn = null;
 export const setOnEarn = fn => (onEarn = fn);
-export function earn(id) {
+export function earn(id, {quiet=false}={}) {
   if (window.__resetting || have.has(id)) return false;
   const p = PATCHES.find(x => x.id === id); if (!p) return false;
   have.add(id); meta[id] = { sol: context().sol ?? null, at: Date.now() };
-  queue.push(p);
+  if(!quiet)queue.push(p);
   if (have.size === PATCHES.length && !meta.medal) { meta.medal = { sol: context().sol ?? null, at: Date.now() }; queue.push(MEDAL); }
   save(); next(); onEarn?.(p);
   return true;

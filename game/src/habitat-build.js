@@ -1,6 +1,7 @@
 // The habitat construction site in the world (quest state and text: habitat-build-state.js).
 import * as THREE from 'three';
-import {collectSalvage,recordSurvey,pioneerReady,spendFor,stockText,SURVEY_SECONDS} from './pioneer-state.js';
+import {collectSalvage,recordSurvey,buildStarter,pioneerReady,spendFor,stockText,SURVEY_SECONDS} from './pioneer-state.js';
+import {recordStarter} from './learning-state.js';
 import { heightAt } from './world.js';
 import { HAB_DONE, ROCKS, PRESSURE_SECONDS, habitatBuilt } from './habitat-build-state.js';
 
@@ -68,6 +69,14 @@ export class HabitatBuild {
       g.add(label('CARGO '+String(i+1).padStart(2,'0')));g.position.set(x,heightAt(x,z),z);g.userData={kind:'hab-cargo',id:i,label:'Recover salvage '+(i+1)+' · structural alloy and sealed flight supplies'};
       world.clearRocksAround?.(x,z,1.2);this.group.add(g);return g;
     });
+    // The first cargo's packing frame unfolds into a useful rack: a quick, real build.
+    this.starter=new THREE.Group();this.starter.position.copy(this.cargo[0].position);this.starter.position.x+=2;
+    this.starter.userData={kind:'hab-starter',label:'Assemble supply rack · E / Action'};
+    const rackMat=new THREE.MeshStandardMaterial({color:'#72edc4',transparent:true,opacity:.45,roughness:.65});
+    for(const x of [-.55,.55])for(const z of [-.3,.3]){const leg=new THREE.Mesh(new THREE.BoxGeometry(.08,.9,.08),rackMat);leg.position.set(x,.45,z);this.starter.add(leg);}
+    const shelf=new THREE.Mesh(new THREE.BoxGeometry(1.3,.12,.8),rackMat);shelf.position.y=.9;this.starter.add(shelf);
+    this.starter.add(label('BUILD SUPPLY RACK'));this.group.add(this.starter);
+    world.clearRocksAround?.(this.starter.position.x,this.starter.position.z,1);
     const readings=['Footing levels','Module alignment','Airlock clearance'];
     this.surveys=readings.map((text,i)=>{
       const g=new THREE.Group(),x=c.x+(i-1)*7,z=this.front+3;
@@ -87,6 +96,8 @@ export class HabitatBuild {
     if(initial){this.anim=null;this.growing=[];if(this.measuring)this.measuring.mesh.rotation.y=0;this.measuring=null;this.m.model.scale.copy(this.model.scale);this.frames.forEach(f=>f.scale.set(1,1,1));}
     this.group.visible = !built;
     this.cargo.forEach((g,i)=>g.visible=s===0&&!!b?.pioneer?.exitedPod&&!b.pioneer.collected.includes(i));
+    this.starter.visible=!!b?.pioneer&&b.pioneer.starterBuilt!==undefined&&b.pioneer.collected.length>0;
+    this.starter.traverse(o=>{if(o.isMesh&&o.material===this.starter.children[0].material){o.material.opacity=b?.pioneer?.starterBuilt?1:.45;o.material.color.set(b?.pioneer?.starterBuilt?'#aebec7':'#72edc4');}});
     this.surveys.forEach((g,i)=>g.visible=s===0&&b?.pioneer?.collected.length===6&&!b.pioneer.surveyed.includes(i));
     this.rocks.forEach((r, i) => {
       r.visible = s === 1 && !b.cleared.includes(i);
@@ -113,11 +124,12 @@ export class HabitatBuild {
     w.remoteShadowDirty = true;
     if (!initial) this.save();
   }
-  targets() { return habitatBuilt(this.state()) ? [] : [...this.cargo,...this.surveys,...this.rocks, ...this.pads, this.post, this.airlock, this.valve].filter(o => o.visible); }
+  targets() { return habitatBuilt(this.state()) ? [] : [...this.cargo,...this.surveys,...this.rocks, ...this.pads, this.post, this.airlock, this.valve,...(this.b?.pioneer?.starterBuilt===false?[this.starter]:[])].filter(o => o.visible); }
   // Where the quest marker points
   target() {
     const b = this.b; if (!b || habitatBuilt(this.state())) return null;
     const p = this.world.player.position, nearest = list => list.filter(o => o.visible).sort((a, c) => a.position.distanceTo(p) - c.position.distanceTo(p))[0]?.position;
+    if(b.pioneer?.starterBuilt===false&&b.pioneer.collected.length)return this.starter.position;
     if(b.step===0&&b.pioneer&&!pioneerReady(b))return nearest(b.pioneer.collected.length<6?this.cargo:this.surveys);
     if (b.step === 0) return { x: this.centre.x, z: this.front };
     if (b.step === 1) return nearest(this.rocks);
@@ -145,8 +157,9 @@ export class HabitatBuild {
   use(mesh) {
     const b = this.b, d = mesh.userData; if (!b) return false;
     if(!mesh.visible)return true;
+    if(d.kind==='hab-starter'){if(buildStarter(b)){recordStarter(this.state());this.apply();this.guide('First build complete! Your supply rack is ready. Suit air and the base clock now run: return to the pod to refill. Next, collect the remaining orange cargo.',true);}return true;}
     if(d.kind==='hab-cargo'){
-      if(collectSalvage(b,d.id)){this.apply();this.guide('Cargo secured. '+stockText(b)+(b.pioneer.collected.length===6?' All cargo found. Use the three blue survey instruments next.':' Follow the marker to the next orange bundle.'),true);}return true;
+      if(collectSalvage(b,d.id)){this.apply();this.guide('Cargo secured. '+stockText(b)+(b.pioneer.starterBuilt===false?' Next, use E / Action on the green supply rack beside the first cargo bundle.':b.pioneer.collected.length===6?' All cargo found. Use the three blue survey instruments next.':' Follow the marker to the next orange bundle.'),true);}return true;
     }
     if(d.kind==='hab-survey'){
       if(!b.pioneer?.calibrator)return true;

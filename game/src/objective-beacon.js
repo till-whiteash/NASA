@@ -38,8 +38,12 @@ export class ObjectiveBeacon {
     const w=innerWidth,h=innerHeight,padX=w<600?82:105,padY=100;
     const off=behind||Math.abs(x)>1-padX*2/w||Math.abs(y)>1-padY*2/h;
     if(off){const scale=Math.max(Math.abs(x)/(1-padX*2/w),Math.abs(y)/(1-padY*2/h),.001);x/=scale;y/=scale;}
-    this.element.style.left=THREE.MathUtils.clamp((x+1)*w/2,padX,w-padX)+'px';
-    this.element.style.top=THREE.MathUtils.clamp((y+1)*h/2,padY,h-padY)+'px';
+    const px=THREE.MathUtils.clamp((x+1)*w/2,padX,w-padX);
+    let py=THREE.MathUtils.clamp((y+1)*h/2,padY,h-padY);
+    const card=document.querySelector('#mission-objective');
+    if(card&&!card.hidden){const r=card.getBoundingClientRect();if(px-padX<r.right&&px+padX>r.left&&py+80>r.top&&py-80<r.bottom)py=Math.min(h-padY,r.bottom+85);}
+    this.element.style.left=px+'px';
+    this.element.style.top=py+'px';
     this.element.style.opacity=d<4&&!off?'.6':'1';
     this.arrow.hidden=!off;this.arrow.style.transform=`rotate(${Math.atan2(y,x)*180/Math.PI+90}deg)`;
     const kind=task.target;

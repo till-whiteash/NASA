@@ -8,7 +8,7 @@ const facts=JSON.parse(readFileSync(new URL('../game/data/mars-facts.json',impor
 const o=new Outpost('normal',facts),c={farmQuest:{rewarded:false}};
 // A new crew builds its habitat first (habitat-build-state.js), then the safety checks begin.
 assert.equal(marsObjective(o,c).id,'hab-exit');
-o.habBuild.pioneer.exitedPod=true;o.habBuild.pioneer.collected=[0,1,2,3,4,5];o.habBuild.pioneer.surveyed=[0,1,2];
+o.habBuild.pioneer.starterBuilt=true;o.habBuild.pioneer.exitedPod=true;o.habBuild.pioneer.collected=[0,1,2,3,4,5];o.habBuild.pioneer.surveyed=[0,1,2];
 for(let i=0;i<6;i++){o.habBuild.step=i;assert.equal(marsObjective(o,c).id,'hab-'+i);}
 o.habBuild.step=6;
 assert.equal(marsObjective(o,c).id,'safety-reserves');

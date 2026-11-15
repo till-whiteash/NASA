@@ -1,3 +1,6 @@
+import {openingPractice} from './pioneer-state.js';
+import {powerSnapshot,recordPowerChoice,explainBase,observeConsequences} from './learning-state.js';
+import {learningSummary,openLearning} from './learning-ui.js';
 import {newCommission,habitatReady,collectCommissionKit,beginCommission,tickCommission,commissionObjective} from './habitat-commission.js';
 import {openCampaign,openEvidence} from './research-board.js';
 import {tickStory} from './story-state.js';
@@ -114,7 +117,8 @@ onLog(n => { $('#log-btn').textContent = `Logbook ${n} (L)`; if (n >= 15) earn('
 
 // The mission logbook: every real fact you have met, as cards you can read again.
 function openLogbook() {
-  openSettings({tab:'information'});
+  if(!outpost)return openSettings({tab:'information'});
+  modal({title:'Your mission logbook',html:learningSummary(outpost),choices:[{label:'Review my decisions',primary:true,onPick:()=>openLearning(outpost,saveGame)},{label:'NASA facts and sources',onPick:()=>openSettings({tab:'information'})},{label:'Back'}]});
 }
 let weather = { mode: 'archived', flares: [], sources: [] };
 const weatherReady = loadSpaceWeather().then(w => { weather = w; showSun(); });
@@ -308,13 +312,15 @@ async function resume(d) {
 }
 
 $('#reset-progress').onclick = () => modal({ title: 'Reset progress?', html: '<p>This deletes your saved mission and all your badges. It cannot be undone.</p>', choices: [{ label: 'Keep my progress', primary: true }, { label: 'Delete everything', onPick: resetGame }] });
-async function startNew() {
+async function startNew({guided=false}={}) {
   if(state.phase !== 'title') return;
+  state.phase='briefing';
   missionMenu.dispose();
   clearSave();                                                 // a new mission replaces the old save
   if (isTouch() && document.body.classList.contains('layout-phone') && canFullscreen) goFullscreen();   // phones: fill the screen like an app
   startSound();                                                // sound can only start after a click
   $('#title').classList.add('hidden');
+  if(guided){state.phase='cruise';await arrive({guided:true});return;}
   await playCinematic('ares_vi_briefing'); await playCinematic('briefing_mission');   // Director Hale's briefing, then the orbit plan
   await walkBriefingRoom({ destination: 'mars' });             // walk around the briefing room, then Ready for launch
   setSound({ scene: 'launch', thrust: 0 });
@@ -331,12 +337,14 @@ async function startNew() {
 }
 // Start downloading the opening briefing while the title screen is up, so it plays the moment you launch.
 (window.requestIdleCallback || setTimeout)(() => preloadCinematic('ares_vi_briefing'), { timeout: 2500 });
-$('#start').onclick = () => {
+function requestNew(guided=false){
   const s = readSave();
-  if (!s) return startNew();
+  if (!s) return startNew({guided});
   modal({ title: 'You have a saved game', html: `<p>Sol ${s.outpost.sol} of ${DIFFICULTY[s.difficulty].sols} (${DIFFICULTY[s.difficulty].label}). Starting a new game replaces it.</p>`,
-    choices: [{ label: `Continue my game (sol ${s.outpost.sol})`, primary: true, onPick: () => resume(s) }, { label: 'Start a new game', onPick: startNew }] });
-};
+    choices: [{ label: `Continue my game (sol ${s.outpost.sol})`, primary: true, onPick: () => resume(s) }, { label: 'Start a new game', onPick:()=>startNew({guided}) }] });
+}
+$('#start').onclick=()=>requestNew(false);
+$('#guided-start').onclick=()=>requestNew(true);
 
 function buildWorld() {
   world = new World(renderer, F, () => {});
@@ -440,7 +448,7 @@ function buildWorld() {
 
 // ---------------- after lift-off: how we get there, then arrival ----------------
 
-async function arrive() {
+async function arrive({guided=false}={}) {
   launch?.dispose(); launch = null;
   $('#countdown').classList.add('hidden'); $('#skip')?.remove(); $('#retry-launch')?.remove();
   setSound({scene:'arrival',thrust:0});
@@ -449,14 +457,14 @@ async function arrive() {
   buildWorld();
   $('#loading').classList.add('hidden');
   // Clear launch captions before waiting for network-dependent base assets.
-  const ready = await waitForBase(world.ready, { trip: true, minMs: 9000 });
+  const ready = await waitForBase(world.ready, { trip: !guided, minMs: guided?0:9000 });
   if (!ready) return;
   setSound({ scene: 'arrival' });
-  await playCinematic('mars_approach');          // orbit insertion, then the landing pod undocks
+  if(!guided)await playCinematic('mars_approach');          // orbit insertion, then the landing pod undocks
   let landingFilm = null;
   // Ewan's existing Mars landing owns the world camera and leaves its lander on the surface.
   const landFilm = async () => { state.phase = 'mars'; await playLanding(world); };
-  const selectedSite = await showArrival(F, outpost.delayMinutes(), {onDescent:()=>{landingFilm = landFilm(); return landingFilm;}});
+  const selectedSite = guided?'gusev':await showArrival(F, outpost.delayMinutes(), {onDescent:()=>{landingFilm = landFilm(); return landingFilm;}});
   if (!selectedSite) { location.reload(); return; }
   state.site = selectedSite;
   outpost.site = selectedSite;
@@ -474,11 +482,7 @@ async function arrive() {
   $('#hud').classList.remove('hidden');
   phoneTips();
   say('welcome');
-  modal({ title: 'Welcome to Mars, junior astronaut!', html: `
-    <p><b>Start in your pod, then build your habitat.</b> Your suit is on and checked. Use the hatch and complete its pressure cycle. Outside, recover six orange cargo bundles and calibrate the three blue survey instruments before building. </p><p><b>Your own construction choices.</b> Nothing is built yet, so your lander is your shelter. Follow the arrow to the habitat site, then the quest shows each step: clear the ground, raise the frames, fit the shells and pressurise.</p>
-    <p>To work on something, aim at it and ${keyWord('press E','tap Action')}. Rocks need the pickaxe (1).</p>
-    <p>You landed at <b>${outpost.s.name}</b>. ${outpost.s.why}${outpost.site === 'gusev' ? '' : ' The ground you walk on is Gusev Crater, used for training.'}</p>`,
-    choices: [{ label: "Let's go!", primary: true }] });
+  modal({ title: 'Your first job: leave the pod', html: `<p>Your suit is already checked. Find the <b>hatch marker</b>, aim at it and ${keyWord('press E','tap Action')}. Wait for pressure to match, then use the outer hatch.</p><p>${keyWord('WASD to walk · drag or click the view to look · Esc releases the mouse','Left thumb to move · right thumb to look')}</p><p>Build a supply rack from your first cargo bundle. <b>Practice mode:</b> suit air and the base clock wait until that first build is complete. You can watch the flight films later in the Field manual.</p>`,choices:[{label:'Find the hatch',primary:true}] });
 }
 
 // ---------------- inside the outpost ----------------
@@ -679,7 +683,7 @@ function openPower() {
     <p>Emergency reserve: <b>${(outpost.emergencyKWh||0).toFixed(0)} kWh</b> · stored air ${outpost.o2.toFixed(1)} kg · ${outpost.food} prepared meals + ${outpost.rations||0} packaged rations. Emergency power is finite; connect the permanent array. Shielding is passive: electricity runs shelter equipment, not a radiation force field.</p>
     <p>Each sol you make <b>${outpost.energy().toFixed(0)} kWh</b>${outpost.dust ? ' (a dust storm is blocking the sunlight!)' : ''}. The night heater takes <b>${outpost.today.heater} kWh</b> first, so you can share out <b>${outpost.today.energy.toFixed(0)} kWh</b>. Move the sliders - the total always stays 100%.</p>
     ${rows.map(([k, label]) => `<div class="split-row"><span>${label}</span><input type="range" min="0" max="100" value="${Math.round(s[k] * 100)}" data-k="${k}"><b id="v-${k}">${Math.round(s[k] * 100)}%</b></div>`).join('')}
-    <div class="forecast" id="forecast"></div>
+    <div class="forecast" id="forecast"></div><div id="power-explanation" class="learning-review" aria-live="polite"></div>
     <p class="source">Science sent to Earth so far: <b>${outpost.scienceSent}</b>${next ? ` - your base reaches the <b>${next[1].name}</b> at ${next[1].unlockAt}, and Earth sends new designs.` : ' - you are a self-sustaining settlement!'}</p>
     <div class="earth-card" id="earth-card"><div class="earth-globe"><canvas aria-label="A 3D Earth you can spin"></canvas><canvas class="moon-globe" aria-label="The Moon - drag to spin it too"></canvas><a class="epic-thumb" target="_blank" rel="noopener" title="Today's real photo from NASA's EPIC camera"><img alt="The whole Earth today, photographed by NASA's EPIC camera"></a><span class="spin-tip">drag to spin</span></div><p>Looking for today's photo of Earth…</p></div>
     ${factHTML(F.sunlight)}`;
@@ -687,6 +691,7 @@ function openPower() {
   modal({ title: remote ? '⚡ Power control (game paused)' : '🖥 Power console - time is passing', pause: remote, html, choices: [{ label: 'Done', primary: true }] });
   const box = $('#modal .modal-box');
   const sliders = [...box.querySelectorAll('input[type=range]')];
+  let beforeChoice=null;
   const draw = () => {
     const f = outpost.today;
     const sign = v => (v >= 0 ? `<span class="pos">+${v.toFixed(2)}</span>` : `<span class="neg">${v.toFixed(2)}</span>`);
@@ -699,6 +704,7 @@ function openPower() {
       <div>Solar panels: ${f.solar.toFixed(0)} kWh<br><small>${Math.round(outpost.clean * 100)}% clean${outpost.clean < 0.8 ? ' - go outside and wipe them!' : ''}${outpost.reactors ? ` · reactor +${outpost.reactors * TUNED.reactorKWh}` : ''}</small></div>
       <div>Night heater: ${f.heater} kWh<br><small>${f.cold ? '<span class="neg">batteries too small - cold nights!</span>' : `batteries hold ${outpost.battery} kWh - enough`}</small></div>
       ${outpost.relayDown ? `<div><span class="neg">Relay orbiter lost</span><br><small>talking straight to Earth needs ${f.commsNeed.toFixed(0)} kWh (${outpost.relayDown} sols until a new one arrives)</small></div>` : ''}`;
+    const reasons=explainBase(outpost,colony?.s);box.querySelector('#power-explanation').textContent=reasons.length?reasons[0].title+': '+reasons[0].cause+' '+reasons[0].next:'Current budget covers the checked power conditions. Keep watching reserves as conditions change.';
     rows.forEach(([k]) => (box.querySelector('#v-' + k).textContent = Math.round(outpost.split[k] * 100) + '%'));
   };
   // the people you are talking to: today's real photo of the whole Earth, from NASA's EPIC camera
@@ -713,6 +719,7 @@ function openPower() {
   });
   sliders.forEach(sl => sl.oninput = () => {
     // Moving one slider takes the difference from the others, so the total is always 100%.
+    beforeChoice??=powerSnapshot(outpost);
     const k = sl.dataset.k, want = sl.value / 100, others = rows.map(r => r[0]).filter(x => x !== k);
     const rest = others.reduce((a, o) => a + outpost.split[o], 0) || 1;
     const nextSplit = { [k]: want };
@@ -721,6 +728,7 @@ function openPower() {
     sliders.forEach(x => { if (x !== sl) x.value = Math.round(outpost.split[x.dataset.k] * 100); });
     draw();
   });
+  sliders.forEach(sl=>sl.onchange=()=>{if(beforeChoice){recordPowerChoice(outpost,beforeChoice);beforeChoice=null;saveGame();}});
   draw();
 }
 
@@ -1134,7 +1142,7 @@ function handle(ev) {
       modal({ title: `🏗 Your base is now a ${t.name}!`, html: `${eventArt('tier-up', 'The outpost growing bigger')}<p>Earth's engineers studied the science you sent and radioed you new designs:</p><p>${designs.map(u => `• <b>${u.name}</b> - ${u.desc}`).join('<br>')}</p><p>Build them at the <b>workbench</b> inside the outpost using parts.</p>` });
       break;
     }
-    case 'cold-night': toast('🥶 Your batteries ran flat before morning - the cold slowed the oxygen maker and greenhouse. Build an extra battery!', 5000); break;
+    case 'cold-night': break; // The saved consequence explanation includes the actual capacity and heater demand.
     case 'wind-clean': toast('💨 A gust of wind blew some dust off your solar panels! (This really happened to the Spirit and Opportunity rovers.)', 5000); break;
     case 'panel-fault': outpost.today = outpost.forecast(); filmThen(inside ? null : ['failure_solar_panel', 'panel_failure'], () => modal({ title: '⚠️ Solar tracker failure!', html: `<p>One solar tracker's drive motor stalled and then its bracket gave way. The panel sags out of the sunlight: <b>solar power is down 20%</b>.</p><p><b>Fix it:</b> go to the solar panels and ${keyWord('press E', 'tap Action')} to swap in a spare drive unit (uses 1 part). If nobody does, the crew gets to it in ${outpost.panelFault} sols.</p>` })); break;
     case 'rover-stuck': filmThen(inside ? null : ['failure_rover_stuck', 'rover_stuck'], () => modal({ title: '🚙 The rover is stuck!', html: `<p>Your rover drove onto soft sand hidden under a crust of dust, and its wheels dug in. It can't move until you dig it out.</p><p><b>Fix it:</b> walk to the rover and ${keyWord('press E', 'tap Action')}.</p><p class="fact">This really happens: NASA's Spirit rover got stuck in soft sand at a place called Troy in 2009 and never got out. Opportunity was luckier: in 2005 it spent five weeks slowly backing out of a sand ripple.</p>` })); break;
@@ -1261,13 +1269,13 @@ function endMission() {
     radiation: `Your radiation badge reached NASA's ${F.careerLimit.value} mSv limit, so the crew had to go home. Try more shielding, or hiding in the shelter during solar storms.`,
   }[o.why];
   modal({ title: o.win ? '🏆 Mission complete!' : '🚀 Mission over', html: `
-    ${zhetelaPortraitHTML()}<p>${why}</p>${firstMissionReport(outpost,colony.s).filter(m=>m.done).map(m=>`<p>✓ ${m.title}: ${m.lesson}</p>`).join('')}
+    ${zhetelaPortraitHTML()}<p>${why}</p>${learningSummary(outpost)}${firstMissionReport(outpost,colony.s).filter(m=>m.done).map(m=>`<p>✓ ${m.title}: ${m.lesson}</p>`).join('')}
     <p>Sols survived: <b>${outpost.sol}</b> · Science sent to Earth: <b>${outpost.scienceSent}</b> · Radiation: <b>${outpost.dose.toFixed(0)} mSv</b> · Score: <b>${outpost.score()}</b></p>
     ${factHTML(F.roundTrip)}
     <h4>📒 You collected ${logbook.size} real NASA fact cards. Quick quiz for your badge:</h4>
     <div id="quiz"></div><div id="badge"></div>
     <details><summary>📒 Read my logbook</summary><div class="log-list">${[...logbook.values()].map(f => factHTML(f, false)).join('')}</div></details>`,
-    choices: [{ label: 'Play again', primary: true, onPick: () => location.reload() }] });
+    choices: [{label:'Explain my decisions',onPick:()=>openLearning(outpost,()=>{},endMission)},{ label: 'Play again', primary: true, onPick: () => location.reload() }] });
   const qs = pickQuestions(new Set(logbook.keys()));
   runQuiz($('#quiz'), qs, score => {
     const b = badgeFor(score, qs.length);
@@ -1868,7 +1876,8 @@ renderer.setAnimationLoop(() => {
     if(!inside&&!isModalOpen())world.habBuild?.update(dt);
     if(!isModalOpen()&&room!==airlockRoom)updateMissionPower(dt);
     if (!paused && !outpost.over) {
-      const step = dt * state.speed;
+      const practice=openingPractice(outpost);
+      const step = practice?0:dt * state.speed;
       solClock += step;
       if (world.nearest()?.type === 'door') tutorialStep = 1;
       if (!inside && world.driving) {
@@ -1880,7 +1889,7 @@ renderer.setAnimationLoop(() => {
       } else if (!inside) {
         // Outside, the suit uses air (faster in the freezing night) and the outpost's shielding isn't protecting you.
         const runningNow = (!world.keys.ControlLeft && !world.keys.ControlRight && (world.keys.ShiftLeft || world.keys.ShiftRight)) && !world.noRun && world.move.lengthSq() > 4;
-        suit -= dt / suitAirSeconds();   // breathing harder (game balance)
+        suit -= (practice?0:dt) / suitAirSeconds();   // breathing harder (game balance)
         const f = outpost.today, perSol = step / TUNED.solSeconds;
         outpost.dose += F.surfaceDose.value * f.protection * perSol;   // the part the shield would have blocked
         if (outpost.storm) outpost.dose += outpost.storm.strength * TUNED.stormDose / outpost.storm.total * perSol * f.protection;
@@ -1909,7 +1918,7 @@ renderer.setAnimationLoop(() => {
         else toast('Freeze-dried ration. Better than nothing.', 3000);
       }
       if (ev === 'starving') toast(keyWord('You are out of rations, so you are slower and breathing harder. Eat inside the outpost or the rover (hold F).', 'You are out of rations, so you are slower and breathing harder. Eat inside the outpost or the rover.'), 6000);
-      if (!inside && !world.driving && Math.hypot(world.player.position.x - 28, world.player.position.z + 35) > 25) earn('steps');
+      if (!inside && !world.driving && Math.hypot(world.player.position.x - 28, world.player.position.z + 35) > 25) earn('steps',{quiet:true}); // Keep the first construction objective visible; the patch still enters the collection.
       if (world.driving && roverFrom && world.sev.pos.distanceTo(roverFrom) > 200) earn('driver');
       // Panel dust: sample cleanliness through the sol for the power total (sim.js). In a dust storm, dust settles on
       // the panels fast enough that they need cleaning at least twice a sol (a game speed-up: real storm dust builds
@@ -1930,10 +1939,10 @@ renderer.setAnimationLoop(() => {
         queue.push(...outpost.tick());
         const renewed=colony.renewOres(outpost.sol);if(renewed)toast(`${renewed} ore deposits replenished · new sol`,3500);
         const notes = colony.tickSol(outpost);
+        const learning=observeConsequences(outpost,colony.s,notes);
         if(activeBed && isModalOpen() && $('[data-bed-controls]'))openGreenhouse(activeBed);
-        const ripe = notes.filter(n => n.type === 'ripe'), dry = notes.filter(n => n.type === 'thirsty');
+        const ripe = notes.filter(n => n.type === 'ripe');
         if (ripe.length) toast(`🌱 ${ripe.map(n => CROPS[n.gh.crop].name).join(' and ')} ready to harvest in your greenhouse!`, 5000);
-        else if (dry.length) toast(`💧 ${dry.length > 1 ? dry.length + ' greenhouse tanks are' : 'A greenhouse tank is'} empty - the plants stopped growing. Bring water in the jug.`, 5000);
         pending = pending.filter(p => {
           if (p.sol > outpost.sol) return true;
           world.dropSupplyPod(); if (p.cargo) world.pickups.at(-1).cargo = p.cargo;
@@ -1941,6 +1950,7 @@ renderer.setAnimationLoop(() => {
           toast(p.cargo?.seeds ? 'Seeds arrived near base · orange map square.' : 'Supplies landed · orange map square.');
           return false;
         });
+        if(learning.length)toast(learning[0].title+': '+learning[0].cause+' '+learning[0].next+' Open Logbook (L).',8000);
         saveGame();
         world.setLink(outpost.today.link);
         world.setPanelDust(outpost.clean); world.panelsDirty = outpost.clean < 0.97;
@@ -2075,16 +2085,20 @@ function drawMissionHud(){
   if(!q.seedsCollected){const seedOrder=pending.find(p=>p.cargo?.seeds);if(seedOrder)q.seedArrival=seedOrder.sol;q.seedsLanded=world.pickups.some(p=>p.kind==='pod'&&p.cargo?.seeds);}
   const task=activeMissionObjective();
   const milestones=firstMissionReport(outpost,colony.s);
+  let cause=missionCard.querySelector('.mission-cause');if(!cause){cause=document.createElement('details');cause.className='mission-cause';cause.innerHTML='<summary>Why is this happening?</summary><div></div><button type="button">Review my decisions</button>';cause.querySelector('button').onclick=()=>openLearning(outpost,saveGame);missionCard.append(cause);}
+  const issue=habitatBuilt(outpost)?explainBase(outpost,colony.s)[0]:null;cause.hidden=!issue;if(issue)cause.querySelector('div').textContent=issue.title+'. '+issue.cause+' '+issue.next;
   const miningTask=task.id==='hab-1'||task.target==='build-ore'||(task.id==='power-2'&&(outpost.construction?.cleared?.length||0)<4);
-  missionCard.querySelector('.mission-progress').textContent=miningTask?keyWord('Left click to mine · E to inspect','Tap Mine to break rocks · Inspect to learn'):habitatBuilt(outpost)?`First base: ${milestones.filter(m=>m.done).length}/4 milestones · E / Action to interact`:'Follow the marker · aim at the object · E / Action';
+  missionCard.querySelector('.mission-progress').textContent=openingPractice(outpost)?keyWord('WASD walk · E use · practice: air and clock paused','Move with left thumb · Action to use · practice: air and clock paused'):miningTask?keyWord('Left click to mine · E to inspect','Tap Mine to break rocks · Inspect to learn'):habitatBuilt(outpost)?`First base: ${milestones.filter(m=>m.done).length}/4 milestones · E / Action to interact`:'Follow the marker · aim at the object · E / Action';
   if(milestones.every(m=>m.done)&&!outpost.firstBaseDebrief){outpost.firstBaseDebrief=true;saveGame();zhetela('First base mission complete! Open the quest log for your learning debrief. Keep packaged food in reserve. Next: rover charging, supported shelter shielding and food-culture research.',true);}
   missionCard.hidden=isModalOpen()||world.cinematic||$('#hud').classList.contains('menu-open');
-  if(task.id+'|'+(task.step||'')!==missionKey){missionKey=task.id+'|'+(task.step||'');zhetela(task.step||task.detail);missionCard.querySelector('summary').textContent=task.target==='workbench'?'Go to the workbench':task.title;if(task.step){const next=document.createElement('small');next.className='mission-next-step';next.textContent=task.step;missionCard.querySelector('summary').append(next);}missionCard.querySelector('p').textContent=task.detail;missionCard.open=true;missionCollapseAt=task.id==='explore'?performance.now()+8000:0;}
+  if(task.id+'|'+(task.step||'')!==missionKey){missionKey=task.id+'|'+(task.step||'');/* The quest card is the one source of next-step instructions. */missionCard.querySelector('summary').textContent=task.target==='workbench'?'Go to the workbench':task.title;if(task.step){const next=document.createElement('small');next.className='mission-next-step';next.textContent=task.step;missionCard.querySelector('summary').append(next);}missionCard.querySelector('p').textContent=task.detail;missionCard.open=true;missionCollapseAt=task.id==='explore'?performance.now()+8000:0;}
   if(missionCollapseAt&&performance.now()>missionCollapseAt){missionCard.open=false;missionCollapseAt=0;}
   if(!interior.workbenchMarker){
     const marker=new THREE.Mesh(new THREE.OctahedronGeometry(.16),new THREE.MeshBasicMaterial({color:'#c995ff',depthTest:false,depthWrite:false}));
     marker.name='workbench-objective';marker.renderOrder=100;interior.scene.add(marker);interior.workbenchMarker=marker;
   }
+  if(!capsule.hatchMarker){capsule.hatchMarker=interior.workbenchMarker.clone();capsule.scene.add(capsule.hatchMarker);}
+  const hatch=capsule.stations.find(s=>s.type==='ship-exit');capsule.hatchMarker.visible=inside&&room===capsule&&task.id==='hab-exit'&&!isModalOpen();if(hatch)capsule.hatchMarker.position.set(hatch.x,1.5,hatch.z);
   const isGrow=task.target==='greenhouse';
   if(isGrow&&!ghRoom.objectiveMarker){ghRoom.objectiveMarker=interior.workbenchMarker.clone();ghRoom.scene.add(ghRoom.objectiveMarker);}
   const grow=ghRoom.objectiveMarker;if(grow){grow.visible=inside&&room===ghRoom&&isGrow&&!isModalOpen();const bedIndex=colony.s.base.findIndex(b=>b.ready)||0;const bed=ghRoom.stations.find(s=>s.type==='gh-bed'&&s.bed===Math.max(0,bedIndex));if(bed)grow.position.set(bed.x,2,bed.z);}
@@ -2104,7 +2118,7 @@ function researchMenu(){openResearch(outpost,colony,world,saveGame);}
 function openMissionLog(){
   if(!outpost||!colony)return;
   const task=activeMissionObjective();
-  modal({title:'Mission objectives',choices:[{label:'Tutorial & current step',onPick:openTutorial},{label:'Food cultures & relay network',onPick:researchMenu},{label:'The silent rover · crew investigation',onPick:()=>openCampaign(outpost,saveGame)},{label:'NASA & CSA research desk',onPick:openEvidence}],html:`${zhetelaPortraitHTML()}<h4>${task.title}</h4><p>${task.detail}</p><details><summary>First base · progress & learning debrief</summary>${firstMissionReport(outpost,colony.s).map(m=>`<p>${m.done?'✓':'○'} <b>${m.title}</b>${m.done?'<br>'+m.lesson:''}</p>`).join('')}<p>Equipment, construction steps and growth times are simplified training rules. Continue playing to improve your base.</p></details><p>Builder projects completed: ${Object.entries(colony.s.buildHistory||{}).map(([k,n])=>`${RECIPES[k]?.name||k} × ${n}`).join(', ')||'none yet'}.</p><ol>${missionLog(outpost,colony.s).map(t=>`<li>${t.done?'✓':'○'} ${t.title}</li>`).join('')}</ol><details><summary>Optional exploration</summary><p>Collect samples, map landmarks, grow more crops and improve your shelter. The surface map tracks exploration; Settings → Information explains the science.</p></details><p>Solar panels make electricity. Solar sails propel spacecraft and are not needed here. Regolith shielding reduces radiation; it never makes exposure zero.</p>`});
+  modal({title:'Mission objectives',choices:[{label:'Mission debrief · my decisions',onPick:()=>openLearning(outpost,saveGame)},{label:'Tutorial & current step',onPick:openTutorial},{label:'Food cultures & relay network',onPick:researchMenu},{label:'The silent rover · crew investigation',onPick:()=>openCampaign(outpost,saveGame)},{label:'NASA & CSA research desk',onPick:openEvidence}],html:`${zhetelaPortraitHTML()}<h4>${task.title}</h4><p>${task.detail}</p>${learningSummary(outpost)}<details><summary>First base · progress & learning debrief</summary>${firstMissionReport(outpost,colony.s).map(m=>`<p>${m.done?'✓':'○'} <b>${m.title}</b>${m.done?'<br>'+m.lesson:''}</p>`).join('')}<p>Equipment, construction steps and growth times are simplified training rules. Continue playing to improve your base.</p></details><p>Builder projects completed: ${Object.entries(colony.s.buildHistory||{}).map(([k,n])=>`${RECIPES[k]?.name||k} × ${n}`).join(', ')||'none yet'}.</p><ol>${missionLog(outpost,colony.s).map(t=>`<li>${t.done?'✓':'○'} ${t.title}</li>`).join('')}</ol><details><summary>Optional exploration</summary><p>Collect samples, map landmarks, grow more crops and improve your shelter. The surface map tracks exploration; Settings → Information explains the science.</p></details><p>Solar panels make electricity. Solar sails propel spacecraft and are not needed here. Regolith shielding reduces radiation; it never makes exposure zero.</p>`});
 }
 function updateMissionPower(dt){
   if(!outpost||!world.settlement)return;

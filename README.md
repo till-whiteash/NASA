@@ -5,8 +5,10 @@
 
 ## Guided first-person construction
 
-The game includes a guided landing-pod-to-habitat mission. Leave the
-pod, recover six cargo bundles, calibrate three survey points, clear the site,
+Choose **Start on Mars · guided first build** for the short training route.
+Leave the pod, open a cargo bundle and assemble its supply rack. Suit air and
+the base clock wait until this first build succeeds, then normal survival resumes.
+Recover the remaining cargo (six bundles total), calibrate three survey points, clear the site,
 raise six frames, fit shells and airlocks, and check pressure. The player chooses
 the module build order on engineered footprints. Existing greenhouse expansion
 still uses Builder placement.
@@ -22,6 +24,11 @@ terminals: solar/controller, battery, base and rover charger. An extra battery
 must be placed, inspected and wired in parallel before it adds storage. Both
 sets of tutorial stones and mineral mining remain available. Old saves retain
 progress. Publishing to `main` updates the GitHub Pages site.
+
+The **Logbook → Review my decisions** debrief records your first build, power
+allocation changes and observed crop problems, with causes, next actions and
+retryable reflections saved with the mission. Forecasts are labelled separately
+from outcomes. One sol takes **300 seconds** at normal simulation speed.
 
 - [Implementation, science and test guide](game/POWER-TUTORIAL.md)
 - [Agent handover and compatibility rules](README-AGENT-HANDOVER.md)

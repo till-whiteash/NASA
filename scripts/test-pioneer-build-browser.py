@@ -14,6 +14,7 @@ SCRIPT="""async()=>{
  p.exitedPod=true;h.apply();result.cargoPhoto=photo(h.cargo[1].position);
  for(const obj of h.cargo)result.cargo.push(use(obj));
  if(p.collected.length!==6)throw Error('Missing cargo');
+ use(h.starter,.9);if(!p.starterBuilt)throw Error('Missing starter build');
  result.surveyPhoto=photo(h.surveys[1].position);
  use(h.surveys[0],1.4);w.player.position.x+=10;h.update(.2);if(h.measuring)throw Error('Survey did not cancel');
  for(const obj of h.surveys){use(obj,1.4);for(let n=0;n<32;n++)h.update(.1);result.survey.push(p.surveyed.includes(obj.userData.id));}

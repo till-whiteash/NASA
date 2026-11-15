@@ -3,6 +3,7 @@ export function recordLesson(s,key){(s.tutorial??={})[key]=true;}
 export function tutorialLessons(o,s){const t=s.tutorial||{},p=o.habBuild?.pioneer;return [
  ...(p?[
  {title:'Leave the pod safely',done:p.exitedPod,text:'Follow the hatch marker. Press E / Action, wait for PRESSURE MATCHED, then press E / Action again to open the outer hatch. Your checked suit is already on.'},
+ ...(p.starterBuilt!==undefined?[{title:'Build your first supply rack',done:p.starterBuilt,text:'Open an orange bundle, then follow the marker to the green rack beside cargo 1. Aim and press E / Action. It reuses its packing frame. Suit air and the base clock start after this practice build.'}]:[]),
  {title:'Find your building supplies',done:p.collected.length===6,text:'Follow the marker to an orange cargo bundle, walk close and press E / Action. The next bundle is marked automatically. Six bundles contain all the structural supplies for your first habitat.'},
  {title:'Use the calibrator',done:p.surveyed.length===3,text:'Go to the marked blue instrument. Press E / Action and stand nearby until the check finishes. Repeat at the other two instruments. Walking away cancels a measurement; you can try again.'},
  {title:'Build your first home',done:o.habBuild.step>=6,text:'Left click / tap Mine with the pickaxe to clear the four marked rocks. Then use each glowing footprint to build a frame. Follow the marker to fit shells, airlocks and finally open the green pressure valve.'}
