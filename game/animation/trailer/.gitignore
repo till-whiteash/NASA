@@ -1,0 +1,5 @@
+clips/
+build/
+stills/
+*.blend1
+__pycache__/
