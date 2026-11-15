@@ -50,6 +50,53 @@ export const LOOKS = {                                        // background, hem
 // Newly rendered clean movies use responsive captions; legacy movies retain baked captions.
 const CLEAN_VIDEO = name => ['ares_vi_briefing', 'ares_vi_briefing_moon', 'launch_moon', 'briefing_mission', 'briefing_moon', 'cruise_loop', 'mars_approach'].includes(name);
 const VIDEO = name => new URL(`previews/${name}${CLEAN_VIDEO(name) ? '-hd' : ''}.mp4`, ANIMATION_ROOT).href;
+const POSTER = name => new URL(`previews/posters/${name}.jpg`, ANIMATION_ROOT).href;
+// What the loading screen calls each film.
+const FILM_TITLES = {
+  ares_vi_briefing: ['Ares VI · final briefing', 'Mars mission'], ares_vi_briefing_moon: ['Artemis · final briefing', 'Moon mission'],
+  briefing_mission: ['The road to Mars', 'Mission plan'], briefing_moon: ['The road to the Moon', 'Mission plan'],
+  launch_earth: ['Liftoff', 'Leaving Earth'], launch_moon: ['Liftoff', 'Leaving Earth'], cruise_loop: ['Six months in space', 'The journey'],
+  mars_approach: ['Arriving at Mars', 'Orbit insertion'], edl_mars: ['Entry, descent and landing', 'Seven minutes'],
+  outpost_26_months: ['Twenty-six months', 'Building the outpost'], dust_storm: ['Dust storm', 'Mars weather'],
+  failure_solar_panel: ['Panel fault', 'Something broke'], failure_rover_stuck: ['Rover stuck', 'Something broke'],
+  failure_air_leak: ['Air leak', 'Something broke'], ascent_mars: ['Leaving Mars', 'Mission complete'],
+};
+const LOADING_FACTS = [
+  'Light from Mars takes between 3 and 22 minutes to reach Earth, so mission control can never steer you live.',
+  'A day on Mars, a sol, lasts 24 hours 39 minutes.',
+  'Mars has two small moons, Phobos and Deimos.',
+  'Olympus Mons on Mars is about two and a half times taller than Mount Everest.',
+  'The Moon is moving away from Earth by about 3.8 cm every year.',
+  'Mars gravity is 38% of Earth\'s: a 40 kg backpack would feel like 15 kg.',
+  'Twelve people have walked on the Moon, all between 1969 and 1972.',
+  'Mars is red because its dust is full of iron oxide: rust.',
+];
+// A loading screen for the film's video: a still from the film, its title, real download progress and a fact.
+function filmLoader(box, name) {
+  const [title, kicker] = FILM_TITLES[name] || ['Mission film', 'Zhetalis'];
+  const el = document.createElement('div'); el.className = 'cine-loading';
+  el.innerHTML = `<img class="cl-poster" alt="" src="${POSTER(name)}"><div class="cl-card"><p class="cl-kicker"></p><h2 class="cl-title"></h2>
+    <div class="cl-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div><p class="cl-status">Loading film…</p><p class="cl-fact"></p></div>`;
+  el.querySelector('.cl-kicker').textContent = kicker; el.querySelector('.cl-title').textContent = title;
+  el.querySelector('.cl-poster').onerror = e => e.target.remove();
+  const bar = el.querySelector('.cl-bar'), fill = bar.querySelector('i'), status = el.querySelector('.cl-status'), fact = el.querySelector('.cl-fact');
+  let f = Math.floor(Math.random() * LOADING_FACTS.length);
+  const nextFact = () => { fact.classList.remove('on'); setTimeout(() => { fact.textContent = LOADING_FACTS[f++ % LOADING_FACTS.length]; fact.classList.add('on'); }, 250); };
+  nextFact(); const factTimer = setInterval(nextFact, 6000);
+  box.append(el);
+  let shown = 3; const born = performance.now(), MIN_MS = 1400;   // long enough to read, never a flicker
+  return {
+    progress(video) {                                  // how much of the film has downloaded (the browser starts it when it can)
+      const d = video.duration, b = video.buffered;
+      if (!d || !isFinite(d) || !b.length) return;
+      let end = 0; for (let i = 0; i < b.length; i++) if (b.start(i) <= video.currentTime + .5) end = Math.max(end, b.end(i));
+      const pct = Math.min(100, Math.max(shown, Math.round(end / d * 100))); shown = pct;
+      fill.style.width = pct + '%'; bar.setAttribute('aria-valuenow', pct); status.textContent = `Loading film… ${pct}%`;
+    },
+    ready() { status.textContent = 'Starting…'; fill.style.width = Math.max(shown, 100) + '%'; },
+    done(now = false) { const wait = now ? 0 : Math.max(0, MIN_MS - (performance.now() - born)); setTimeout(() => { clearInterval(factTimer); el.classList.add('cl-out'); setTimeout(() => el.remove(), 450); }, wait); },
+  };
+}
 const captionsCache = new Map();
 function captionsFor(name) {
   if (!captionsCache.has(name)) captionsCache.set(name, fetch(new URL(`glb/${name}.captions.json`, ANIMATION_ROOT), { signal: AbortSignal.timeout(5000) }).then(r => r.ok ? r.json() : null).catch(() => null));
@@ -62,7 +109,8 @@ export function playCinematic(name, { clip, world } = {}) {
     box.innerHTML = '<p class="cine-phase"></p><p class="cine-cap" aria-live="polite"></p><button type="button" class="cine-skip">Skip ›</button><p class="cine-load">Loading…</p>';
     document.body.append(box);
     const cap = box.querySelector('.cine-cap'), phase = box.querySelector('.cine-phase');
-    let done = false, video = null, videoPending = false;
+    let done = false, video = null, videoPending = false, endLoader = null;
+    box.insertAdjacentHTML('beforeend', '<p class="cine-buffer-badge" aria-live="polite">Buffering…</p>');
     const playVideo = async () => {
       if (done || video || videoPending) return;
       videoPending = true;
@@ -73,9 +121,16 @@ export function playCinematic(name, { clip, world } = {}) {
       video = document.createElement('video'); video.className = 'cine-video';
       Object.assign(video, { src: VIDEO(name), muted: true, playsInline: true, preload: 'auto' }); video.setAttribute('playsinline', '');
       box.prepend(video); box.classList.add('cine-has-video'); cap.textContent = ''; phase.textContent = '';
-      const loading = box.querySelector('.cine-load');
-      if (loading) loading.textContent = 'Loading movie…';
-      video.addEventListener('loadeddata', () => loading?.remove(), { once: true });
+      box.querySelector('.cine-load')?.remove();
+      const loader = filmLoader(box, name);
+      const onProgress = () => loader.progress(video);
+      for (const ev of ['progress', 'loadedmetadata', 'durationchange']) video.addEventListener(ev, onProgress);
+      video.addEventListener('canplay', () => loader.ready(), { once: true });
+      video.addEventListener('playing', () => loader.done(), { once: true });
+      endLoader = () => loader.done(true);
+      // a slow connection mid-film: a small buffering badge instead of a frozen picture
+      video.addEventListener('waiting', () => { if (video.currentTime > .2) box.classList.add('cine-buffering'); });
+      video.addEventListener('playing', () => box.classList.remove('cine-buffering'));
       if (CLEAN_VIDEO(name)) {
         box.classList.remove('cine-bars'); box.classList.add('cine-clean-video');
         delete cap.dataset.key;
@@ -105,7 +160,7 @@ export function playCinematic(name, { clip, world } = {}) {
     };
     if (world) { world.cinematic = true; for (const k of Object.keys(world.keys || {})) world.keys[k] = false; }
     const end = played => {
-      if (done) return; done = true; video?.pause(); removeEventListener('keydown', key, true);
+      if (done) return; done = true; video?.pause(); endLoader?.(); removeEventListener('keydown', key, true);
       box.classList.add('cine-out');
       setTimeout(() => box.remove(), 400);
       if (world) world.cinematic = false;

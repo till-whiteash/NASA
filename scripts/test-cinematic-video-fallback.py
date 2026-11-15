@@ -25,7 +25,7 @@ try:
         pg.goto(f'http://127.0.0.1:{srv.server_port}/film-test.html')
         for name in ['ares_vi_briefing', 'ares_vi_briefing_moon', 'briefing_mission', 'briefing_moon', 'cruise_loop', 'mars_approach', 'launch_moon']:
             result = pg.evaluate("""async name => {
-              const {playCinematic} = await import('./src/cinematic.js?v=blender-films-2');
+              const {playCinematic} = await import('./src/cinematic.js?v=blender-films-3');
               const world={keys:{KeyW:true},cinematic:false};
               const playback=playCinematic(name,{world});
               await new Promise(r=>setTimeout(r,1400));

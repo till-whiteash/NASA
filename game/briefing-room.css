@@ -47,3 +47,25 @@
 
 /* Mission hints must not cover either movie captions or Ewan's landing camera. */
 body:has(.cinematic, .scene-cinematic) #zhetela-message { visibility: hidden; }
+
+/* Film loading screen (src/cinematic.js filmLoader): a still from the film, its title, download progress and a fact. */
+.cinematic .cine-loading { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; background: #04060a; overflow: hidden; transition: opacity .45s ease; font-family: Poppins, system-ui, sans-serif; color: #f1f2f2; }
+.cinematic .cine-loading.cl-out { opacity: 0; pointer-events: none; }
+.cine-loading .cl-poster { position: absolute; inset: -40px; width: calc(100% + 80px); height: calc(100% + 80px); object-fit: cover; filter: blur(18px) brightness(.45) saturate(1.1); transform: scale(1.04); animation: cl-drift 14s ease-in-out infinite alternate; }
+@keyframes cl-drift { from { transform: scale(1.04) translateX(-1.5%); } to { transform: scale(1.1) translateX(1.5%); } }
+.cine-loading .cl-card { position: relative; width: min(520px, 86vw); padding: 28px 30px 24px; border-radius: 22px; background: rgba(8,10,14,.62); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(10px); box-shadow: 0 30px 80px -30px rgba(0,0,0,.8); }
+.cl-kicker { margin: 0 0 6px; font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: #ff9a5c; }
+.cine-loading .cl-title { margin: 0 0 22px; font-size: clamp(24px, 4vw, 34px); font-weight: 600; letter-spacing: -.03em; line-height: 1.15; color: #fff; }
+.cl-bar { height: 6px; border-radius: 999px; background: rgba(255,255,255,.12); overflow: hidden; }
+.cl-bar i { display: block; height: 100%; width: 3%; border-radius: inherit; background: linear-gradient(90deg, #ff7a2f, #ffb27a); transition: width .4s ease; position: relative; }
+.cl-bar i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); animation: cl-shine 1.4s linear infinite; }
+@keyframes cl-shine { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.cl-status { margin: 10px 0 0; font-size: 13px; color: #c3c9cb; font-variant-numeric: tabular-nums; }
+.cl-fact { margin: 18px 0 0; padding-top: 16px; border-top: 1px solid rgba(255,255,255,.1); font-size: 14px; line-height: 1.55; color: #dfe3e4; min-height: 3.1em; opacity: 0; transition: opacity .25s ease; }
+.cl-fact::before { content: "Did you know? "; color: #ff9a5c; font-weight: 600; }
+.cl-fact.on { opacity: 1; }
+.cinematic .cine-buffer-badge { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); z-index: 3; margin: 0; padding: 7px 14px 7px 32px; border-radius: 999px; background: rgba(8,10,14,.7); border: 1px solid rgba(255,255,255,.14); color: #e7eaeb; font: 600 12px/1.2 Poppins, system-ui, sans-serif; opacity: 0; transition: opacity .2s ease; pointer-events: none; }
+.cinematic .cine-buffer-badge::before { content: ""; position: absolute; left: 12px; top: 50%; width: 11px; height: 11px; margin-top: -7px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); border-top-color: #ff7a2f; animation: cl-spin .8s linear infinite; }
+@keyframes cl-spin { to { transform: rotate(360deg); } }
+.cinematic.cine-buffering .cine-buffer-badge { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .cine-loading .cl-poster, .cl-bar i::after, .cinematic .cine-buffer-badge::before { animation: none; } }
