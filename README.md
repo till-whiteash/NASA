@@ -1,2 +1,2 @@
 # Zhetalis-Nasa
-**Play the game:** https://code-aar.github.io/Zhetalis-Nasa/game/ - **Guide for judges:** [game/JUDGES.md](game/JUDGES.md)
+**Play the game:** https://till-whiteash.github.io/NASA/game/ - **Guide for judges:** [game/JUDGES.md](game/JUDGES.md)
