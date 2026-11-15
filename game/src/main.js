@@ -1,3 +1,5 @@
+import {advanceISRU} from './isru-state.js';
+import {installRenderHealth,renderRatio} from './render-health.js';
 import { HabitatBuild } from './habitat-build.js';
 import { habitatBuilt } from './habitat-build-state.js';
 import { extractWater, purifyWater } from './water-processing.js';
@@ -80,14 +82,15 @@ loadModel('sls.glb'); loadModel('mobile-launcher.glb');   // NASA's 3D models st
 
 // Phones and tablets: draw fewer pixels, and skip shadows on small screens, so the game stays smooth
 const coarse = matchMedia('(pointer: coarse)').matches, smallScreen = Math.min(screen.width, screen.height) < 600;
-const renderer = new THREE.WebGLRenderer({ canvas: $('#view'), antialias: effectiveQuality(GRAPHICS_MODE) !== 'low' });
+const renderer = new THREE.WebGLRenderer({ canvas: $('#view'), antialias: true, powerPreference: 'high-performance' });
 // Pixel count is the biggest cost: only an explicit High setting goes past 1.5x, and never past 2x (4K/retina screens).
-const targetRatio = () => Math.min(devicePixelRatio, effectiveQuality(GRAPHICS_MODE) === 'low' ? 1 : GRAPHICS_MODE === 'high' ? 2 : 1.5);
+const targetRatio = () => renderRatio(innerWidth,innerHeight,devicePixelRatio,effectiveQuality(GRAPHICS_MODE));
 renderer.setPixelRatio(targetRatio());
 renderer.setSize(innerWidth, innerHeight, false);
 renderer.shadowMap.enabled = effectiveQuality(GRAPHICS_MODE) !== 'low';
 renderer.shadowMap.type = THREE.PCFShadowMap;   // filtered edges at a fraction of PCFSoft's per-pixel sampling cost
 renderer.shadowMap.autoUpdate = false; let shadowFrame = 0, insideShadowWait = 0;
+const renderHealth=installRenderHealth(renderer.domElement,{save:()=>saveGame(),stop:()=>releaseControls()});
 const adaptiveRes = createAdaptiveRes(renderer, targetRatio, { enabled: () => !location.search.includes('fixedres') });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;   // softer, film-like light and colour
@@ -353,7 +356,7 @@ function buildWorld() {
     world.extraTargets = p => {
       const list = targets(p), step = outpost.powerStep;
       const task=marsObjective(outpost,colony.s),target=missionTarget(task.target);
-      if(['base','charger','shelter','soil'].includes(task.target)&&target&&task.id!=='charge')list.unshift({type:'mission-work',task,range:2.8,d:Math.hypot(p.x-target.x,p.z-target.z)});
+      if(['base','charger','shelter','soil','isru'].includes(task.target)&&target&&task.id!=='charge')list.unshift({type:'mission-work',task,range:2.8,d:Math.hypot(p.x-target.x,p.z-target.z)});
       return list;
     };
     construction = new Construction(world,interior,{state:()=>outpost,colony:()=>colony,save:saveGame,sync:syncPowerHardware,advance:advancePower,guide:zhetela});
@@ -1147,6 +1150,21 @@ function patchLeak() {
   filmThen(inside ? null : ['failure_air_leak', 'leak_patched'], () => toast('💨 Leak patched. The crew tops the air back up from the tanks.', 5000));
 }
 
+function dieOutside() {
+  if(state.phase!=='mars'||outpost.over)return;
+  releaseControls();suit=0;queue.length=0;
+  coop.close(true);remote?.clear();
+  outpost.over={win:false,why:'suit-oxygen'};
+  state.phase='dead';
+  if(!guestMission)clearSave();
+  document.exitPointerLock?.();$('#hud').classList.add('hidden');
+  setSound({scene:'quiet',thrust:0});
+  modal({title:'You died',dismissible:false,html:'<p>Your suit ran out of oxygen outside.</p><p>This run is over. Your base, inventory and mission progress are lost. Retry starts a new mission; there is no respawn.</p>',choices:[
+    {label:'Retry — new mission',primary:true,onPick:()=>{const u=new URL(location.href);u.searchParams.set('newMission','1');location.assign(u);}},
+    {label:'Main menu',onPick:()=>{const u=new URL(location.href);u.searchParams.delete('newMission');history.replaceState(null,'',u);location.reload();}}
+  ]});
+}
+
 function endMission() {
   clearSave();   // the mission is over, so there is nothing to resume
   document.exitPointerLock?.();
@@ -1190,6 +1208,7 @@ function pressKey(code) {
   if (code === 'KeyX') { construction?.placeBattery(); return; }
   if (code === 'KeyR') { construction?.cancel(); return; }
   if (code === 'KeyE') {
+    if(!inside&&!world.driving){const task=marsObjective(outpost,colony.s),p=missionTarget(task.target);if(task.id.startsWith('isru-')&&p&&Math.hypot(world.player.position.x-p.x,world.player.position.z-p.z)<2.8){performMissionWork(task);return;}}
     if(construction?.use()) return;
     if (inside) { const s = room.nearest(); if (s) stationAction(s); }
     else { const n = world.nearest(); if (n) collect(n); else if (colony.tool === 'builder' && !world.driving) openBuild(); }
@@ -1332,12 +1351,12 @@ soundLabel(); addEventListener('touchstart', soundLabel, { passive: true, once: 
 $('#view-btn').onclick = () => { if (world && !inside) world.firstPerson = !world.firstPerson; };
 $('#speed-btn').onclick = () => { state.speed = state.speed === 1 ? 3 : 1; $('#speed-btn').textContent = 'Speed ×' + state.speed; };
 let viewportFrame;
-function resizeGame(){cancelAnimationFrame(viewportFrame);viewportFrame=requestAnimationFrame(()=>{renderer.setPixelRatio(Math.max(.5,targetRatio()*adaptiveRes.scale));renderer.setSize(innerWidth,innerHeight,false);renderer.shadowMap.enabled=effectiveQuality(GRAPHICS_MODE)!=='low';world?.resize();launch?.resize();interior?.resize();capsule?.resize();ghRoom?.resize();airlockRoom?.resize();});}
+function resizeGame(){cancelAnimationFrame(viewportFrame);viewportFrame=requestAnimationFrame(()=>{renderer.setPixelRatio(targetRatio()*adaptiveRes.scale);renderer.setSize(innerWidth,innerHeight,false);renderer.shadowMap.enabled=effectiveQuality(GRAPHICS_MODE)!=='low';world?.resize();launch?.resize();interior?.resize();capsule?.resize();ghRoom?.resize();airlockRoom?.resize();});}
 addEventListener('resize',resizeGame);window.visualViewport?.addEventListener('resize',resizeGame);
 
 // ---------------- HUD ----------------
 function questBearing(){
-  const task=marsObjective(outpost,colony.s),step=outpost.powerStep,exterior=['power','base','charger','shelter','soil','ice','seed-pod'].includes(task.target);
+  const task=marsObjective(outpost,colony.s),step=outpost.powerStep,exterior=['power','base','charger','shelter','soil','ice','seed-pod','isru'].includes(task.target);
   let target,label;
   const galley=step===6 && colony.s.produce>0;
   if(!inside&&['workbench','greenhouse','locker','water'].includes(task.target))return ({workbench:'Workbench',greenhouse:'Grow beds',locker:'Storage locker',water:'Water plant'})[task.target]+' · inside the base';
@@ -1479,7 +1498,7 @@ devConsole({
 
 // Testing helper for the team: open the game with #debug in the address, then use
 // game.event('solar-storm-warning'), game.event('dust', {sols: 5}), game.outpost.parts = 50 ...
-if (location.hash === '#debug') window.game = { get eva(){return eva;},get airlock(){return airlockRoom;}, get construction(){return construction;}, mission: { objective:()=>marsObjective(outpost,colony.s), tick:updateMissionPower, target:missionTarget, log:openMissionLog }, get body() { return body; }, patches: () => openPatches(), get colony() { return colony; }, get outpost() { return outpost; }, get launch() { return launch; }, get world() { return world; }, get interior() { return interior; }, get capsule() { return capsule; }, goInShip: () => goInShip(), goInGreenhouse: (f = 'hab') => goInGreenhouse(f), get ghRoom() { return ghRoom; }, get renderer() { return renderer; }, get inside() { return inside; }, event: (type, extra = {}) => queue.push({ type, ...extra }), goInside: () => goInside(), station: t => stationAction({ type: t }), sound: soundDebug, phase: p => (solClock = p * TUNED.solSeconds), discover: (title = 'TEST SITE', eyebrow = 'SITE CONTACT', sub = '+5 science', accent = '#7fd4e8') => showDiscovery({ eyebrow, title, sub, accent }) };
+if (location.hash === '#debug') window.game = { get suit(){return suit;},set suit(v){suit=Math.max(0,Math.min(1,Number(v)));},get eva(){return eva;},get airlock(){return airlockRoom;}, get construction(){return construction;}, mission: { objective:()=>marsObjective(outpost,colony.s), tick:updateMissionPower, target:missionTarget, log:openMissionLog }, get body() { return body; }, patches: () => openPatches(), get colony() { return colony; }, get outpost() { return outpost; }, get launch() { return launch; }, get world() { return world; }, get interior() { return interior; }, get capsule() { return capsule; }, goInShip: () => goInShip(), goInGreenhouse: (f = 'hab') => goInGreenhouse(f), get ghRoom() { return ghRoom; }, get renderer() { return renderer; }, get inside() { return inside; }, event: (type, extra = {}) => queue.push({ type, ...extra }), goInside: () => goInside(), station: t => stationAction({ type: t }), sound: soundDebug, phase: p => (solClock = p * TUNED.solSeconds), discover: (title = 'TEST SITE', eyebrow = 'SITE CONTACT', sub = '+5 science', accent = '#7fd4e8') => showDiscovery({ eyebrow, title, sub, accent }) };
 
 // ---------------- co-op and night skip ----------------
 // Co-op (coop.js, remote-players.js): everyone sends their astronaut's pose ten times a second; the host's pose also
@@ -1663,6 +1682,7 @@ function showStory() {
 }
 $('#loading').classList.add('hidden');
 renderer.setAnimationLoop(() => {
+  if(document.hidden||renderHealth.failed||state.phase==='dead'){clock.getDelta();return;}
   // Opening/arrival films have no world argument, but still cover the whole canvas.
   if (isCinematicActive() || isBriefingRoomActive()) { clock.getDelta(); return; }
   adaptiveRes.tick();
@@ -1699,6 +1719,7 @@ renderer.setAnimationLoop(() => {
     return;
   }
   if (state.phase === 'mars' && world) {
+    world.settlement?.isru?.apply(outpost.isruStep||0);
     const paused = ((isPaused() || devConsoleOpen) && !coop.active) || !!world.cinematic || (airlockRoom && room===airlockRoom);
     if(interior.rackedSuit)interior.rackedSuit.visible=!eva.equipped;
     setSound({ inside, suit, dust: !!outpost.dust, running: !!(!world.keys.ControlLeft && !world.keys.ControlRight && (world.keys.ShiftLeft || world.keys.ShiftRight)), habPod: inside && room === interior ? Math.round(interior.pos.x / 10.2) : -1, habTread: !!interior?.habTreadmill }); tickSound(dt);
@@ -1736,10 +1757,7 @@ renderer.setAnimationLoop(() => {
         const f = outpost.today, perSol = step / TUNED.solSeconds;
         outpost.dose += F.surfaceDose.value * f.protection * perSol;   // the part the shield would have blocked
         if (outpost.storm) outpost.dose += outpost.storm.strength * TUNED.stormDose / outpost.storm.total * perSol * f.protection;
-        if (suit <= 0) {
-          suit = 1; outpost.o2 = Math.max(0, outpost.o2 - 5);
-          modal({ title: '🆘 Out of suit air!', html: '<p>Your crewmates came out and carried you back inside just in time. Refilling your suit in a hurry used <b>5 kg of the outpost\'s oxygen</b>. Keep an eye on your suit meter!</p>', onClose: goInside });
-        }
+        if (suit <= 0) { dieOutside(); return; }
       } else suit = Math.min(1, suit + step * 0.25);
       // your own hunger (survival.js)
       const moving = !inside && !world.driving && world.move.lengthSq() > 0.5;
@@ -1865,10 +1883,11 @@ function setupMissionHud(){
 }
 function activeMissionObjective(){
   const primary=marsObjective(outpost,colony.s);
-  return primary.id.startsWith('safety-')||primary.id==='relay'?primary:(builderQuest(outpost,colony.s)||primary);
+  return primary.id.startsWith('safety-')||primary.id.startsWith('isru-')||primary.id==='relay'?primary:(builderQuest(outpost,colony.s)||primary);
 }
 function missionTarget(kind){
   const m=world?.settlement;if(!m)return null;
+  if(kind==='isru')return m.isru?.site||null;
   if(kind==='hab')return world.habBuild?.target()||null;
   const socketId=nextWiringSocket(outpost,kind,construction?.wire);const socket=construction?.sockets.find(p=>p.userData.id===socketId);if(socket)return socket.position;
   if(['workbench','greenhouse','locker','water','console','safety-shelter','monitor'].includes(kind))return null; // The objective is the indoor station, never the stairs.
@@ -1886,6 +1905,7 @@ function missionTarget(kind){
 }
 function performMissionWork(task){
   if(marsObjective(outpost,colony.s).id!==task.id)return;
+  if(task.id.startsWith('isru-')){if(!advanceISRU(outpost,colony.s,colony.tool)){toast('Equip the builder from the storage locker to construct the ISRU plant.');return;}world.settlement.isru?.apply(outpost.isruStep);outpost.today=outpost.forecast();saveGame();toast(outpost.isruStep===5?'ISRU commissioned: powered oxygen production improved by 30%.':'ISRU construction step complete.');return;}
   if(task.id==='charger-1'){zhetela('Aim at the highlighted charging-post slot in the parking bay and press E / Action.');return;}
   if(task.id==='base'||task.id==='charger-2'){zhetela('Select the output socket, then walk to the matching input socket and press E / Action.');return;}
   else if(task.id.startsWith('charger-'))outpost.chargerStep++;
@@ -1949,3 +1969,5 @@ function updateMissionPower(dt){
   world.chargingStatus=chargeRover(o,world.sev,m.chargingBay,dt);
   if(!wasDocked&&o.roverCharged){saveGame();toast('Rover connected · '+world.chargingStatus.status);}
 }
+
+if(new URL(location.href).searchParams.has('newMission')){const u=new URL(location.href);u.searchParams.delete('newMission');history.replaceState(null,'',u);startNew();}

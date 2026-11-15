@@ -78,6 +78,7 @@ const label = (() => {   // small printed or hand-written labels, cached by text
 
 export function dressOutpost({ world, heightAt, layout, access }) {
   const scene = world.scene, root = new THREE.Group(); root.name = 'outpost-kit'; scene.add(root);
+  let isru;
   const live = [];   // things that move: excluded from the static merge
   const colliders = world.colliders;
   const paint = std('paintWhite', '#ffffff', { map: wornPaint('#ece8e1'), roughness: .62 });
@@ -276,6 +277,7 @@ export function dressOutpost({ world, heightAt, layout, access }) {
   // 4. ISRU YARD beside the east end of the row: regolith, oxygen, water, ice, fuel
   // ====================================================================================================
   {
+    const before=new Set(root.children), colliderStart=colliders.length;
     const last = layout.moduleColliders[layout.moduleColliders.length - 1];
     const cx = last.x + 14, cz = last.z + 1, Y = new THREE.Group();
     const top = slab(cx, cz, 17, 19, 0); place(Y, cx, cz, 0, top);
@@ -402,6 +404,24 @@ export function dressOutpost({ world, heightAt, layout, access }) {
       g.rotation.y = rnd() * 3; g.receiveShadow = true; g.name = 'walkable-isru-berm';
       colliders.push({ x, z, r: 3.2, object: g, driveOver: true, surfaceContact: createRockContact(g) });
     }
+    const assets=root.children.filter(o=>!before.has(o));
+    const yardColliders=colliders.splice(colliderStart);
+    const pad=new THREE.Group(), equipment=new THREE.Group();
+    pad.name='isru-foundation';equipment.name='isru-equipment';root.add(pad,equipment);
+    assets.forEach(o=>(o===Y||o===berm?equipment:pad).attach(o));
+    mergeStatic(pad);mergeStatic(equipment,{exclude:live});live.push(pad,equipment);
+    const cable=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
+      new THREE.Vector3(access.entrances[0].x+2.7,ground(access.entrances[0].x,access.entrances[0].doorZ)+.1,access.entrances[0].doorZ+1),
+      new THREE.Vector3(cx,ground(cx,cz+10)+.1,cz+10),new THREE.Vector3(cx,top+.15,cz+8)
+    ]),32,.045,6,false),black);root.add(cable);live.push(cable);
+    let stage=-1;
+    isru={site:{x:cx,z:cz+10.5},pad,equipment,cable,apply(next=0){
+      if(next===stage)return;stage=next;pad.visible=next>=2;equipment.visible=next>=3;cable.visible=next>=4;
+      for(const c of yardColliders){const i=colliders.indexOf(c);if(i>=0)colliders.splice(i,1);}
+      if(next>=3)colliders.push(...yardColliders);
+      world.cameraListAge=0;world.sunMoved=true;
+    }};
+
   }
 
   // ====================================================================================================
@@ -455,5 +475,6 @@ export function dressOutpost({ world, heightAt, layout, access }) {
   root.traverse(o => { if (o.isMesh) { o.castShadow = o.castShadow ?? true; } });
   root.updateMatrixWorld(true);
   const saved = mergeStatic(root, { exclude: live });
-  return { root, saved };
+  isru?.apply(0);
+  return { root, saved, isru };
 }

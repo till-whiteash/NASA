@@ -11,7 +11,7 @@ import { loadModel } from './nasamodels.js';
 import { GREENHOUSE } from './colony.js';
 import { GH, heightAt } from './world.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { dressOutpost } from './outpost-kit.js?v=rover-traversal-2';
+import { dressOutpost } from './outpost-kit.js?v=survival-isru-1';
 
 export async function installSettlement(world){
   const gltf=await loadAssetWithRetry(new GLTFLoader(), 'assets/mars-base/scene.gltf', { critical: true }),model=gltf.scene;
@@ -194,14 +194,15 @@ export async function installSettlement(world){
   world.colliders.push({x:-30.8,z:26,r:.5,object:charging});
   world.clearRocksAround(-34,26,6);
   // Keep the procedural surface fit-out optional so a prop fault cannot block mission setup.
-  try { dressOutpost({ world, heightAt, layout, access }); }
+  let surfaceKit;
+  try { surfaceKit=dressOutpost({ world, heightAt, layout, access }); }
   catch (error) { console.warn('Outpost kit unavailable', error); }
   const shelter=layout.moduleColliders[3],shelterSite={x:shelter.x,z:shelter.z-shelter.r-1.8},soilSite={x:shelter.x-9,z:shelterSite.z-3};
   const soilPile=new THREE.Mesh(new THREE.SphereGeometry(1,48,24),soilMat);soilPile.scale.set(2,.7,1.5);soilPile.position.set(soilSite.x,heightAt(soilSite.x,soilSite.z),soilSite.z);world.scene.add(soilPile);
   const equipmentBlock=equipmentContact(model);
   const objectiveBeacon=new THREE.Mesh(new THREE.RingGeometry(.8,1,64),new THREE.MeshBasicMaterial({color:'#c78aff',side:THREE.DoubleSide,transparent:true,opacity:.85,depthWrite:false}));objectiveBeacon.rotation.x=-Math.PI/2;world.scene.add(objectiveBeacon);
   const inlet=new THREE.Mesh(new THREE.BoxGeometry(.42,.7,.22),cyan);inlet.position.set(access.entrances[0].x+2.7,.65,access.entrances[0].doorZ+1);world.scene.add(inlet);
-  const mission={objectiveBeacon,charging,chargerCable,chargerSite:{x:-30.8,z:26},chargingBay:{x:-34,z:26},shelterSite,soilSite,crossings,serviceCables,glassTunnel,blockEquipment:pos=>{const top=world.panelHeight(pos.x,pos.z);if(Number.isFinite(top)&&pos.y>=top-.18)return;equipmentBlock(pos);},pack,cable,powerSite,...access,model,layout,greenhouse,bindGreenhouse:room=>{mission.greenhouseRoom=room;room.setRegolith(soilLevel);},updateGreenhouse:(beds,powered=true)=>{
+  const mission={isru:surfaceKit?.isru,objectiveBeacon,charging,chargerCable,chargerSite:{x:-30.8,z:26},chargingBay:{x:-34,z:26},shelterSite,soilSite,crossings,serviceCables,glassTunnel,blockEquipment:pos=>{const top=world.panelHeight(pos.x,pos.z);if(Number.isFinite(top)&&pos.y>=top-.18)return;equipmentBlock(pos);},pack,cable,powerSite,...access,model,layout,greenhouse,bindGreenhouse:room=>{mission.greenhouseRoom=room;room.setRegolith(soilLevel);},updateGreenhouse:(beds,powered=true)=>{
     // The racks seen through the dome are a few pixels from beyond 40 m: skip their ~100 draws out there.
     if(mission.visibleFurnishings){const c=world.camera.position;mission.visibleFurnishings.visible=Math.hypot(c.x-greenhouse.position.x,c.z-greenhouse.position.z)<40;}
     const room=mission.greenhouseRoom;if(!room)return;
@@ -209,12 +210,13 @@ export async function installSettlement(world){
     // The copy seen through the dome only needs rebuilding when the view changes visibly (crop, growth in 10% steps,
     // harvest-ready, power), not on every hundredth of growth or litre of tank water.
     const key=(beds||[]).map(b=>`${b?.crop}|${(+b?.grown||0).toFixed(1)}|${b?.ready}`).join(';')+'|'+powered;if(key===mission.greenhouseKey)return;mission.greenhouseKey=key;
-    if(mission.visibleFurnishings)greenhouse.remove(mission.visibleFurnishings);
+    if(mission.visibleFurnishings){for(const g of mission.visibleFurnishings.userData.ownedGeometry||[])g.dispose();greenhouse.remove(mission.visibleFurnishings);}
     // Share the actual interior geometry and materials; draw() owns their lifecycle. The copy drops the grow lights
     // (four point lights in the outdoor scene made every lit pixel outside, terrain included, pay for them; the LED
     // bars are emissive and still glow) and bakes its ~120 parts into a handful of draw calls.
     const copy=room.furnishings.clone(true),lights=[];copy.traverse(o=>{if(o.isLight)lights.push(o);});lights.forEach(l=>l.removeFromParent());
-    mergeStatic(copy);mission.visibleFurnishings=copy;greenhouse.add(copy);
+    const sharedGeometry=new Set();copy.traverse(o=>{if(o.geometry)sharedGeometry.add(o.geometry);});
+    mergeStatic(copy);copy.userData.ownedGeometry=[];copy.traverse(o=>{if(o.geometry&&!sharedGeometry.has(o.geometry))copy.userData.ownedGeometry.push(o.geometry);});mission.visibleFurnishings=copy;greenhouse.add(copy);
   },surveys:new Set(),setWall:level=>shielding.visible=level>0,setRegolith:applySoil};
   world.settlement=mission;return mission;
 }

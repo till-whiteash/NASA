@@ -1,3 +1,4 @@
+import {isruObjective,ISRU_COMPLETE} from './isru-state.js';
 import {habBuildObjective,habBuildLog} from './habitat-build-state.js';
 // Pure progression: saved simulation fields are the single source of truth.
 export const POWER_TASKS=[
@@ -17,6 +18,7 @@ export function marsObjective(o,c){
  if(!o.baseConnected)return {id:'base',title:'Connect battery to base',detail:'Select Battery protected OUT at the field, then walk to Base IN beside Airlock 01 and select it.',target:'base'};
  if(!(o.research?.relay>=3))return {id:'relay',title:'Commission the Mars relay terminal',detail:'Go inside to the monitoring station. Request service, await acknowledgement, install the terminal and acquire the relay. This is a training network, not Starlink at Mars.',target:'monitor'};
  if(!c?.farmQuest?.rewarded)return firstMealObjective(o,c);
+ const isru=isruObjective(o,c);if(isru)return isru;
  if((o.chargerStep||0)<3){const step=o.chargerStep||0;return {id:'charger-'+step,title:['Go to the workbench','Place the charging station','Connect the charging station'][step],detail:['Go to the workbench inside the base. Press E / Action and choose Assemble landed rover charger kit.','Use the marked parking bay outside to install its charger.','Select Base charger OUT, then walk to Rover charger IN at the parking bay and select it.'][step],target:step===0?'workbench':'charger'};}
  if(!o.roverCharged)return {id:'charge',title:'Park and connect the rover',detail:'Drive into the cyan bay and stop. The connected station charges from spare daytime solar power or its stored reserve. Parking verifies the connection even at night; an empty reserve waits for sunlight.',target:'charger'};
  if(!o.upgrades.regolith){const step=o.soilStep||0;return {id:'soil-'+step,title:['Inspect the shelter area','Collect loose Martian soil','Fill the shielding bags','Place the shielding bags'][step],detail:['Use the marked shelter site to check the supports.','Use the nearby soil pile to collect regolith for the shielding bags.','Return to the workbench to fill and seal the support bags.','Use the shelter site to place the supported bags. Soil reduces radiation; it does not remove all risk. Thickness and these protection values are simplified game rules.'][step],target:['shelter','soil','workbench','shelter'][step]};}
@@ -33,6 +35,7 @@ export function missionLog(o,c){return [
  {title:'Connect battery to base',done:!!o.baseConnected},
  {title:'Request and commission a Mars relay terminal',done:o.research?.relay>=3},
  {title:'Harvest and prepare your first meal',done:!!c?.farmQuest?.rewarded},
+ {title:'Build, power and commission the ISRU yard',done:o.isruStep>=ISRU_COMPLETE},
  {title:'Build and connect rover charger',done:o.chargerStep>=3},
  {title:'Park and charge rover',done:!!o.roverCharged},
  {title:'Inspect, collect soil, fill bags, shield the shelter',done:o.upgrades.regolith>0},

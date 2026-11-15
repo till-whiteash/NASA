@@ -909,7 +909,7 @@ export function dressHab(I) {
     // the room's frame in the hab, for its floor, bunks and station (bunks.js); the pod is baked flat later
     Rm.updateMatrix(); const frameM = Rm.matrix.clone();
     const toScene = (x, z) => new THREE.Vector3(x, 0, z).applyMatrix4(frameM);
-    I.shelterRoom = { frame: frameM, walk: { x0: -.78, x1: .66, z0: -1.55, z1: 0 }, door: { x0: -.32, x1: .32, z0: -.4, z1: .75 }, bunkZ, tops: [.55, 1.55] };
+    I.shelterRoom = { frame: frameM, walk: { x0: -.49, x1: .42, z0: -1.45, z1: 0 }, door: { x0: -.32, x1: .32, z0: -.4, z1: .75 }, bunkZ, tops: [.55, 1.55] };
     if (st) { const p = toScene(0, -.75); st.x = p.x; st.z = p.z; st.label = 'check the storm shelter supplies'; }
     // NASA models, scaled to real sizes (metres) and placed when they finish loading
     const place = (file, size, axis, x, y, z, ry = 0, after) => loadModel(file).then(g => {
@@ -921,6 +921,11 @@ export function dressHab(I) {
         // some NASA files make suit fabric 75-85% opaque: draw it solid so the wall doesn't show through it
         for (const mt of [].concat(m.material)) { if (mt.transmission > 0) { mt.transmission = 0; mt.needsUpdate = true; } }   // the NASA ACES file exports its fabric as glass (transmission 1)
         for (const mt of [].concat(m.material)) if (mt.transparent && (mt.opacity ?? 1) >= .5) { mt.transparent = false; mt.opacity = 1; mt.alphaTest = mt.map ? .5 : 0; mt.depthWrite = true; mt.needsUpdate = true; } });   // visors (under 50%) stay see-through
+      // Fit hanging equipment to its wall bay before adding it to the room.
+      if(after!=null){
+        holder.updateMatrixWorld(true);const bounds=new THREE.Box3().setFromObject(holder),size=bounds.getSize(new THREE.Vector3());
+        holder.scale.multiplyScalar(Math.min(1,.42/size.x,.65/size.z));
+      }
       Rm.add(holder);
       if (after != null) {   // a number: hang it flat against the right-hand water wall at that x (its real depth varies)
         Rm.updateWorldMatrix(true, false); holder.updateMatrixWorld(true); const bw = new THREE.Box3().setFromObject(holder);   // (a stale room matrix once threw a bag 20 m away)

@@ -1,9 +1,9 @@
 // Keeps the frame rate smooth: if the game runs slowly the picture is drawn at a slightly lower
 // resolution, and it climbs back to full sharpness when the computer has spare time.
 // Only the pixel count changes. Nothing in the game itself moves or looks different.
-export function createAdaptiveRes(renderer, target, { min = 0.6, slowMs = 24, fastMs = 17, enabled = () => true } = {}) {
+export function createAdaptiveRes(renderer, target, { min = 0.75, slowMs = 24, fastMs = 17, enabled = () => true } = {}) {
   let avg = 16.7, last = performance.now(), scale = 1, holdUntil = 0, slowFor = 0, fastFor = 0;
-  const apply = () => renderer.setPixelRatio(Math.max(0.5, target() * scale));
+  const apply = () => renderer.setPixelRatio(target() * scale);
   return {
     reset() { scale = 1; slowFor = fastFor = 0; apply(); },
     get scale() { return scale; },

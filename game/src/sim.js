@@ -89,7 +89,7 @@ export class Outpost {
     this.food = this.crew * 3;
     this.rations = d.food;
     this.safetyChecks = { reserves:false, shelter:false }; this.emergencyKWh = 36; this.habBuild = { step: 0, cleared: [], rockHits: {}, frames: [], pressure: 0 };   // a new crew builds its habitat first (habitat-build.js)
-    this.powerStep = 0; this.baseConnected=false; this.chargerStep=0; this.roverCharged=false; this.soilStep=0; this.chargeReserve=0;
+    this.isruStep = 0; this.powerStep = 0; this.baseConnected=false; this.chargerStep=0; this.roverCharged=false; this.soilStep=0; this.chargeReserve=0;
     this.harvestMeals = 0;
     this.parts = Math.max(0, d.parts + SITES[this.site].parts);
     this.dose = 0; this.science = 0; this.scienceSent = 0;
@@ -136,7 +136,7 @@ export class Outpost {
     const cold = this.battery < heater && this.reactors === 0;   // batteries run flat before morning
     const e = Math.max(0, total - heater);                       // the heater's night power is set aside first
     const lifeK = e * this.split.life * (cold ? 0.7 : 1);         // freezing machines work worse
-    const o2 = lifeK * TUNED.o2Share * TUNED.o2PerKWh * (1 + 0.3 * this.upgrades.moxie);
+    const o2 = lifeK * TUNED.o2Share * TUNED.o2PerKWh * (1 + 0.3 * this.upgrades.moxie) * (this.isruStep >= 5 && this.baseConnected ? 1.3 : 1);
     const food = 0; // Stored meals come from the locker, deliveries and harvested beds.
     const commsNeed = TUNED.commsNeedKWh * (this.relayDown > 0 ? TUNED.directToEarthFactor : 1);
     const link = e * this.split.comms >= commsNeed && this.blackout === 0;

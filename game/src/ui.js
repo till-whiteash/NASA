@@ -42,7 +42,7 @@ export const isModalOpen = () => modalOpen;
 export const isPaused = () => modalOpen && modalPauses;   // the outpost panel lets time keep running
 
 // A pop-up with choices. Every choice shows its cost, so no choice is "free".
-export function modal({ title, html, choices = [{ label: 'OK' }], onClose, pause = true }) {
+export function modal({ title, html, choices = [{ label: 'OK' }], onClose, pause = true, dismissible = true }) {
   modalPauses = pause;
   const box = $('#modal .modal-box');
   const previousFocus=document.activeElement;
@@ -57,13 +57,16 @@ export function modal({ title, html, choices = [{ label: 'OK' }], onClose, pause
     b.onclick = () => { close(); c.onPick?.(); };
     list.appendChild(b);
   });
-  box.querySelector('.modal-dismiss').onclick = close;
+  box.querySelector('.modal-dismiss').hidden = !dismissible;
+  box.querySelector('.modal-dismiss').style.display = dismissible ? '' : 'none';
+  box.querySelector('.modal-dismiss').disabled = !dismissible;
+  box.querySelector('.modal-dismiss').onclick = dismissible ? close : null;
   box.onkeydown=e=>{if(e.key!=='Tab')return;const focusable=[...box.querySelectorAll('button,input,select,a[href]')].filter(el=>!el.disabled&&el.getClientRects().length);const first=focusable[0],last=focusable.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}};
   let closed = false;
-  dismissCurrent = close;
-  $('#modal').classList.remove('hidden'); modalOpen = true;box.querySelector('.modal-dismiss').focus();
+  dismissCurrent = dismissible ? close : () => {};
+  $('#modal').classList.remove('hidden'); modalOpen = true;(dismissible?box.querySelector('.modal-dismiss'):list.querySelector('button'))?.focus();
   document.exitPointerLock?.();
-  function close() { if (closed) return; closed = true; if (dismissCurrent === close) { $('#modal').classList.add('hidden'); modalOpen = false; dismissCurrent = null;if(previousFocus?.isConnected)previousFocus.focus?.(); } onClose?.(); }
+  function close() { if (closed) return; closed = true; if (dismissCurrent === close || !dismissible) { $('#modal').classList.add('hidden'); modalOpen = false; dismissCurrent = null;if(previousFocus?.isConnected)previousFocus.focus?.(); } onClose?.(); }
   return close;
 }
 
