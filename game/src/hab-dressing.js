@@ -10,6 +10,7 @@
 //    warm dim evenings, very dim amber at night.
 //  - People live here: four (fictional) crew cabins with photos, drawings, books and keepsakes; named mugs and towels.
 import * as THREE from 'three';
+import { mergeStatic } from './static-merge.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createCrew } from './hab-crew.js';
 import { loadModel } from './nasamodels.js';
@@ -60,6 +61,11 @@ function label(text, { w = 512, h = 96, bg = '#26343d', fg = '#ecf2e7', font = '
 // Place a group against the pod wall at angle a (0 = +z side, PI = -z side), facing the pod centre. Local +z faces in.
 function onWall(pod, a, r, g) { g.position.set(pod * SPACING + Math.sin(a) * r, 0, Math.cos(a) * r); g.rotation.y = a + Math.PI; return g; }
 const slotA = j => j / 24 * Math.PI * 2;   // the 24 wall panels of a pod
+// Centre wide wall pieces on solid panel faces and stand them off far enough to clear the faceted wall.
+function onPanel(pod, slot, halfW, g) {
+  const gap = Math.max(0, halfW - .52) * Math.tan(Math.PI / 12) + .012;
+  onWall(pod, slotA(slot), R - .04 - gap, g); g.userData.gap = gap; return g;
+}
 const at = (m, x, y, z) => { m.position.set(x, y, z); return m; };
 const MENUS = ['Rehydrated curry + greenhouse lettuce', 'Pasta night!', 'Tacos (tortillas!)', 'Laksa from the care pack', 'Soup + fresh radishes', 'Pancakes (sol off)'];
 const CABIN_NOTES = {
@@ -541,9 +547,11 @@ export function dressHab(I) {
     for (const side of [1, -1]) { if ((side > 0 && i === 5) || (side < 0 && i === 0)) continue; const a = side > 0 ? Math.PI / 2 : -Math.PI / 2;
       for (const off of [-1.4, 1.4]) { const h = handrail(1.0, true); onWall(i, a + off / R, R - .03, h); h.position.y = 1.2; pods[i].add(h); } }
   }
-  // mission patch decals round the hatches into the Wardroom (the ISS crews do this in the Unity node)
+  // Snap patches beside the Wardroom hatches so their discs never hang in the doorway openings.
   const patchNames = [['GUSEV OUTPOST', 'EXP 1'], ['SPIRIT', 'MER-A 2004'], ['FIRST HARVEST', 'GREENHOUSE'], ['ROVER TEAM', 'R-1'], ['STORM SURVIVORS', 'SOL 22'], ['ZHETALIS', 'MARS CREW']];
-  patchNames.forEach(([a, b], k) => { const side = k < 3 ? -1 : 1, g = new THREE.Group(); onWall(4, side * Math.PI / 2 + [.56, .72, .88][k % 3], R - .06, g); g.add(patchDisc(.24, missionPatch(a, b, ['#2b3a67', '#8a2d2d', '#3f7a52'][k % 3], k % 3), ['#2b3a67', '#8a2d2d', '#3f7a52'][k % 3], 0, 2.12 + (k % 2) * .2, 0)); pods[4].add(g); });
+  const patchSlots = [16, 15, 14, 8, 9, 10], patchRing = ['#2b3a67', '#8a2d2d', '#3f7a52'];
+  patchNames.forEach(([a, b], k) => { const g = new THREE.Group(); onPanel(4, patchSlots[k], .13, g);
+    g.add(patchDisc(.26, missionPatch(a, b, patchRing[k % 3], k % 3), patchRing[k % 3], 0, 2.3, 0)); pods[4].add(g); });
 
   // ---------- pod 0: airlock & power ----------
   {
@@ -692,10 +700,10 @@ export function dressHab(I) {
       tr.add(box(.16, .02, .06, mat('pSteel', '#b8bec4', { m: .7, r: .32 }), 0, .03, .28)); tr.add(pic(.3, .08, label('TRASH · COMPACT', { w: 384, h: 96, bg: '#f2c230', fg: '#1d1d1d', font: 'bold 36px system-ui' }), 0, .45, .262)); }
     block(G); spots.galley = { group: G, local: new THREE.Vector3(.1, 0, .75), yaw: Math.PI, pose: 'drink' };
     // whiteboard with the chore rota, tonight's menu and a countdown
-    const WB = new THREE.Group(); onWall(4, -.95, R - .2, WB); P.add(WB);
+    const WB = new THREE.Group(); onPanel(4, 21, .75, WB); P.add(WB); const wbGap = WB.userData.gap;
     const wbTex = tex(768, 512, () => {}); I.whiteboard = { texture: wbTex, canvas: wbTex.image, key: '' };
     WB.add(box(1.5, 1.0, .03, mat('wbFrame', '#b9bec2', { m: .5 }), 0, 1.55, .015)); WB.add(pic(1.44, .94, wbTex, 0, 1.55, .035));
-    for (const x of [-.6, .6]) WB.add(box(.06, .9, .16, mat('wbFrame', '#b9bec2'), x, 1.55, -.08));   // stand-offs to the wall
+    WB.add(box(1.4, .9, wbGap, mat('wbFrame', '#b9bec2', { m: .5 }), 0, 1.55, -wbGap / 2));   // backing clears the adjoining wall facets
     WB.add(box(1.4, .04, .08, mat('wbFrame', '#b9bec2'), 0, 1.03, .04));   // marker tray
     for (let k = 0; k < 3; k++) WB.add(cyl(.012, .012, .12, mat('marker' + k, ['#c23b2f', '#2d5fa8', '#2d8a4a'][k], { r: .4 }), -.3 + k * .15, 1.03, .06, 8).rotateZ(Math.PI / 2));
     // window nook under the real window: a bench with cushions, a blanket, a plush toy and hanging herbs
@@ -790,9 +798,9 @@ export function dressHab(I) {
   }
   // ---------- filling the sparse spots ----------
   { // Wardroom: crew photo board and a herb shelf
-    const P = pods[4], PB = new THREE.Group(); onWall(4, -.4, R - .2, PB); P.add(PB);
+    const P = pods[4], PB = new THREE.Group(); onPanel(4, 23, .68, PB); P.add(PB); const pbGap = PB.userData.gap;
     PB.add(box(1.36, .96, .04, mat('wbFrame', '#b9bec2', { m: .5 }), 0, 1.6, .0)); PB.add(box(1.3, .9, .03, mat('cork', '#b78a5a', { r: 1 }), 0, 1.6, .015));
-    for (const x of [-.55, .55]) PB.add(box(.06, .8, .16, mat('wbFrame', '#b9bec2'), x, 1.6, -.09));
+    PB.add(box(1.3, .9, pbGap, mat('cork', '#b78a5a', { r: 1 }), 0, 1.6, -pbGap / 2));   // backing keeps the wide board off both facets
     PB.add(pic(.5, .34, tex(384, 260, (g, w, h) => { const s2 = g.createLinearGradient(0, 0, 0, h); s2.addColorStop(0, '#9fc3e0'); s2.addColorStop(1, '#e8dcc6'); g.fillStyle = '#fbfaf6'; g.fillRect(0, 0, w, h); g.fillStyle = s2; g.fillRect(10, 10, w - 20, h - 60);
       CREW.forEach((c, k) => { g.fillStyle = '#f0f0ea'; g.beginPath(); g.ellipse(70 + k * 82, 150, 30, 58, 0, 0, 7); g.fill(); g.fillStyle = c.colour; g.fillRect(48 + k * 82, 120, 44, 10); g.fillStyle = '#d9c3a0'; g.beginPath(); g.arc(70 + k * 82, 82, 20, 0, 7); g.fill(); });
       g.fillStyle = '#333'; g.font = 'italic 24px "Comic Sans MS", cursive'; g.textAlign = 'center'; g.fillText('Crew 1 · launch day!', w / 2, h - 20); }), -.3, 1.79, .035));
@@ -834,12 +842,12 @@ export function dressHab(I) {
     html: () => k >= (I.habCrew ?? 3) ? '<p>Nobody sleeps here on this mission, so it is full of spare supplies and a water reserve.</p>' : CABIN_NOTES[person.id] + fact('Every crew member gets a private room: NASA studies found shared sleeping spaces hurt sleep on long missions.') }); });
   note(3, 0, 3.3, 'read the crew calendar', '📅 Crew calendar', () => `<p>Sol ${Math.max(1, I.calendar.sol)}. Past sols are crossed off. Mei Lin's birthday and a call home are marked.</p>` + fact('A sol (a Mars day) is 24 hours 39 minutes long.'));
   note(3, slotA(8.4), 3.3, 'knock on the hygiene stall', '🚿 Hygiene stall', '<p>Toilet, wash basin and a water-saving shower. Each crewmate has a towel in their own colour.</p>' + fact('NASA put bathrooms both near the crew quarters and near the work area in its CHAPEA Mars habitat.'));
-  note(4, -.95, 3.2, 'read the whiteboard', '📝 Wardroom whiteboard', () => { const ppl = CREW.slice(0, I.habCrew ?? 3), sol = Math.max(1, I.calendar.sol); return `<p><b>Chores today:</b><br>${['Galley & dishes', 'Filters & vacuum', 'Greenhouse check', 'Trash compactor'].map((j, i) => `${j}: ${ppl[(i + sol) % ppl.length].first ?? 'You'}`).join('<br>')}</p><p><b>Dinner:</b> ${MENUS[sol % MENUS.length]}</p>` + fact('Sharing chores and meals helps crews get along on long missions.'); });
+  note(4, slotA(21) - Math.PI * 2, 3.2, 'read the whiteboard', '📝 Wardroom whiteboard', () => { const ppl = CREW.slice(0, I.habCrew ?? 3), sol = Math.max(1, I.calendar.sol); return `<p><b>Chores today:</b><br>${['Galley & dishes', 'Filters & vacuum', 'Greenhouse check', 'Trash compactor'].map((j, i) => `${j}: ${ppl[(i + sol) % ppl.length].first ?? 'You'}`).join('<br>')}</p><p><b>Dinner:</b> ${MENUS[sol % MENUS.length]}</p>` + fact('Sharing chores and meals helps crews get along on long missions.'); });
   note(4, .82, 2.9, 'use the galley', '☕ Gusev Café', '<p>Hot water for drinks and dried food, a warmer for pouches, and a pantry of labelled food.</p>' + fact('On the ISS, salt and pepper are liquids — salt dissolved in water, pepper in oil — so the grains do not float into the air.'));
   note(4, Math.PI + .45, 2.9, 'pick up the plush toy', '🧸 The plush toy', '<p>It rode along to Mars in someone\'s kit. Now it guards the window seat.</p>' + fact('Crews often bring a small plush toy on launch day: when it starts floating, everyone knows they have reached space.'));
   note(4, 2.15, 3.2, 'look at the mission patches', '🎖 Patch wall', '<p>Each team and big moment gets a patch: the first harvest, the rover team, surviving the first dust storm.</p>' + fact('ISS crews stick their mission patches on the walls of the Unity node, where they eat together.'));
   note(4, -2.45, 3.1, 'browse the bookshelf', '📚 Bookshelf', '<p>Paper books, board games and a launch-day photo. Screens are everywhere, so the crew likes having something to hold.</p>' + fact('Crews on long missions have asked for more free-time choices: books, games, music and films.'));
-  note(4, -.4, 3.2, 'look at the photo board', '📸 Photo board', '<p>Crew 1 on launch day, postcards from home, and a reminder: movie night on Friday.</p>' + fact('Photos of home and family are some of the most important things astronauts take into space.'));
+  note(4, slotA(23) - Math.PI * 2, 3.2, 'look at the photo board', '📸 Photo board', '<p>Crew 1 on launch day, postcards from home, and a reminder: movie night on Friday.</p>' + fact('Photos of home and family are some of the most important things astronauts take into space.'));
   note(5, .95, 3.1, 'read the exercise log', '🏃 Exercise log', '<p>Someone skipped their session and got a sad face. The treadmill has a harness that holds you down onto the belt.</p>' + fact('ISS astronauts exercise about two hours a day to protect their bones and muscles.'));
   note(5, Math.PI / 2, 2.9, "look at Spirit's map", "🗺 Spirit's drive", '<p>The route NASA\'s Spirit rover drove through Gusev crater from 2004 to 2010: the landing site, Bonneville crater, the Columbia Hills and Home Plate.</p>' + fact('Spirit was planned to work for 90 sols and kept going for more than six years.'));
   note(5, -.7, 3.2, 'open the medical cabinet', '🩺 Medical', '<p>First aid, medicines and an ultrasound. One crewmate trains as the medical officer.</p>' + fact('The ISS has an ultrasound machine; doctors on Earth can guide the crew through a scan.'));
@@ -972,6 +980,84 @@ export function dressHab(I) {
 
   I.habCabins = cabins;
   createCrew(I, CREW);
+  // ---------- wear, repairs and the NASA look: a lived-in pass over every pod ----------
+  // Real stations (ISS, Skylab, Mir) are never clean: floors scuffed in lanes, grime at hand height, panels swapped
+  // during repairs and left in a different white, tape labels, red emergency hardware by every hatch, cable runs and
+  // conduit wherever there is bare wall. Nothing here is solid; it all sits on or against the wall, and anything at
+  // floor level checks the furniture list first so it never lands on top of an existing item.
+  { const W = new THREE.Group(); W.name = 'hab-wear'; root.add(W);
+    const L = pods.map((P, i) => { const g = new THREE.Group(); g.position.x = i * SPACING; P.add(g); return g; });   // pod-centred frames (onWall already adds the pod offset itself)
+    const HATCH = new Set([5, 6, 7, 17, 18, 19]), PANEL_R = R - .045;
+    const blocked = (pod, a, r, hw = .35) => { const p = new THREE.Vector3(pod * SPACING + Math.sin(a) * r, 1, Math.cos(a) * r), q = new THREE.Vector3();
+      return I.solids.some(s => { q.copy(p).applyMatrix4(s.inv); return q.x > s.min.x - hw && q.x < s.max.x + hw && q.z > s.min.z - hw && q.z < s.max.z + hw; }); };
+    const decal = (w, d, map, op = 1) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map, transparent: true, opacity: op, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, toneMapped: true })); m.rotation.x = -Math.PI / 2; m.renderOrder = 2; return m; };
+    // floor: scuffed lanes, black heel marks and tan dust drifts
+    const scuff = (variant) => tex(512, 512, (g, w, h) => { seed = 700 + variant * 13;
+      for (let i = 0; i < 160; i++) { g.strokeStyle = `rgba(${rnd() < .65 ? '20,18,16' : '235,230,220'},${.05 + rnd() * .12})`; g.lineWidth = .8 + rnd() * 2.2; g.beginPath(); const x = rnd() * w, y = rnd() * h, a = rnd() * 3.14; g.moveTo(x, y); g.lineTo(x + Math.cos(a) * (10 + rnd() * 40), y + Math.sin(a) * (4 + rnd() * 12)); g.stroke(); }
+      for (let i = 0; i < 26; i++) { g.fillStyle = `rgba(20,18,16,${.1 + rnd() * .16})`; g.save(); g.translate(rnd() * w, rnd() * h); g.rotate(rnd() * 6.28); g.scale(1, .28); g.beginPath(); g.arc(0, 0, 5 + rnd() * 8, 0, 7); g.fill(); g.restore(); }   // heel marks
+      for (let i = 0; i < 12; i++) { const gr = g.createRadialGradient(0, 0, 0, 0, 0, 40 + rnd() * 50); g.save(); g.translate(rnd() * w, rnd() * h); gr.addColorStop(0, 'rgba(60,45,30,.22)'); gr.addColorStop(1, 'rgba(60,45,30,0)'); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, 100, 0, 7); g.fill(); g.restore(); } });
+    const dustDrift = tex(512, 256, (g, w, h) => { seed = 71; for (let i = 0; i < 40; i++) { const gr = g.createRadialGradient(0, 0, 0, 0, 0, 30 + rnd() * 40); g.save(); g.translate(rnd() * w, rnd() * h); g.scale(1.6, 1); gr.addColorStop(0, 'rgba(176,128,92,.5)'); gr.addColorStop(1, 'rgba(176,128,92,0)'); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, 80, 0, 7); g.fill(); g.restore(); }
+      for (let i = 0; i < 14; i++) { g.save(); g.translate(40 + i * 30, h / 2 + (i % 2 ? 14 : -14)); g.rotate(.1); g.fillStyle = 'rgba(60,40,28,.35)'; g.beginPath(); g.ellipse(0, 0, 5, 12, 0, 0, 7); g.fill(); g.restore(); } });   // bootprints in the dust
+    L.forEach((P, i) => { const s = decal(8.2, 8.2, scuff(i % 2), .8); s.position.set(0, .014, 0); s.rotation.z = i * 1.3; P.add(s); });
+    for (const [pod, a] of [[0, 0], [0, Math.PI], [2, -Math.PI / 2 + .06], [5, Math.PI / 2], [4, -Math.PI / 2], [1, Math.PI / 2]]) {   // dust blown in by the hatches
+      const d = decal(2.6, 1.3, dustDrift, .85); d.position.set(Math.sin(a) * 3.2, .016, Math.cos(a) * 3.2); d.rotation.z = -a + Math.PI / 2; L[pod].add(d); }
+    // wall: grime on every solid panel, drawn per panel (kick marks, hand-height smudges, vent streaks, tape residue)
+    const gtex = v => tex(192, 384, (g, w, h) => { seed = 90 + v * 11; const m = h / 3.3;
+      const bot = g.createLinearGradient(0, h - .55 * m, 0, h); bot.addColorStop(0, 'rgba(70,52,38,0)'); bot.addColorStop(1, 'rgba(70,52,38,.38)'); g.fillStyle = bot; g.fillRect(0, h - .55 * m, w, .55 * m);
+      for (let i = 0; i < 6; i++) { const x = rnd() * w, gg = g.createLinearGradient(0, 0, 0, h); gg.addColorStop(0, 'rgba(80,60,44,0)'); gg.addColorStop(.4, `rgba(80,60,44,${.05 + rnd() * .08})`); gg.addColorStop(1, 'rgba(80,60,44,0)'); g.fillStyle = gg; g.fillRect(x, 0, 2 + rnd() * 6, h); }
+      for (let i = 0; i < 7; i++) { const gr = g.createRadialGradient(0, 0, 0, 0, 0, 22); gr.addColorStop(0, 'rgba(90,70,52,.22)'); gr.addColorStop(1, 'rgba(90,70,52,0)'); g.save(); g.translate(rnd() < .5 ? 14 : w - 14, h - (.9 + rnd() * .55) * m); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, 22, 0, 7); g.fill(); g.restore(); }   // hands on the wall
+      for (let i = 0; i < 9; i++) { g.strokeStyle = `rgba(50,40,30,${.12 + rnd() * .12})`; g.lineWidth = .8; g.beginPath(); const x = rnd() * w, y = h - (.2 + rnd() * 1.3) * m; g.moveTo(x, y); g.lineTo(x + 20 + rnd() * 30, y + (rnd() - .5) * 8); g.stroke(); }   // scratches
+      if (v === 1) { g.fillStyle = 'rgba(200,190,150,.3)'; g.fillRect(w * .3, h - 1.6 * m, w * .4, 10); }   // old tape residue
+    });
+    const grimeMats = [0, 1, 2].map(v => new THREE.MeshBasicMaterial({ map: gtex(v), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+    L.forEach((P, i) => { for (let j = 0; j < 24; j++) { if (HATCH.has(j)) continue; const g = new THREE.Mesh(new THREE.PlaneGeometry(1.04, CEIL), grimeMats[(j + i) % 3]); const a = slotA(j); g.position.set(Math.sin(a) * (R - .047), CEIL / 2, Math.cos(a) * (R - .047)); g.rotation.y = a + Math.PI; g.renderOrder = 2; P.add(g); } });
+    // cable runs and conduit above the furniture: three cables on clips, plus an insulated coolant line with flow arrows
+    const clip = mat('clip', '#2a2e33', { r: .6 }), cables = [mat('cabBlack', '#1b1d20', { r: .6 }), mat('cabBlue', '#2f64b5', { r: .5 }), mat('cabOrange', '#d9683a', { r: .5 })], cool = mat('coolant', '#c9d3d8', { r: .45, m: .2 });
+    const arcRun = (P, j0, j1, y, r, m, rad, off = 0) => { const pts = []; for (let k = 0; k <= Math.ceil((j1 - j0) * 3); k++) { const a = slotA(Math.min(j1, j0 + k / 3)) + off; pts.push(new THREE.Vector3(Math.sin(a) * r, y + Math.sin(k * 1.3) * .006, Math.cos(a) * r)); } P.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), pts.length * 3, rad, 6, false), m)); return pts; };
+    L.forEach((P, i) => { for (const [j0, j1] of (i === 2 ? [[8, 10.6], [13.4, 16], [20, 28]] : [[8, 16], [20, 28]])) {   // life support has the greenhouse hatch at slots 11-13: no run across the doorway
+
+      arcRun(P, j0, j1, 3.02, R - .07, cables[0], .022); arcRun(P, j0, j1, 3.07, R - .07, cables[1], .016); arcRun(P, j0, j1, 2.97, R - .07, cables[2], .016);
+      arcRun(P, j0, j1, 2.76, R - .08, cool, .04);
+      for (let k = 0; k < Math.floor((j1 - j0) * 2); k++) { const a = slotA(j0 + .25 + k * .5), c = new THREE.Group(); c.position.set(Math.sin(a) * (R - .055), 3.02, Math.cos(a) * (R - .055)); c.rotation.y = a + Math.PI; c.add(box(.035, .16, .025, clip)); P.add(c); }   // cable clips
+      for (let k = 0; k < Math.floor(j1 - j0); k++) { const a = slotA(j0 + .5 + k), c = new THREE.Group(); c.position.set(Math.sin(a) * (R - .06), 2.76, Math.cos(a) * (R - .06)); c.rotation.y = a + Math.PI; c.add(box(.1, .12, .06, mat('bracket', '#8d949a', { m: .6, r: .4 }))); const lb = pic(.12, .04, label(k % 2 ? 'COOLANT →' : 'LOOP B', { w: 192, h: 64, bg: '#2f64b5', fg: '#fff', font: 'bold 34px system-ui' }), 0, .08, .035); c.add(lb); P.add(c); }
+    } });
+    // replaced panels: cleaner and a different white than the old ones, with bright new screws and a dated repair tag
+    const newPanelM = mat('newPanel', '#f8f6f0', { r: .5 }), oldScrew = mat('oldScrew', '#8d949a', { m: .6, r: .5 }), newScrew = mat('newScrew', '#d8dde0', { m: .8, r: .25 });
+    const repairs = [[0, 3, 'REPLACED SOL 12'], [0, 15, 'PANEL B-7 · SOL 31'], [1, 10, 'NEW · SOL 20'], [1, 22, 'REPLACED SOL 8'], [2, 9, 'FILTER ACCESS · SOL 40'], [3, 9, 'FIXED SOL 19'], [4, 12, 'NEW PANEL · SOL 5'], [5, 14, 'REPLACED SOL 27'], [3, 21, 'PANEL C-2 · SOL 36']];
+    for (const [pod, j, txt] of repairs) { const a = slotA(j); const G = new THREE.Group(); onWall(pod, a, R - .045, G); pods[pod].add(G);
+      G.add(box(.86, .8, .012, newPanelM, 0, 2.62, 0)); G.add(box(.9, .02, .014, mat('shim', '#b9bec2', { m: .5 }), 0, 3.03, 0)); G.add(box(.9, .02, .014, mat('shim', '#b9bec2', { m: .5 }), 0, 2.21, 0));
+      for (const x of [-.38, .38]) for (const y of [2.29, 2.95]) { G.add(cyl(.016, .016, .012, newScrew, x, y, .008, 8).rotateX(Math.PI / 2)); }
+      for (const [x, y] of [[-.38, 2.62], [.38, 2.62]]) G.add(cyl(.016, .016, .012, oldScrew, x, y, .008, 8).rotateX(Math.PI / 2));   // two old screws reused: mismatched hardware
+      G.add(pic(.24, .07, label(txt, { w: 384, h: 96, bg: '#f2e46a', fg: '#2a2a2a', font: '30px "Comic Sans MS", cursive' }), .22, 2.34, .012)).children.at(-1).rotation.z = (pod % 2 ? .03 : -.03); }
+    // red emergency hardware at the hatches (extinguisher, O2 mask cabinet, e-stop) and first-aid green: placed only on free wall
+    const redM = mat('emRed', '#c23b2f', { r: .45 }), brk = mat('bracket', '#8d949a', { m: .6, r: .4 }), whiteM = mat('white', '#f4f4f0', { r: .5 });
+    const extinguisher = (G) => { G.add(cyl(.075, .075, .42, redM, 0, 1.3, .1, 14)); G.add(cyl(.03, .03, .08, brk, 0, 1.55, .1, 8)); G.add(box(.1, .04, .05, brk, 0, 1.58, .1)); G.add(box(.16, .03, .05, brk, 0, 1.18, .08)); G.add(box(.16, .03, .05, brk, 0, 1.42, .08)); const hose = new THREE.Mesh(new THREE.TorusGeometry(.05, .008, 6, 14, 4.6), mat('hose', '#1a1a1a')); hose.position.set(.09, 1.4, .1); G.add(hose); G.add(pic(.14, .1, label('FIRE', { w: 192, h: 128, bg: '#c23b2f', fg: '#fff', font: 'bold 60px system-ui' }), 0, 1.78, .03)); };
+    const o2cab = (G) => { G.add(box(.42, .36, .16, redM, 0, 1.3, .08)); G.add(box(.34, .28, .01, whiteM, 0, 1.3, .165)); G.add(box(.06, .2, .012, redM, 0, 1.3, .172)); G.add(box(.2, .06, .012, redM, 0, 1.3, .172)); G.add(pic(.34, .08, label('EMERGENCY O₂ · BREAK GLASS', { w: 448, h: 96, bg: '#c23b2f', fg: '#fff', font: 'bold 34px system-ui' }), 0, 1.58, .035)); };
+    const estop = (G) => { G.add(box(.14, .14, .05, mat('yel', '#f2c230', { r: .5 }), 0, 1.35, .025)); G.add(cyl(.045, .05, .05, redM, 0, 1.35, .06, 14).rotateX(Math.PI / 2)); G.add(pic(.14, .04, label('E-STOP', { w: 192, h: 64, bg: '#1d1d1d', fg: '#f2c230', font: 'bold 38px monospace' }), 0, 1.2, .02)); };
+    const aid = (G) => { G.add(box(.36, .26, .1, mat('aid', '#2e8b57', { r: .5 }), 0, 1.45, .05)); G.add(box(.05, .16, .012, whiteM, 0, 1.45, .104)); G.add(box(.16, .05, .012, whiteM, 0, 1.45, .104)); G.add(pic(.3, .06, label('FIRST AID', { w: 320, h: 64, bg: '#2e8b57', fg: '#fff', font: 'bold 38px system-ui' }), 0, 1.65, .03)); };
+    const stations = [[extinguisher, 4], [o2cab, 20], [estop, 8], [extinguisher, 16]];
+    pods.forEach((P, i) => stations.forEach(([fn, j], n) => { const a = slotA(j); if (blocked(i, a, R - .3, .45)) return; const G = new THREE.Group(); onWall(i, a, R - .045, G); fn(G); P.add(G); }));
+    { const a = slotA(2); if (!blocked(4, a, R - .3, .45)) { const G = new THREE.Group(); onWall(4, a, R - .045, G); aid(G); pods[4].add(G); } }
+    // equipment boxes and a vertical conduit drop above the furniture: black boxes with yellow tags, so no wall is empty
+    pods.forEach((P, i) => [[2, .26, 3.05], [10, -.2, 3.05], [14, .1, 3.05], [22, -.15, 3.05]].forEach(([j, off, y], n) => { const a = slotA(j) + off / R; const G = new THREE.Group(); onWall(i, a, R - .045, G);
+      G.add(box(.38, .26, .12, mat('blackBox', '#1c1f22', { r: .55, m: .2 }), 0, y - .55, .06)); G.add(box(.34, .22, .01, mat('blackBox2', '#25292d', { r: .5 }), 0, y - .55, .125));
+      for (let k = 0; k < 4; k++) G.add(cyl(.012, .012, .01, k % 2 ? glowDot('#7dffb2') : glowDot('#ffb347'), -.12 + k * .08, y - .5, .13, 6).rotateX(Math.PI / 2));
+      G.add(pic(.16, .05, label(['J-04', 'PDU-2', 'FAN CTRL', 'DATA 1'][n], { w: 192, h: 64, bg: '#f2c230', fg: '#161616', font: 'bold 34px monospace' }), -.06, y - .74, .02));
+      G.add(cyl(.018, .018, 1.0, mat('conduit', '#9aa1a7', { m: .6, r: .4 }), .12, y + .02, .04, 8)); P.add(G); }));
+    function glowDot(c) { return mat('led' + c, c, { e: c, ei: 1.4, r: .4 }); }
+    // dented, taped storage crates near the workshop and airlock walls (where nothing else stands)
+    const crateM = [mat('crateGrey', '#7d858c', { r: .6 }), mat('crateBlue', '#3b6aa8', { r: .6 })], dentM = mat('dent', '#4e555b', { r: .8 });
+    for (const [pod, j] of [[1, 2], [1, 13], [0, 11], [0, 14], [5, 11]]) { const a = slotA(j); if (blocked(pod, a, R - .55, .5)) continue; const G = new THREE.Group(); onWall(pod, a, R - .5, G); pods[pod].add(G);
+      for (let k = 0; k < 2; k++) { const c = box(.62, .38, .42, crateM[(j + k) % 2], k * .05, .19 + k * .38, 0); c.rotation.y = k * .06; G.add(c); G.add(box(.66, .04, .46, mat('lid', '#9aa1a7', { m: .3, r: .5 }), k * .05, .4 + k * .38, 0).rotateY(k * .06)); }
+      const d = box(.24, .2, .02, dentM, .1, .2, .22); d.rotation.set(.05, .1, .25); G.add(d);   // a dent in the front
+      G.add(pic(.3, .1, label(['HAND TOOLS', 'FILTERS', 'SPARE VALVES', 'CABLES', 'FOOD · DAY 20'][(pod + j) % 5], { w: 384, h: 128, bg: '#f2e46a', fg: '#2a2a2a', font: 'bold 40px "Comic Sans MS", cursive' }), -.05, .66, .22)); }
+    // tool marks: scratches, drill pilots and a hanging tag round the maintenance access in life support and the airlock
+    const toolTex = tex(256, 256, (g, w, h) => { seed = 44; g.strokeStyle = 'rgba(40,35,30,.55)'; for (let i = 0; i < 38; i++) { g.lineWidth = .6 + rnd() * 1.1; g.beginPath(); const x = 20 + rnd() * 216, y = 20 + rnd() * 216; g.moveTo(x, y); g.lineTo(x + (rnd() - .5) * 38, y + (rnd() - .5) * 26); g.stroke(); } g.fillStyle = 'rgba(30,25,20,.6)'; for (let i = 0; i < 7; i++) { g.beginPath(); g.arc(30 + rnd() * 196, 30 + rnd() * 196, 1.6 + rnd() * 1.6, 0, 7); g.fill(); } });
+    for (const [pod, j] of [[2, 15], [0, 10], [2, 2]]) { const a = slotA(j), G = new THREE.Group(); onWall(pod, a, R - .045, G); pods[pod].add(G);
+      G.add(box(.7, .8, .014, mat('access', '#aab0b6', { m: .4, r: .5 }), 0, 1.5, .007)); for (const x of [-.31, .31]) for (const y of [1.15, 1.85]) G.add(cyl(.018, .018, .014, y > 1.5 && x < 0 ? newScrew : oldScrew, x, y, .012, 8).rotateX(Math.PI / 2));
+      const tm = pic(.9, .9, toolTex, 0, 1.5, .016); tm.material = new THREE.MeshBasicMaterial({ map: toolTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); G.add(tm); G.add(pic(.22, .08, label('DO NOT OPEN\nUNDER PRESSURE', { w: 288, h: 96, bg: '#c23b2f', fg: '#fff', font: 'bold 26px system-ui' }), 0, 1.97, .02)); G.add(box(.04, .12, .01, mat('tag', '#f2e46a'), .3, 1.22, .02)); }
+    mergeStatic(W, { exclude: [] });
+  }
   // ---------- live state: circadian light, calendar, crew-dependent cabins ----------
   const lamps = []; scene.traverse(o => { if (o.userData.habLamp) lamps.push(o); });
   const K = { night: new THREE.Color('#ffb36b'), evening: new THREE.Color('#ffd2a1'), day: new THREE.Color('#fff4e6'), morning: new THREE.Color('#e3eeff') };
