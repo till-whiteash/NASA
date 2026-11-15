@@ -120,7 +120,7 @@ function captionsFor(name) {
   return captionsCache.get(name);
 }
 
-export function playCinematic(name, { clip, world } = {}) {
+export function playCinematic(name, { clip, world, onSkip } = {}) {
   return new Promise(resolve => {                    // plays even with reduced motion: the films carry the story
     const box = document.createElement('section'); box.className = 'cinematic'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Cutscene');
     box.innerHTML = '<p class="cine-phase"></p><p class="cine-cap" aria-live="polite"></p><button type="button" class="cine-skip">Skip ›</button><p class="cine-load">Loading…</p>';
@@ -187,7 +187,7 @@ export function playCinematic(name, { clip, world } = {}) {
       if (world) world.cinematic = false;
       resolve(played);
     };
-    const advance = () => end(true);
+    const advance = () => { onSkip?.(); end(true); };
     const key = e => { if (e.code === 'Escape') { e.preventDefault(); e.stopPropagation(); advance(); } else if (['Space', 'Enter'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); } };
     addEventListener('keydown', key, true);
     // Skip exits this film; the caller advances the mission.

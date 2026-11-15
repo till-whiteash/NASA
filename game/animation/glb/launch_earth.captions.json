@@ -4,6 +4,11 @@
    "name": "launch_earth",
    "start": 0.0,
    "end": 30.611
+  },
+  {
+   "name": "launch_pad",
+   "start": 0,
+   "end": 23.5
   }
  ],
  "captions": [

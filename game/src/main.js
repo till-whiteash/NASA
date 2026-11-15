@@ -304,9 +304,20 @@ async function startNew() {
   state.phase = 'launch-film';
   buildWorld(); // build Mars while the Blender launch movie plays
   loadMarsMap(); loadRoverPhotos(); loadEarthToday();
-  await playCinematic('launch_earth');
-  state.phase = 'cruise';
-  await arrive();
+  // Match the HD film to the original flight at 47 km, before booster separation.
+  // Its remaining animation includes the 100 km crossing, tower/core staging and orbit.
+  launch = new Launch();
+  let skipLaunch = false;
+  await playCinematic('launch_earth', { clip: 'launch_pad', onSkip: () => { skipLaunch = true; } });
+  if (skipLaunch) { state.phase = 'cruise'; await arrive(); return; }
+  await launch.ready;
+  launch.resumeAtBoosterSeparation();
+  launch.resize();
+  $('#countdown').classList.remove('hidden');
+  const skip = document.createElement('button'); skip.id = 'skip'; skip.textContent = 'Skip launch ›';
+  Object.assign(skip.style, { position: 'fixed', right: '16px', bottom: '16px', zIndex: 5 });
+  skip.onclick = () => { launch.done = true; }; document.body.appendChild(skip);
+  state.phase = 'launch'; // existing render loop runs all the way through the old orbit ending
 }
 // Start downloading the opening briefing while the title screen is up, so it plays the moment you launch.
 (window.requestIdleCallback || setTimeout)(() => preloadCinematic('ares_vi_briefing'), { timeout: 2500 });
