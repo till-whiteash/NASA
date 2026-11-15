@@ -1,3 +1,4 @@
+import {bankObjective} from './battery-bank-state.js';
 import {habBuildObjective,habBuildLog} from './habitat-build-state.js';
 import {powerLearnObjective,labDone,missingPrints} from './power-tutorial-state.js';
 // Pure progression: saved simulation fields are the single source of truth.
@@ -17,6 +18,7 @@ export function marsObjective(o,c){
  if(o.powerStep===2){const b=o.construction||{},cleared=b.cleared?.length||0,placed=b.placed?.field?.length||0;return {id:'power-2',title:cleared<4?'Clear the remote power site':'Place the solar panels',step:cleared<4?`${cleared}/4 rocks cleared · equip pickaxe from belt`:`${placed}/3 panels placed`,detail:cleared<4?'Walk to the marked field away from camp. Aim at each site rock and strike it with your pickaxe using E / Action.':'Aim at each highlighted panel footprint and press E / Action to place an assembled panel.',target:'power'};}
  if(o.powerStep<6){const [title,detail,target]=POWER_TASKS[o.powerStep];return {id:'power-'+o.powerStep,title,detail,target};}
  if(!o.baseConnected)return {id:'base',title:'Connect battery to base',detail:'Select Battery protected OUT at the field, then walk to Base IN beside Airlock 01 and select it.',target:'base'};
+ const bank=bankObjective(o);if(bank)return bank;
  if(!(o.research?.relay>=3))return {id:'relay',title:'Commission the Mars relay terminal',detail:'Go inside to the monitoring station. Request service, await acknowledgement, install the terminal and acquire the relay. This is a training network, not Starlink at Mars.',target:'monitor'};
  if(!c?.farmQuest?.rewarded)return firstMealObjective(o,c);
  if((o.chargerStep||0)<3){const step=o.chargerStep||0;return {id:'charger-'+step,title:['Go to the workbench','Place the charging station','Connect the charging station'][step],detail:['Go to the workbench inside the base. Press E / Action and choose Assemble landed rover charger kit.','Use the marked parking bay outside to install its charger.','Select Base charger OUT, then walk to Rover charger IN at the parking bay and select it.'][step],target:step===0?'workbench':'charger'};}

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {BatteryBank} from './battery-bank.js';
 import {heightAt} from './world.js';
 import {ASSEMBLIES,buildState,fitPart,assemblyDone,circuitFor,circuitReady,circuitConnected,CIRCUITS,socketPartner,socketFeedback,SOCKET_LABELS,POLE_NAME,leadsOn,nextPole,connectLead,leadLesson,ORDER_LESSON,REVERSE_LESSON} from './construction-state.js';
 import {loadModel} from './nasamodels.js';
@@ -18,13 +19,14 @@ function fieldCable(a,b,side,colour,r){
   const nut=new THREE.Mesh(new THREE.CylinderGeometry(r*2.3,r*2.3,.03,6),new THREE.MeshStandardMaterial({color:'#2b2f33',roughness:.5}));nut.position.set(p.x,p.y-.005,p.z);g.add(nut);}
  return g;
 }
-// The ground rod beside the battery cabinet and its green-yellow bonding lead.
-function groundBond(pack){
- const g=new THREE.Group(),rodX=pack.x+.95,rodZ=pack.z+.35,top=heightAt(rodX,rodZ);
- const rod=new THREE.Mesh(new THREE.CylinderGeometry(.025,.025,.5,10),new THREE.MeshStandardMaterial({color:'#b07a3a',roughness:.3,metalness:.9}));rod.position.set(rodX,top+.1,rodZ);g.add(rod);
- const clamp=new THREE.Mesh(new THREE.BoxGeometry(.08,.05,.06),new THREE.MeshStandardMaterial({color:'#8d969c',metalness:.8,roughness:.35}));clamp.position.set(rodX,top+.3,rodZ);g.add(clamp);
- const lead=new THREE.CatmullRomCurve3([new THREE.Vector3(pack.x+.7,pack.y-.2,pack.z+.3),new THREE.Vector3(pack.x+.82,top+.05,pack.z+.38),new THREE.Vector3(rodX,top+.3,rodZ)]);
- g.add(new THREE.Mesh(new THREE.TubeGeometry(lead,24,.016,8),new THREE.MeshStandardMaterial({color:'#c9c234',roughness:.6})));
+// Chassis bonding is a continuous metal fault-return path to the protected source.
+// Martian soil is never the fuse-clearing return.
+function groundBond(pack,base){
+ const g=new THREE.Group(),mat=new THREE.MeshStandardMaterial({color:'#d1cf45',roughness:.6});
+ const a=pack.clone().add(new THREE.Vector3(.6,.05,.3)),b=base.clone();
+ const pts=[a,new THREE.Vector3(a.x,heightAt(a.x,a.z)+.08,a.z),new THREE.Vector3(b.x,heightAt(b.x,b.z)+.08,b.z),b];
+ g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),100,.018,8),mat));
+ const bar=new THREE.Mesh(new THREE.BoxGeometry(.5,.08,.14),new THREE.MeshStandardMaterial({color:'#b69148',metalness:.8,roughness:.3}));bar.position.copy(a);g.add(bar);
  return g;
 }
 // Workbench parts modelled after real hardware (animation/scripts/make_power_kit.py): each shows its red + / black - terminals.
@@ -71,6 +73,7 @@ export class Construction {
   this.packGhost=new THREE.Mesh(new THREE.BoxGeometry(1.5,.9,1),new THREE.MeshBasicMaterial({color:'#8be5d1',transparent:true,opacity:.25,depthWrite:false}));this.packGhost.position.copy(m.pack.position);this.packGhost.userData={kind:'battery-place',label:'Place assembled battery'};this.group.add(this.packGhost);
   this.chargerGhost=new THREE.Mesh(new THREE.BoxGeometry(.55,1.35,.5),this.packGhost.material.clone());this.chargerGhost.position.copy(ground(-30.8,26,.675));this.chargerGhost.userData={kind:'charger-place',label:'Place assembled charging post'};this.group.add(this.chargerGhost);
   const lineGeo=new THREE.BufferGeometry();lineGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(19*3),3));this.preview=new THREE.Line(lineGeo,new THREE.LineDashedMaterial({color:'#ffd577',dashSize:.3,gapSize:.15}));world.scene.add(this.preview);this.preview.visible=false;
+  this.bank=new BatteryBank(world,{state,save,guide,cancel:()=>this.cancel(),cable:fieldCable});
   this.cables=new Map();this.removedApplied=new Set();this.notice='';this.noticeUntil=0;
   this.rockSamples=[];const rm=new THREE.Matrix4(),rp=new THREE.Vector3(),rs=new THREE.Vector3();for(let i=0;i<world.rocks.count;i++){world.rocks.getMatrixAt(i,rm);rp.setFromMatrixPosition(rm);rs.setFromMatrixScale(rm);if(rp.y>-1000)this.rockSamples.push({id:i,matrix:rm.clone(),position:rp.clone(),radius:Math.max(rs.x,rs.y,rs.z)*2});}
   this.rockProxy=new THREE.Mesh(world.rocks.geometry,world.rocks.material);this.rockProxy.matrixAutoUpdate=false;
@@ -100,11 +103,11 @@ export class Construction {
   this.guide('Battery placed. Next, connect Solar OUT to Battery controller IN.',true);return true;
  }
  postPosition(id,pole){const s=this.sockets.find(p=>p.userData.id===id);s.updateMatrixWorld(true);return s.userData.posts[pole].getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,.07,0));}
- cancel(){dispatchEvent(new Event('zhetela-dismiss'));this.wire=null;this.pole=null;this.held=null;this.preview.visible=false;this.heldDisplay.visible=false;}
+ cancel(){this.bank?.cancel();dispatchEvent(new Event('zhetela-dismiss'));this.wire=null;this.pole=null;this.held=null;this.preview.visible=false;this.heldDisplay.visible=false;}
  notify(text){this.notice=text;this.noticeUntil=performance.now()+2400;}
  removeRock(id){const w=this.world,m=new THREE.Matrix4(),p=new THREE.Vector3();w.rocks.getMatrixAt(id,m);p.setFromMatrixPosition(m);if(p.y<-1000)return;w.rocks.setMatrixAt(id,new THREE.Matrix4().makeTranslation(p.x,-10000,p.z));w.rocks.instanceMatrix.needsUpdate=true;w.rocks.computeBoundingSphere();w.lowRocks=w.lowRocks.filter(c=>Math.hypot(c.x-p.x,c.z-p.z)>.01);for(let i=w.colliders.length-1;i>=0;i--){const c=w.colliders[i];if(c.rock&&Math.hypot(c.x-p.x,c.z-p.z)<.01)w.colliders.splice(i,1);}}
  update(inside,room,blocked){
-  const o=this.state(),s=buildState(o);this.drop.hidden=!(this.held||this.wire)||blocked;document.body.classList.toggle('construction-active',!!this.kind&&inside);this.inside=inside;this.room=room;this.blocked=blocked||this.world.driving;
+  const o=this.state(),s=buildState(o);this.bank.update(inside,blocked);this.drop.hidden=!(this.held||this.wire||this.bank.held)||blocked;document.body.classList.toggle('construction-active',!!this.kind&&inside);this.inside=inside;this.room=room;this.blocked=blocked||this.world.driving;
   const batteryDistance=Math.hypot(this.world.player.position.x-this.packGhost.position.x,this.world.player.position.z-this.packGhost.position.z);
   this.placeBatteryButton.hidden=o.powerStep!==4||inside||this.blocked;this.placeBatteryButton.disabled=batteryDistance>4||Math.abs(this.world.player.position.y-this.packGhost.position.y)>3;this.placeBatteryButton.textContent=this.placeBatteryButton.disabled?`Battery slot · ${Math.ceil(batteryDistance)} m away`:'Place battery (X)';
   for(const id of s.removed||[])if(!this.removedApplied.has(id)){this.removeRock(id);this.removedApplied.add(id);}
@@ -119,8 +122,8 @@ export class Construction {
   for(let i=0;i<3;i++)for(const pole of leadsOn(o,i)){if(this.cables.has(i+pole))continue;const ids=CIRCUITS[i];
    const a=this.postPosition(ids[0],pole),b=this.postPosition(ids[1],pole),side=new THREE.Vector3(-(b.z-a.z),0,b.x-a.x).normalize().multiplyScalar(pole==='+'?-.08:.08);
    const cable=fieldCable(a,b,side,POLE_COLOUR[pole],i===2?.035:.028);this.world.scene.add(cable);this.cables.set(i+pole,cable);}
-  // once the solar side is wired, the cabinet is bonded to a ground rod (green-yellow lead): GND is tied to the soil
-  if(leadsOn(o,0).length===2&&!this.groundRod){this.groundRod=groundBond(this.world.settlement.pack.position);this.world.scene.add(this.groundRod);}
+  // Once the base is wired, bond its metal frame back to the protected cabinet bus.
+  if(o.baseConnected&&!this.groundRod){const e=this.world.settlement.entrances[0];this.groundRod=groundBond(this.world.settlement.pack.position,new THREE.Vector3(e.x+2.3,.5,e.doorZ+1.14));this.world.scene.add(this.groundRod);}
   // Legacy cables ended at the wrong model faces; visible leads now terminate at sockets.
   this.world.settlement.cable.visible=false;this.world.settlement.chargerCable.visible=false;
   this.hit=null;this.hint='';if(this.blocked){this.preview.visible=false;this.heldDisplay.visible=false;return;}
@@ -128,7 +131,7 @@ export class Construction {
   if(inside){camera=camera.clone();camera.position.add(room.scene.position);camera.updateMatrixWorld();}
   this.group.updateMatrixWorld(true);this.interior.scene.updateMatrixWorld(true);
   this.ray.setFromCamera(this.world.aimPoint||new THREE.Vector2(0,0),camera);
-  const objects=inside?(this.bench.visible?this.slots.filter(p=>p.visible):[]):[...this.sockets,...this.rubble,...this.ghosts,this.packGhost,this.chargerGhost,...(this.world.habBuild?.targets()||[])].filter(p=>p.visible);
+  const objects=inside?(this.bench.visible?this.slots.filter(p=>p.visible):[]):[...this.sockets,...this.rubble,...this.ghosts,this.packGhost,this.chargerGhost,...this.bank.targets(),...(this.world.habBuild?.targets()||[])].filter(p=>p.visible);
   // Layout and habitat changes can hide scenery after rockSamples was captured.
   // Pick against the live instance transform so removed rubble cannot steal a strike.
   let hit=this.ray.intersectObjects(objects,true)[0];
@@ -139,6 +142,7 @@ export class Construction {
   if(this.hit?.object.userData.kind==='socket')this.hint=this.hit.object.userData.label+' - '+socketFeedback(o,this.hit.object.userData.id,this.wire);
   if(this.held)this.hint=`Holding ${this.held} · `+this.hint+' · R to cancel';
   if(this.wire){const target=this.sockets.find(p=>p.userData.id===partner);this.hint=`${this.pole==='-'?'Black − lead':'Red + lead'} → ${target.userData.label} ${this.pole==='-'?'−':'+'} · ${Math.round(target.position.distanceTo(player))} m · E / Action · R to drop. `+this.hint;}
+  if(this.bank.held)this.hint=this.bank.hint()+' · '+this.hint;
   if(this.noticeUntil>performance.now())this.hint=this.notice+' · '+this.hint;
   this.heldDisplay.visible=!!this.held&&inside&&!blocked;
   if(this.heldDisplay.visible){if(this.heldDisplay.userData.name!==this.held){this.heldDisplay.clear();const source=this.slots.find(m=>m.userData.kind==='part'&&m.userData.name===this.held);const copy=source.clone();copy.position.set(0,0,0);copy.visible=true;this.heldDisplay.add(copy);this.heldDisplay.userData.name=this.held;}this.heldDisplay.position.set(.35,-.3,-.8).applyMatrix4(camera.matrixWorld);this.heldDisplay.quaternion.copy(camera.quaternion);}
@@ -148,6 +152,7 @@ export class Construction {
  use(){
   if(this.blocked||!this.hit)return false;
   const o=this.state(),s=buildState(o),mesh=this.hit.object,d=mesh.userData;
+  if(d.kind?.startsWith('bank-'))return this.bank.use(mesh);
   if(d.kind?.startsWith('hab-'))return this.world.habBuild?.use(mesh)??false;   // habitat construction (habitat-build.js)
   if(mesh===this.world.rocks||d.kind==='rubble'){
    if(this.colony().tool!=='pickaxe'){this.guide('Equip the pickaxe from your tool belt before breaking this rock.');return true;}
@@ -166,7 +171,7 @@ export class Construction {
   if(d.kind==='deploy'){if(o.powerStep!==2||s.cleared.length<4)return true;(s.placed.field??=[]);if(!s.placed.field.includes(d.id))s.placed.field.push(d.id);if(s.placed.field.length===3)this.advance(2);this.notify(`Solar panels placed: ${s.placed.field.length}/3.`);this.save();return true;}
   if(d.kind==='battery-place'){this.placeBattery();return true;}
   if(d.kind==='charger-place'){if(o.chargerStep===1){o.chargerStep=2;this.sync();this.save();this.guide('Charger placed. Connect Base charger OUT to Rover charger IN.');}return true;}
-  if(d.kind==='socket'){
+  if(d.kind==='socket'){this.bank.cancel();
    const socketCircuit=CIRCUITS.findIndex(pair=>pair.includes(d.id));
    if(circuitConnected(o,socketCircuit)){
     if(this.wire&&CIRCUITS[socketCircuit]?.includes(this.wire))this.cancel();

@@ -29,3 +29,11 @@
 @media (max-height: 500px) and (orientation: landscape) {
   #zhetela-message { bottom: 110px; max-width: calc(100vw - 130px); }
 }
+
+/* App portrait framing: approved artwork and wrist-wave, displayed from the waist up. */
+#zhetela-message canvas{width:96px;height:102.5px;border-radius:0;align-self:center}
+.zhetela-speaker span{width:64px;height:68px;border-radius:0;background:url('assets/zhetela/standing.png') center top/156.25% auto no-repeat}
+.zhetela-speaker i{display:none}
+@media(max-width:600px){#zhetela-message canvas{width:64px;height:68px}}
+
+#zhetela-message canvas,.zhetela-speaker span{mask-image:linear-gradient(to bottom,#000 78%,transparent 100%)}

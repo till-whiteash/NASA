@@ -1,6 +1,9 @@
 // Outpost simulation: the trade-offs. No graphics here, so it can be tested on its own.
 // Real values come from data/mars-facts.json; "tuned" values are game balance and labelled as such.
 
+import {queueBattery} from './battery-bank-state.js';
+import {newHabBuild} from './habitat-build-state.js';
+
 export const DIFFICULTY = {
   easy:   { label: 'Cadet',     sols: 60,  crew: 2, o2: 30, food: 30, parts: 6, eventRate: 0.7, blurb: '60 sols, 2 crew. Gentle storms.' },
   normal: { label: 'Explorer',  sols: 120,  crew: 3, o2: 25, food: 25, parts: 3, eventRate: 1.0, blurb: '120 sols, 3 crew. Real trade-offs.' },
@@ -67,7 +70,7 @@ export const TIERS = [
 // the DESIGN once your base reaches that tier.
 export const UPGRADES = {
   suit:       { name: 'Suit tank upgrade',     parts: 3,  tier: 0, desc: 'Stay outside 50% longer.' },
-  battery:    { name: 'Extra battery',         parts: 3,  tier: 0, desc: `Stores ${TUNED.batteryUpgrade} kWh more for the night, so the heater never runs out.` },
+  battery:    { name: 'Extra battery',         parts: 3,  tier: 0, desc: `Stores ${TUNED.batteryUpgrade} kWh more for the night, after you place, inspect and wire its parallel branch. It does not create energy.` },
   regolith:   { name: 'Add a layer of Mars soil (regolith)', parts: 3, tier: 0, max: 3, desc: 'Add another half metre of supported shielding at the storm shelter. Thickness and protection are illustrative. The first layer helps most - each extra layer helps less.' },
   panel:      { name: 'Extra solar panel',     parts: 4,  tier: 1, desc: `+${TUNED.kWhPerPanel} kWh every clear sol (only in daylight).` },
   greenhouse: { name: 'Bigger greenhouse',     parts: 5,  tier: 1, desc: 'Adds 40% to each grow bed’s harvest.' },
@@ -88,7 +91,7 @@ export class Outpost {
     this.o2 = d.o2;
     this.food = this.crew * 3;
     this.rations = d.food;
-    this.safetyChecks = { reserves:false, shelter:false }; this.emergencyKWh = 36; this.habBuild = { step: 0, cleared: [], rockHits: {}, frames: [], pressure: 0 };   // a new crew builds its habitat first (habitat-build.js)
+    this.safetyChecks = { reserves:false, shelter:false }; this.emergencyKWh = 36; this.habBuild = newHabBuild();   // a new crew builds its habitat first (habitat-build.js)
     this.powerStep = 0; this.baseConnected=false; this.chargerStep=0; this.roverCharged=false; this.soilStep=0; this.chargeReserve=0;
     this.harvestMeals = 0;
     this.parts = Math.max(0, d.parts + SITES[this.site].parts);
@@ -248,7 +251,7 @@ export class Outpost {
     if (!u || (key === 'panel' && this.panels >= 12) || !this.unlocked(key) || this.parts < u.parts || ((u.once || u.max) && this.built(key))) return false;
     this.parts -= u.parts;
     if (key === 'panel') this.panels += 1;
-    else if (key === 'battery') { this.upgrades.battery += 1; this.battery += TUNED.batteryUpgrade; }
+    else if (key === 'battery') { queueBattery(this); }
     else if (key === 'reactor') this.reactors += 1;
     else this.upgrades[key] += 1;
     this.today = this.forecast();

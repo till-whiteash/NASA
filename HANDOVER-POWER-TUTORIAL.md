@@ -1,5 +1,7 @@
 # Handover: power tutorial (3D printer, circuit lab, grounding, coiled cables, power per base)
 
+> Historical handover. The completed integration and current instructions are in [README-AGENT-HANDOVER.md](README-AGENT-HANDOVER.md). In particular, the old extra-battery follow-up is now implemented and the soil-grounding description is superseded by conductive chassis bonding. Do not follow the old push checklist automatically.
+
 Written for Codex to continue. All of this is committed on a local branch and **not pushed**.
 
 ## Where the work is

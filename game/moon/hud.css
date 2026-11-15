@@ -18,7 +18,7 @@ body .hud-top-right #minimap { width: 132px; height: 132px; }
 body .map-legend { max-width: 200px; font-size: 11px; }
 body #fact-pop, body #zhetela-message { position: fixed; top: auto; left: auto; right: calc(16px + var(--safe-r)); bottom: calc(76px + var(--safe-b)); width: min(350px, calc(100vw - 32px)); max-width: none; max-height: min(300px, 45dvh); overflow: auto; margin: 0; padding: 12px; background: #192328; font-size: 13px; line-height: 1.45; border-radius: 12px; }
 body #zhetela-message { align-items: flex-start; }
-body #zhetela-message canvas { width: 44px; height: 44px; }
+body #zhetela-message canvas { width: 56px; height: 60px; align-self: center; }
 body #zhetela-message > div { padding-right: 34px; }
 body #zhetela-message .zhetela-close { top: 4px; right: 4px; }
 body #fact-pop h4 { margin: 0 0 5px; font-size: 14px; }

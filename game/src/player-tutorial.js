@@ -1,6 +1,12 @@
 // Tutorial completion follows actions; opening a help page never completes a lesson.
 export function recordLesson(s,key){(s.tutorial??={})[key]=true;}
-export function tutorialLessons(o,s){const t=s.tutorial||{};return [
+export function tutorialLessons(o,s){const t=s.tutorial||{},p=o.habBuild?.pioneer;return [
+ ...(p?[
+ {title:'Leave the pod safely',done:p.exitedPod,text:'Follow the hatch marker. Press E / Action, wait for PRESSURE MATCHED, then press E / Action again to open the outer hatch. Your checked suit is already on.'},
+ {title:'Find your building supplies',done:p.collected.length===6,text:'Follow the marker to an orange cargo bundle, walk close and press E / Action. The next bundle is marked automatically. Six bundles contain all the structural supplies for your first habitat.'},
+ {title:'Use the calibrator',done:p.surveyed.length===3,text:'Go to the marked blue instrument. Press E / Action and stand nearby until the check finishes. Repeat at the other two instruments. Walking away cancels a measurement; you can try again.'},
+ {title:'Build your first home',done:o.habBuild.step>=6,text:'Use the pickaxe on the four marked rocks. Then use each glowing footprint to build a frame. Follow the marker to fit shells, airlocks and finally open the green pressure valve.'}
+ ]:[]),
  {title:'Equip a tool',done:!!t.equip,text:'Press 1 or 2, or tap a tool in your belt. The highlighted slot is equipped. Take the builder from the storage locker; your belt holds two tools.'},
  {title:'Put it away',done:!!t.unequip,text:'Press the same number again, press Q, or tap Empty hands. On a phone, tap the selected tool again. This keeps the tool in your belt.'},
  {title:'Mine a mineral deposit',done:!!t.mine||s.seenOre?.length>0,text:'Equip the pickaxe. Aim at a mineral deposit and press E, click, or tap Action several times. Ordinary rubble clears space but gives no mineral samples.'},
@@ -18,6 +24,7 @@ export function tutorialLessons(o,s){const t=s.tutorial||{};return [
  {title:'Build an expansion',done:Object.values(s.buildHistory||{}).some(n=>n>0),text:'Unload the recipe materials, equip the builder and go outside. Open Builder. A greenhouse needs flat, clear ground; batteries and panels expand the existing power field. Locked recipes explain what is missing.'}
 ];}
 export function questHelp(task){
+ if(task.id?.startsWith('hab-')||task.id?.startsWith('bank-'))return (task.step?task.step+'. ':'')+task.detail;
  if(task.target==='workbench')return 'Go inside to the workbench marker. Press E / Action. For assembly, take a part from the front row, then select its matching highlighted slot.';
  if(task.target==='locker')return 'Enter the base and follow the indoor locker marker. Press E / Action at the storage locker. Use Take to move a tool onto your two-slot belt.';
  if(task.target==='build-ore')return 'Follow the quest marker to the mineral deposit. Equip the pickaxe (1 or 2 / tap its slot), aim at the rock and use it repeatedly.';

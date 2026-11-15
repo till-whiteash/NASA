@@ -1,5 +1,6 @@
 // Starter power, the learning way: print the parts on the 3D printer, learn series, parallel and grounding in the
 // circuit lab, then assemble and wire for real. Pure state: saved fields are the single source of truth.
+import {wiredBatteries} from './battery-bank-state.js';
 import { ASSEMBLIES } from './construction-state.js';
 
 // What the printer can make. Electronics (solar cells, controller chips, lithium cells) come from Earth:
@@ -59,12 +60,13 @@ export function powerLearnObjective(o) {
 // One battery and one solar array (3 panels) can power at most one base. The main habitat uses the first set;
 // every greenhouse you add needs another battery and three more panels.
 export const PANELS_PER_ARRAY = 3;
-export function powerSets(o) { return Math.min(1 + (o.upgrades?.battery || 0), Math.floor((o.panels || 0) / PANELS_PER_ARRAY)); }
+export function powerSets(o) { return Math.min(1 + wiredBatteries(o), Math.floor((o.panels || 0) / PANELS_PER_ARRAY)); }
 export function basesPowered(c) { return 1 + (c?.greenhouses || []).length; }
 export function canPowerAnotherBase(o, c) { return basesPowered(c) < powerSets(o); }
 export function powerCapacityNote(o, c) {
   const sets = powerSets(o), bases = basesPowered(c);
   if (bases < sets) return `Power for ${sets - bases} more base${sets - bases > 1 ? 's' : ''}.`;
+  if(wiredBatteries(o)<(o.upgrades?.battery||0))return 'Place, inspect and connect your extra battery at the field power site. An unwired pack cannot power another base.';
   const needBat = bases + 1 > 1 + (o.upgrades?.battery || 0), needPanels = Math.max(0, (bases + 1) * PANELS_PER_ARRAY - (o.panels || 0));
   return `One battery and one solar array power one base. To power another: ${[needBat ? 'build an Extra battery' : '', needPanels ? `add ${needPanels} more solar panel${needPanels > 1 ? 's' : ''}` : ''].filter(Boolean).join(' and ')}.`;
 }

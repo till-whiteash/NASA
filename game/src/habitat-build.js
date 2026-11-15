@@ -1,5 +1,6 @@
 // The habitat construction site in the world (quest state and text: habitat-build-state.js).
 import * as THREE from 'three';
+import {collectSalvage,recordSurvey,pioneerReady,spendFor,stockText,SURVEY_SECONDS} from './pioneer-state.js';
 import { heightAt } from './world.js';
 import { HAB_DONE, ROCKS, PRESSURE_SECONDS, habitatBuilt } from './habitat-build-state.js';
 
@@ -58,6 +59,23 @@ export class HabitatBuild {
     const pipe = new THREE.Mesh(new THREE.CylinderGeometry(.12, .12, 1, 12), steel); pipe.position.y = .5; this.valve.add(pipe);
     const wheel = new THREE.Mesh(new THREE.TorusGeometry(.26, .05, 8, 24), new THREE.MeshStandardMaterial({ color: '#3ad17a', emissive: '#0d4a26' })); wheel.position.y = 1.05; this.valve.add(wheel); this.wheel = wheel;
     this.valve.position.set(vx, heightAt(vx, vz), vz); this.valve.userData = { kind: 'hab-seal', label: 'Open the pressurisation valve' }; this.group.add(this.valve);
+    const label=(text)=>{const canvas=document.createElement('canvas');canvas.width=512;canvas.height=96;const ctx=canvas.getContext('2d');ctx.fillStyle='#142630';ctx.fillRect(0,0,512,96);ctx.fillStyle='#ecfaf7';ctx.font='bold 30px system-ui';ctx.textAlign='center';ctx.fillText(text,256,58);const map=new THREE.CanvasTexture(canvas);map.colorSpace=THREE.SRGBColorSpace;const sign=new THREE.Mesh(new THREE.PlaneGeometry(1.8,.34),new THREE.MeshBasicMaterial({map,side:THREE.DoubleSide}));sign.position.set(0,1.15,.42);return sign;};
+    this.cargo=Array.from({length:6},(_,i)=>{
+      const g=new THREE.Group(),x=c.x+(i%3-1)*3.2,z=this.front+8+Math.floor(i/3)*3.2;
+      const box=new THREE.Mesh(new THREE.BoxGeometry(1.4,.8,.85),new THREE.MeshStandardMaterial({color:'#d18a40',roughness:.68,metalness:.2}));box.position.y=.4;g.add(box);
+      for(const x of [-.45,.45]){const strap=new THREE.Mesh(new THREE.BoxGeometry(.07,.83,.89),steel);strap.position.set(x,.42,0);g.add(strap);}
+      if(i%2){for(let n=0;n<2;n++){const scrap=new THREE.Mesh(new THREE.BoxGeometry(.95,.035,.6),steel);scrap.position.set((n-.5)*.28,.94+n*.12,0);scrap.rotation.set(n*.16,0,(n-.5)*.3);g.add(scrap);}}
+      g.add(label('CARGO '+String(i+1).padStart(2,'0')));g.position.set(x,heightAt(x,z),z);g.userData={kind:'hab-cargo',id:i,label:'Recover salvage '+(i+1)+' · structural alloy and sealed flight supplies'};
+      world.clearRocksAround?.(x,z,1.2);this.group.add(g);return g;
+    });
+    const readings=['Footing levels','Module alignment','Airlock clearance'];
+    this.surveys=readings.map((text,i)=>{
+      const g=new THREE.Group(),x=c.x+(i-1)*7,z=this.front+3;
+      const pole=new THREE.Mesh(new THREE.CylinderGeometry(.06,.09,1.35,8),steel);pole.position.y=.675;g.add(pole);
+      const instrument=new THREE.Mesh(new THREE.BoxGeometry(.52,.3,.3),new THREE.MeshStandardMaterial({color:'#58a8d2',emissive:'#102f4a'}));instrument.position.y=1.4;g.add(instrument);
+      const ring=new THREE.Mesh(new THREE.TorusGeometry(.65,.035,6,36),ghost('#76e5ff',.7));ring.rotation.x=-Math.PI/2;ring.position.y=.05;g.add(ring);
+      g.add(label(text));g.position.set(x,heightAt(x,z),z);g.userData={kind:'hab-survey',id:i,label:'Calibrate · '+text};world.clearRocksAround?.(x,z,1);this.group.add(g);return g;
+    });
     if (this.b) this.b.modules = this.mods.length;
     this.anim = null; this.apply(true);
   }
@@ -65,7 +83,11 @@ export class HabitatBuild {
   // Show what the saved step says is built.
   apply(initial = false) {
     const b = this.b, built = habitatBuilt(this.state()), s = b?.step ?? HAB_DONE, w = this.world;
+    // Resume/co-op snapshots must replace any partial local visual animation.
+    if(initial){this.anim=null;this.growing=[];if(this.measuring)this.measuring.mesh.rotation.y=0;this.measuring=null;this.m.model.scale.copy(this.model.scale);this.frames.forEach(f=>f.scale.set(1,1,1));}
     this.group.visible = !built;
+    this.cargo.forEach((g,i)=>g.visible=s===0&&!!b?.pioneer?.exitedPod&&!b.pioneer.collected.includes(i));
+    this.surveys.forEach((g,i)=>g.visible=s===0&&b?.pioneer?.collected.length===6&&!b.pioneer.surveyed.includes(i));
     this.rocks.forEach((r, i) => {
       r.visible = s === 1 && !b.cleared.includes(i);
       const hits = b?.rockHits?.[i] || 0;
@@ -91,11 +113,12 @@ export class HabitatBuild {
     w.remoteShadowDirty = true;
     if (!initial) this.save();
   }
-  targets() { return habitatBuilt(this.state()) ? [] : [...this.rocks, ...this.pads, this.post, this.airlock, this.valve].filter(o => o.visible); }
+  targets() { return habitatBuilt(this.state()) ? [] : [...this.cargo,...this.surveys,...this.rocks, ...this.pads, this.post, this.airlock, this.valve].filter(o => o.visible); }
   // Where the quest marker points
   target() {
     const b = this.b; if (!b || habitatBuilt(this.state())) return null;
     const p = this.world.player.position, nearest = list => list.filter(o => o.visible).sort((a, c) => a.position.distanceTo(p) - c.position.distanceTo(p))[0]?.position;
+    if(b.step===0&&b.pioneer&&!pioneerReady(b))return nearest(b.pioneer.collected.length<6?this.cargo:this.surveys);
     if (b.step === 0) return { x: this.centre.x, z: this.front };
     if (b.step === 1) return nearest(this.rocks);
     if (b.step === 2) return nearest(this.pads);
@@ -106,6 +129,14 @@ export class HabitatBuild {
   advance(text) { this.b.step++; this.b.pressure = 0; this.apply(); if (text) this.guide(text, true); }
   use(mesh) {
     const b = this.b, d = mesh.userData; if (!b) return false;
+    if(!mesh.visible)return true;
+    if(d.kind==='hab-cargo'){
+      if(collectSalvage(b,d.id)){this.apply();this.guide('Cargo secured. '+stockText(b)+(b.pioneer.collected.length===6?' All cargo found. Use the three blue survey instruments next.':' Follow the marker to the next orange bundle.'),true);}return true;
+    }
+    if(d.kind==='hab-survey'){
+      if(!b.pioneer?.calibrator)return true;
+      if(!this.measuring){this.measuring={mesh,t:0};this.guide('Calibrator running: '+d.label+'. Stay within 3 metres for 3 seconds.');}return true;
+    }
     if (d.kind === 'hab-rock') {
       if (this.colony().tool !== 'pickaxe') { this.guide('Equip the pickaxe from your tool belt (1 or 2) before breaking site rocks.'); return true; }
       if (this.striking || this.world.toolSwing >= 0) return true; this.striking = true;
@@ -122,13 +153,14 @@ export class HabitatBuild {
     }
     if (d.kind === 'hab-pad') {
       if (b.frames.includes(d.id)) return true;
+      const cost=spendFor(b,'frame',d.id);if(!cost.ok){this.guide(cost.why);return true;}
       b.frames.push(d.id); mesh.visible = false; this.rise(this.frames[d.id]);
       this.notify(`Module ${d.id + 1} framed · ${b.frames.length}/${this.mods.length}`);
       if (b.frames.length >= this.mods.length) this.advance('All frames are up. Use the yellow control post to unfold the pressure shells.'); else this.save();
       return true;
     }
-    if (d.kind === 'hab-shell') { this.unfold(); this.advance('Shells expanded. Next, attach the airlocks and stairs so you can get in without losing air.'); return true; }
-    if (d.kind === 'hab-airlock') { this.advance('Airlocks fitted. Open the green valve and stay close while the cabin fills with air.'); return true; }
+    if (d.kind === 'hab-shell') { if(b.step!==3)return true;const cost=spendFor(b,'shell');if(!cost.ok){this.guide(cost.why);return true;}this.unfold(); this.advance('Shells expanded. Next, attach the airlocks and stairs so you can get in without losing air.'); return true; }
+    if (d.kind === 'hab-airlock') { if(b.step!==4)return true;const cost=spendFor(b,'airlock');if(!cost.ok){this.guide(cost.why);return true;}this.advance('Airlocks fitted. Open the green valve and stay close while the cabin fills with air.'); return true; }
     if (d.kind === 'hab-seal') {
       if (b.step < 5) { this.guide('Attach the airlocks first, or the air would leak straight out.'); return true; }
       if (b.pressure > 0) { this.notify('Pressurising · stay within 6 m'); return true; }
@@ -150,7 +182,15 @@ export class HabitatBuild {
       if (k >= 1) { model.scale.copy(s); model.updateMatrix(); model.updateMatrixWorld(true); this.anim = null; this.apply(true); }
     }
     const p = this.world.player.position;
-    if (b.step === 0 && Math.hypot(p.x - this.centre.x, p.z - this.front) < 12) this.advance('This is your habitat site. First clear the four marked rocks with your pickaxe.');
+    if(this.measuring){
+      const q=this.measuring;
+      if(q.mesh.position.distanceTo(p)>3){this.measuring=null;this.guide('Measurement cancelled. Stand within 3 metres of the instrument and try again.');}
+      else {q.t+=dt;q.mesh.rotation.y=Math.sin(q.t*5)*.12;
+        this.notify('Calibrating '+Math.min(100,Math.round(q.t/SURVEY_SECONDS*100))+'% · stay close');
+        if(q.t>=SURVEY_SECONDS){recordSurvey(b,q.mesh.userData.id);q.mesh.rotation.y=0;this.measuring=null;this.apply();this.guide(b.pioneer.surveyed.length===3?'Survey complete. Clear the four site rocks, then build each module from recovered cargo.':'Survey recorded. Go to the next blue instrument.',true);}
+      }
+    }
+    if (b.step === 0 && pioneerReady(b) && Math.hypot(p.x - this.centre.x, p.z - this.front) < 12) this.advance('This is your habitat site. First clear the four marked rocks with your pickaxe.');
     if (b.step === 5 && b.pressure > 0) {
       const near = this.valve.position.distanceTo(p) < 6;
       this.wheel.rotation.z += dt * 3;

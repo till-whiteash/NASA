@@ -27,8 +27,10 @@ with sync_playwright() as p:
                colliders: hb.colliders.filter(q => w.colliders.includes(q)).length, total: hb.colliders.length, modules: hb.mods.length,
                door: game.mission.target('hab') && true }; }""")
     print('START', start)
-    assert start['obj'] == 'hab-0' and not start['model'] and not start['stairs'] and start['colliders'] == 0, start
+    assert start['obj'] == 'hab-exit' and not start['model'] and not start['stairs'] and start['colliders'] == 0, start
     shot(page, '0-empty-site')
+    # Preparation is exercised through the normal ray in test-pioneer-build-browser.py.
+    page.evaluate("() => { const p=game.outpost.habBuild.pioneer;p.exitedPod=true;p.collected=[0,1,2,3,4,5];p.surveyed=[0,1,2];p.stock={alloy:18,membrane:12,seals:6};game.world.habBuild.apply(); }")
     # 0 -> walk to the site
     page.evaluate("() => { const w = game.world, hb = w.habBuild; w.player.position.set(hb.centre.x, w.player.position.y, hb.front + 4); }")
     assert page.evaluate(STEP, 3)['id'] == 'hab-1'

@@ -2,10 +2,10 @@ import * as THREE from 'three';
 
 // The circuit lab at the workbench: real wiring on a bench, solved like a real circuit (nodal analysis), so whatever
 // the player wires behaves the way it would. Three lessons:
-//   series   - four 12 V Li-ion cells chained + to - make 48 V (voltages add, the same current flows through each)
+//   series   - four illustrative 12 V modules chained + to - make 48 V (voltages add, the same current flows through each)
 //   parallel - two 24 V strings side by side: same voltage, twice the amp-hours, half the current each
 //   ground   - a frayed wire touches the metal frame: without grounding the frame is "live"; with the frame and the
-//              battery - bonded to the ground rod, the fault current rushes to ground and the fuse cuts the power
+//              battery - bonded to the bonding bar, the fault current returns to the source and the fuse cuts the power
 // Moving dots show current (conventional current: out of +, through the load, back into -; speed grows with amps);
 // terminals glow by their voltage (blue 0 V to orange 48 V). Click a terminal, then another, to run a wire;
 // click a wire to remove it.
@@ -16,7 +16,7 @@ const LESSONS = {
     title: 'Lesson 1 · Series: voltages add up',
     teach: [
       '<b>Voltage</b> is the push that drives electricity, like water pressure in a pipe. <b>Current</b> (amps) is how much flows each second.',
-      'Each lithium-ion cell here gives <b>12 V</b>. Join them <b>in series</b> - the <b>+</b> of one cell to the <b>−</b> of the next - and their pushes add up: 4 × 12 V = <b>48 V</b>.',
+      'Each teaching battery module here gives <b>12 V</b>. Join them <b>in series</b> - the <b>+</b> of one cell to the <b>−</b> of the next - and their pushes add up: 4 × 12 V = <b>48 V</b>.',
       'In series there is only <b>one path</b>, so the same current flows through every cell, like water through one long pipe.',
       'Solar panels do the same: about 60 small 0.5 V cells in series make one 30 V panel.',
     ],
@@ -38,12 +38,12 @@ const LESSONS = {
     title: 'Lesson 3 · Grounding: a safe path for faults',
     teach: [
       'Sometimes insulation wears through and a live wire touches the metal <b>frame</b> of a machine. The frame then sits at 48 V, waiting for a path.',
-      'If an astronaut touches that frame while standing on the ground, <b>the path is them</b>. As little as 30 mA through a body is dangerous.',
-      'The battery\'s − is already <b>bonded</b> to a <b>ground rod</b> driven into the soil (the green-yellow wire). A <b>ground wire</b> from the frame to that rod gives a fault an easy road back to the battery: a huge current rushes through it, and the <b>fuse blows</b> and cuts the power in a split second.',
-      'On Mars, grounding also bleeds away the <b>static charge</b> that blowing dust builds up on equipment. That protects electronics, and you.',
+      'If an astronaut touches that frame while also touching a conductor tied to the return, <b>the path is them</b>. Body current depends on the contact and resistance; never test a live frame with your body.',
+      'The battery\'s − is already <b>bonded</b> to a <b>bonding bar</b> connected by a continuous metal conductor (the green-yellow wire). A <b>ground wire</b> from the frame to that bar gives a fault an easy road back to the battery: a huge current rushes through it, and the <b>fuse blows</b> and cuts the power in a split second.',
+      'The return must be a continuous metal path to the protected source. Dry Martian soil is not a dependable fuse-clearing conductor. Static-charge control is a separate design task.',
     ],
-    task: '1. Press <b>⚡ Cause a fault</b> and see what happens without grounding. 2. Wire the <b>frame</b> to the <b>ground rod</b>. 3. Cause the fault again and follow the current to ground.',
-    done: 'The fault current went straight to ground and the 60 A fuse blew. The frame stayed at 0 V, safe to touch. That is why every power system on the outpost is grounded.',
+    task: '1. Press <b>⚡ Cause a fault</b> and see what happens without grounding. 2. Wire the <b>frame</b> to the <b>bonding bar</b>. 3. Cause the fault again and follow the current to ground.',
+    done: 'The fault current returned through the metal bond to the source and the 60 A fuse opened. In this model the frame is close to the reference voltage. A real repair still requires isolation and verification; a meter reading alone is not permission to touch.',
   },
 };
 const ORDER = ['series', 'parallel', 'ground'];
@@ -57,7 +57,7 @@ function label(text, color = '#fff', bg = 'rgba(0,0,0,0)', w = 128, h = 64, size
   return sp;
 }
 
-// ---- the solver: nodal analysis with cells as Norton sources, wires and loads as resistors. Node 'G' (ground rod) is 0 V.
+// ---- the solver: nodal analysis with cells as Norton sources, wires and loads as resistors. Node 'G' (bonding bar) is 0 V.
 function solve(parts) {
   const ids = [...new Set(parts.flatMap(p => [p.a, p.b]))].filter(n => n !== 'G'), idx = new Map(ids.map((n, i) => [n, i])), N = ids.length;
   const A = Array.from({ length: N }, () => new Float64Array(N + 1));
@@ -129,15 +129,15 @@ export function openCircuitLab({ start = 'series', done = {}, onStep } = {}) {
     const bulbLight = new THREE.PointLight('#ffcf7a', 0, 4, 2); bulbLight.position.copy(bulb.position); lampG.add(bulbLight);
     const lt = label('Habitat lamp', '#dfe7ef', null, 256, 48, 28); lt.scale.set(.6, .11, 1); lt.position.set(LAMP.x, .62, LAMP.z); lampG.add(lt);
     terminal('Lp', LAMP.x - .26, .12, LAMP.z, '+', lampG); terminal('Ln', LAMP.x + .26, .12, LAMP.z, '-', lampG);
-    // ground lesson: the equipment frame and the ground rod
+    // ground lesson: the equipment frame and the bonding bar
     const gndG = new THREE.Group(); scene.add(gndG);
     const frameMat = M('#8d969c', { r: .35, m: .8 });
     const frame = new THREE.Mesh(new THREE.BoxGeometry(.7, .4, .5), frameMat); frame.position.set(FRAME.x, .2, FRAME.z); gndG.add(frame);
     const ft = label('Metal frame', '#dfe7ef', null, 256, 48, 28); ft.scale.set(.6, .11, 1); ft.position.set(FRAME.x, .66, FRAME.z); gndG.add(ft);
     terminal('F', FRAME.x - .2, .4, FRAME.z + .1, 'g', gndG);
-    const rod = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, .5, 12), M('#b07a3a', { r: .3, m: .9 })); rod.position.set(ROD.x, .2, ROD.z); gndG.add(rod);
-    const gsym = label('⏚ Ground rod', '#9be59b', null, 256, 48, 28); gsym.scale.set(.62, .11, 1); gsym.position.set(ROD.x, .62, ROD.z); gndG.add(gsym);
-    terminal('G', ROD.x, .44, ROD.z, 'g', gndG);
+    const rod = new THREE.Mesh(new THREE.BoxGeometry(.6, .09, .2), M('#b07a3a', { r: .3, m: .9 })); rod.position.set(ROD.x, .12, ROD.z); gndG.add(rod);
+    const gsym = label('⏚ Bonding bar', '#9be59b', null, 256, 48, 28); gsym.scale.set(.62, .11, 1); gsym.position.set(ROD.x, .62, ROD.z); gndG.add(gsym);
+    terminal('G', ROD.x, .17, ROD.z, 'g', gndG);
     const fray = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(LAMP.x - .26, .2, LAMP.z), new THREE.Vector3(.7, .5, -.95), new THREE.Vector3(FRAME.x - .3, .3, FRAME.z)]), 30, .018, 6), M('#c8231c', { e: '#ff3b2b', ei: 1.5 }));
     fray.visible = false; gndG.add(fray);
     const spark = new THREE.PointLight('#ffd27a', 0, 2, 2); spark.position.set(FRAME.x - .3, .35, FRAME.z); gndG.add(spark);
@@ -221,17 +221,16 @@ export function openCircuitLab({ start = 'series', done = {}, onStep } = {}) {
       } else if (lessonKey === 'ground') {
         const frameV = Math.abs(s.v('F'));
         if (stage === 0) feedback('Everything works. Now press <b>⚡ Cause a fault</b>: a worn wire touches the metal frame.');
-        if (fault && stage === 0 && frameV > 20) { stage = 1; return feedback(`⚠ <b>The frame is live: ${frameV.toFixed(0)} V.</b> Nothing tripped, and the lamp still glows, so nobody notices. Touch the frame while standing on the soil and ${(frameV / BODY_R * 1000).toFixed(0)} mA would pass through you. That is dangerous. Press <b>Repair the wire</b>, then add the ground wire.`, 'bad'); }
-        if (false) { feedback(`⚠ <b>The frame is live: ${frameV.toFixed(0)} V.</b> Nothing tripped, and the lamp still glows, so nobody notices. Touch the frame while standing on the soil and ${(frameV / BODY_R * 1000).toFixed(0)} mA would pass through you. That is dangerous. Press <b>Repair the wire</b>, then add the ground wires.`, 'bad'); }
+        if (fault && stage === 0 && frameV > 20) { stage = 1; return feedback(`⚠ <b>The frame is live: ${frameV.toFixed(0)} V.</b> Nothing tripped, and the lamp still glows, so nobody notices. In this 1,000-ohm contact example, touching the frame and source return would let ${(frameV / BODY_R * 1000).toFixed(0)} mA flow through the contact. That is hazardous; this is a simulation. Press <b>Repair the wire</b>, then add the ground wire.`, 'bad'); }
         if (stage >= 1 && !fault && !fuseBlown) {
           const frameG = isTied('F', 'G'), bonded = isTiedToNeg('G');
-          feedback(frameG && bonded ? 'The frame is grounded. Now cause the fault again and watch where the current goes.' : 'Wire the <b>frame</b> terminal to the <b>ground rod</b>.');
+          feedback(frameG && bonded ? 'The frame is grounded. Now cause the fault again and watch where the current goes.' : 'Wire the <b>frame</b> terminal to the <b>bonding bar</b>.');
           if (frameG && bonded) stage = 2;
         }
         if (fault && stage >= 1) {
           if (fuseBlown && frameV < 1) return win();
-          if (frameV < 1 && !fuseBlown) feedback('The frame is safe at 0 V, but the fault current has no way back to the battery, so the fuse never trips and the fault goes unnoticed. Bond the battery\'s − to the ground rod as well.');
-          else if (frameV > 20) feedback(`⚠ Still live: ${frameV.toFixed(0)} V on the frame. It needs a wire to the ground rod.`, 'bad');
+          if (frameV < 1 && !fuseBlown) feedback('The frame reads close to the reference, but a missing return bond can leave the fault undetected. Bond the battery\'s − to the bonding bar as well.');
+          else if (frameV > 20) feedback(`⚠ Still live: ${frameV.toFixed(0)} V on the frame. It needs a wire to the bonding bar.`, 'bad');
         }
       }
     };
@@ -255,7 +254,7 @@ export function openCircuitLab({ start = 'series', done = {}, onStep } = {}) {
       $('.cl-next').hidden = true; $('.cl-fault').hidden = k !== 'ground'; $('.cl-fault').textContent = '⚡ Cause a fault'; $('.cl-body').hidden = k !== 'ground';
       gndG.visible = k === 'ground';
       if (k === 'ground') [['c0p', 'c1n'], ['c1p', 'c2n'], ['c2p', 'c3n'], ['c3p', 'Lp'], ['c0n', 'Ln']].forEach(([a, b]) => connect(a, b));   // start from the 48 V circuit
-      if (k === 'ground') connect('c0n', 'G', true);                         // the system bond: battery - to the ground rod (fixed)
+      if (k === 'ground') connect('c0n', 'G', true);                         // the system bond: battery - to the bonding bar (fixed)
       evaluate();
     };
     $('.cl-fault').onclick = () => {
@@ -274,7 +273,7 @@ export function openCircuitLab({ start = 'series', done = {}, onStep } = {}) {
     canvas.addEventListener('pointerdown', e => {
       const hit = pick(e); if (!hit) { sel = null; preview.visible = false; return; }
       const id = hit.object.userData.term, w = hit.object.userData.wire;
-      if (w && !sel) { if (w.fixed) { feedback('That green-yellow wire is the system bond: the battery\'s − tied to the ground rod. It stays.'); return; } removeWire(w); feedback('Wire removed.'); return; }
+      if (w && !sel) { if (w.fixed) { feedback('That green-yellow wire is the system bond: the battery\'s − tied to the bonding bar. It stays.'); return; } removeWire(w); feedback('Wire removed.'); return; }
       if (!id) return;
       if (!sel) { sel = id; feedback(`Selected the ${terms.get(id).pole === '+' ? 'red <b>+</b>' : terms.get(id).pole === 'g' ? 'ground' : 'black <b>−</b>'} terminal. Now click where the wire should go.`); return; }
       const a = sel; sel = null; preview.visible = false; connect(a, id);
