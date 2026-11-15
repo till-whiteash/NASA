@@ -142,6 +142,11 @@ export function playCinematic(name, { clip, world } = {}) {
     const key = e => { if (e.code === 'Escape') { e.preventDefault(); e.stopPropagation(); end(true); } else if (['Space', 'Enter'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); } };
     addEventListener('keydown', key, true);
     box.querySelector('.cine-skip').onclick = () => end(true);
+    // The briefing is a rendered film; play it directly instead of the GLB preview.
+    if (name === 'ares_vi_briefing' || name === 'ares_vi_briefing_moon') {
+      playVideo('briefing film');
+      return;
+    }
     if (!hasWebGL()) playVideo('no WebGL on this device');
     else slow = setTimeout(() => { if (!st) playVideo('the 3D version is slow to load'); }, 12000);
     stage(name, box, { clip }).then(s => {
