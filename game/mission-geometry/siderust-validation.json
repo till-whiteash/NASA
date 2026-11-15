@@ -1,0 +1,189 @@
+{
+  "siderust_version": "0.9.1",
+  "tempoch_version": "0.5.1",
+  "siderust_license": "AGPL-3.0",
+  "siderust_source": "https://github.com/Siderust/siderust-py",
+  "method": "Body.Earth/Mars.heliocentric_position(jd).distance_to(): analytical VSOP87",
+  "epoch_note": "The Python Body API accepts an untagged JulianDate. This comparison supplies the same TDB number as Horizons; it is not a strict time-scale conversion validation.",
+  "scope": "Scalar distance check only, for rounded educational displays. No navigation accuracy claim.",
+  "acceptance_km": 10000,
+  "max_absolute_difference_km": 14.166648238897324,
+  "passed": true,
+  "samples": [
+    {
+      "date": "2026-01-01",
+      "jd_input": 2461041.5,
+      "nasa_distance_km": 360632552.1170688,
+      "siderust_distance_km": 360632550.7620967,
+      "absolute_difference_km": 1.3549721240997314
+    },
+    {
+      "date": "2026-02-01",
+      "jd_input": 2461072.5,
+      "nasa_distance_km": 355858636.540986,
+      "siderust_distance_km": 355858635.587168,
+      "absolute_difference_km": 0.9538180232048035
+    },
+    {
+      "date": "2026-03-01",
+      "jd_input": 2461100.5,
+      "nasa_distance_km": 350254426.2020019,
+      "siderust_distance_km": 350254427.6216674,
+      "absolute_difference_km": 1.4196654558181763
+    },
+    {
+      "date": "2026-04-01",
+      "jd_input": 2461131.5,
+      "nasa_distance_km": 343336143.9058806,
+      "siderust_distance_km": 343336148.3892187,
+      "absolute_difference_km": 4.483338117599487
+    },
+    {
+      "date": "2026-05-01",
+      "jd_input": 2461161.5,
+      "nasa_distance_km": 335918672.88193583,
+      "siderust_distance_km": 335918676.7924997,
+      "absolute_difference_km": 3.910563886165619
+    },
+    {
+      "date": "2026-06-01",
+      "jd_input": 2461192.5,
+      "nasa_distance_km": 326741235.60431826,
+      "siderust_distance_km": 326741238.6058309,
+      "absolute_difference_km": 3.00151264667511
+    },
+    {
+      "date": "2026-07-01",
+      "jd_input": 2461222.5,
+      "nasa_distance_km": 315141982.50249547,
+      "siderust_distance_km": 315141981.54952455,
+      "absolute_difference_km": 0.9529709219932556
+    },
+    {
+      "date": "2026-08-01",
+      "jd_input": 2461253.5,
+      "nasa_distance_km": 298838110.87493294,
+      "siderust_distance_km": 298838105.9342258,
+      "absolute_difference_km": 4.940707147121429
+    },
+    {
+      "date": "2026-09-01",
+      "jd_input": 2461284.5,
+      "nasa_distance_km": 276776681.65038455,
+      "siderust_distance_km": 276776671.74789244,
+      "absolute_difference_km": 9.902492105960846
+    },
+    {
+      "date": "2026-10-01",
+      "jd_input": 2461314.5,
+      "nasa_distance_km": 249159819.858768,
+      "siderust_distance_km": 249159806.64306936,
+      "absolute_difference_km": 13.215698629617691
+    },
+    {
+      "date": "2026-11-01",
+      "jd_input": 2461345.5,
+      "nasa_distance_km": 214312550.76316482,
+      "siderust_distance_km": 214312536.59651658,
+      "absolute_difference_km": 14.166648238897324
+    },
+    {
+      "date": "2026-12-01",
+      "jd_input": 2461375.5,
+      "nasa_distance_km": 176159831.65014648,
+      "siderust_distance_km": 176159820.55521324,
+      "absolute_difference_km": 11.094933241605759
+    },
+    {
+      "date": "2027-01-01",
+      "jd_input": 2461406.5,
+      "nasa_distance_km": 136712329.0765703,
+      "siderust_distance_km": 136712320.66252413,
+      "absolute_difference_km": 8.414046168327332
+    },
+    {
+      "date": "2027-02-01",
+      "jd_input": 2461437.5,
+      "nasa_distance_km": 107394653.0809376,
+      "siderust_distance_km": 107394649.98755686,
+      "absolute_difference_km": 3.0933807343244553
+    },
+    {
+      "date": "2027-03-01",
+      "jd_input": 2461465.5,
+      "nasa_distance_km": 102770044.02457736,
+      "siderust_distance_km": 102770044.8687827,
+      "absolute_difference_km": 0.8442053347826004
+    },
+    {
+      "date": "2027-04-01",
+      "jd_input": 2461496.5,
+      "nasa_distance_km": 124935078.77531815,
+      "siderust_distance_km": 124935085.35596023,
+      "absolute_difference_km": 6.5806420892477036
+    },
+    {
+      "date": "2027-05-01",
+      "jd_input": 2461526.5,
+      "nasa_distance_km": 160197465.4382153,
+      "siderust_distance_km": 160197477.0881564,
+      "absolute_difference_km": 11.649941116571426
+    },
+    {
+      "date": "2027-06-01",
+      "jd_input": 2461557.5,
+      "nasa_distance_km": 199208128.73936987,
+      "siderust_distance_km": 199208141.38968834,
+      "absolute_difference_km": 12.6503184735775
+    },
+    {
+      "date": "2027-07-01",
+      "jd_input": 2461587.5,
+      "nasa_distance_km": 234311533.1219136,
+      "siderust_distance_km": 234311545.35321423,
+      "absolute_difference_km": 12.231300622224808
+    },
+    {
+      "date": "2027-08-01",
+      "jd_input": 2461618.5,
+      "nasa_distance_km": 265605382.04249102,
+      "siderust_distance_km": 265605390.94362223,
+      "absolute_difference_km": 8.901131212711334
+    },
+    {
+      "date": "2027-09-01",
+      "jd_input": 2461649.5,
+      "nasa_distance_km": 291071064.5166231,
+      "siderust_distance_km": 291071069.87876356,
+      "absolute_difference_km": 5.362140476703644
+    },
+    {
+      "date": "2027-10-01",
+      "jd_input": 2461679.5,
+      "nasa_distance_km": 310247940.2255353,
+      "siderust_distance_km": 310247940.67462784,
+      "absolute_difference_km": 0.4490925669670105
+    },
+    {
+      "date": "2027-11-01",
+      "jd_input": 2461710.5,
+      "nasa_distance_km": 325061358.5735863,
+      "siderust_distance_km": 325061358.01436645,
+      "absolute_difference_km": 0.5592198371887207
+    },
+    {
+      "date": "2027-12-01",
+      "jd_input": 2461740.5,
+      "nasa_distance_km": 335525789.1606213,
+      "siderust_distance_km": 335525786.1265658,
+      "absolute_difference_km": 3.034055471420288
+    },
+    {
+      "date": "2028-01-01",
+      "jd_input": 2461771.5,
+      "nasa_distance_km": 343512750.2246826,
+      "siderust_distance_km": 343512747.2663722,
+      "absolute_difference_km": 2.9583104252815247
+    }
+  ]
+}

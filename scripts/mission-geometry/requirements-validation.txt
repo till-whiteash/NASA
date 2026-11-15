@@ -1,0 +1,3 @@
+# Optional, isolated developer validation only. Not a game/runtime dependency.
+siderust==0.9.1
+tempoch==0.5.1

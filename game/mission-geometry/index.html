@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>A message across space · Zhetalis</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="view.mjs"></script>
+</head>
+<body>
+  <main>
+    <header><a href="../" aria-label="Open the NASA game">ZHETALIS <span>/ FIELD NOTES</span></a><span class="source-badge">NASA / JPL DATA</span></header>
+    <section class="intro">
+      <div class="eyebrow">MISSION RADIO · OPTIONAL EXPLORATION</div>
+      <h1>A message across space.</h1>
+      <p>Earth and Mars keep moving. A bigger gap means a longer wait for a message.</p>
+    </section>
+    <p id="error" role="alert" hidden></p>
+    <div id="loading" role="status">Loading the mission’s saved NASA data…</div>
+    <section id="explorer" hidden aria-label="Explore Earth and Mars">
+      <div class="map-and-readout">
+        <div class="map-card">
+          <div class="map-heading"><span><i class="status-dot"></i> EARTH ↔ MARS</span><span id="map-date"></span></div>
+          <svg id="map" viewBox="0 0 700 480" role="img" aria-labelledby="map-title map-desc">
+            <title id="map-title">Earth and Mars around the Sun</title>
+            <desc id="map-desc">Top-down positions for the selected date. Planets are enlarged. The dashed line measures the gap, not a flight path.</desc>
+            <defs><radialGradient id="sunlight"><stop offset="0" stop-color="#ffd58c" stop-opacity=".2"/><stop offset="1" stop-color="#ffd58c" stop-opacity="0"/></radialGradient></defs>
+            <g id="stars" aria-hidden="true"></g>
+            <circle cx="350" cy="240" r="140" fill="url(#sunlight)"/>
+            <g fill="none" stroke="#354653"><path id="earth-track"/><path id="mars-track"/></g>
+            <line id="gap" stroke="#b5c8d9" stroke-width="1.5" stroke-dasharray="5 7"/>
+            <circle cx="350" cy="240" r="10" fill="#ffd18a"/>
+            <text x="350" y="271" text-anchor="middle" class="planet-label">Sun</text>
+            <g id="earth"><circle r="20" fill="#78dbe5" opacity=".09"/><circle r="8" fill="#78dbe5"/><text y="-21" text-anchor="middle" class="planet-label">Earth</text></g>
+            <g id="mars"><circle r="20" fill="#f6a781" opacity=".09"/><circle r="8" fill="#f6a781"/><text y="-21" text-anchor="middle" class="planet-label">Mars</text></g>
+          </svg>
+          <p class="map-note">Top-down view · planets enlarged · the line is not a flight path</p>
+        </div>
+        <aside class="readout" aria-label="Radio delay for this date">
+          <div class="metric"><span class="eyebrow">THE GAP BETWEEN US</span><strong id="distance"></strong><span>million kilometres</span></div>
+          <div class="metric"><span class="eyebrow">ONE-WAY RADIO MESSAGE</span><strong id="delay"></strong><span>approximate travel time</span></div>
+          <div class="guide">
+            <img src="../assets/zhetela/standing.png" alt="Zhetela" width="84" height="128">
+            <div><h2>Zhetela’s tip</h2><p id="tip"></p></div>
+          </div>
+        </aside>
+      </div>
+      <div class="date-control">
+        <div class="control-title"><label for="date">Try a different month</label><output id="date-label" for="date"></output></div>
+        <input id="date" type="range" min="0" max="24" value="10" step="1" aria-describedby="date-help">
+        <div class="range-ends"><span>Jan 2026</span><span>Jan 2028</span></div>
+        <div class="comparison"><p id="date-help">Move the slider. Watch the gap and the wait change.</p><div><button type="button" id="near">Find a shorter wait</button><button type="button" id="far">Find a longer wait</button></div></div>
+      </div>
+      <details class="why"><summary>Why can’t we chat instantly?</summary><div><p>Radio signals travel at the speed of light. That is very fast, but space is huge. The signal still needs time to cross the gap.</p><p id="round-trip"></p><p>Each planet follows its own orbit around the Sun. Their different speeds make the gap grow and shrink. A smaller gap alone does not tell us when to launch a rocket.</p></div></details>
+      <details class="sources"><summary>For curious explorers: data and limits</summary><div><p>These are 25 monthly snapshots from <a href="https://ssd-api.jpl.nasa.gov/doc/horizons.html" target="_blank" rel="noopener">NASA/JPL Horizons</a>, from January 2026 to January 2028. They are saved data, not live tracking.</p><p>We measure the straight-line distance between the centres of Earth and Mars in three dimensions, then divide by the speed of light. The diagram is a top-down projection. Dates are midnight TDB, the time scale used by this calculation.</p><p>This is an approximate radio-delay lesson. It does not calculate a rocket journey, the moving receiver’s exact light time, solar interference, signal blockage or relay delays. The shorter/longer buttons compare only these saved monthly samples.</p><p>Siderust was checked separately against this NASA dataset. It is an independent community toolkit, not a NASA source or partner. <a href="README.md">Read the source and validation notes.</a></p></div></details>
+      <p id="announcement" class="sr-only" aria-live="polite" aria-atomic="true"></p>
+    </section>
+    <footer>Explore at your own pace. This note never changes your mission progress.</footer>
+  </main>
+</body>
+</html>
