@@ -47,8 +47,25 @@ export const LOOKS = {                                        // background, hem
   earth: { bg: '#9db8dc', sky: '#cfe2ff', ground: '#5d6b45', sun: '#fff4e2', hemi: 1.2, sunI: 3.0 },
   mars: { bg: '#c49a78', sky: '#f2d2b4', ground: '#6b3d26', sun: '#ffe6c8', hemi: 1.1, sunI: 2.6, fog: [160, 1400] },
 };
-// Newly rendered clean movies use responsive captions; legacy movies retain baked captions.
-const CLEAN_VIDEO = name => ['ares_vi_briefing', 'ares_vi_briefing_moon', 'launch_moon', 'briefing_mission', 'briefing_moon', 'cruise_loop', 'mars_approach'].includes(name);
+// Films with a clean 1080p movie (previews/<name>-hd.mp4) get captions drawn by the page; the rest still play their
+// legacy movie with baked captions until their HD render is added here.
+const HD_FILMS = new Set(['ares_vi_briefing', 'ares_vi_briefing_moon', 'launch_moon', 'briefing_mission', 'briefing_moon', 'cruise_loop', 'mars_approach', 'launch_earth']);
+const CLEAN_VIDEO = name => HD_FILMS.has(name);
+// The film that usually follows each one: it starts downloading while this one plays, so there is no wait between them.
+const FILM_NEXT = { ares_vi_briefing: 'briefing_mission', briefing_mission: 'launch_earth', launch_earth: 'cruise_loop',
+  ares_vi_briefing_moon: 'briefing_moon', briefing_moon: 'launch_moon', mars_approach: 'outpost_26_months' };
+const preloaded = new Map();
+function filmVideo(name) {
+  const v = document.createElement('video'); v.className = 'cine-video';
+  v.muted = true; v.defaultMuted = true; v.setAttribute('muted', '');          // muted films may always autoplay
+  v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'auto'; v.poster = POSTER(name); v.src = VIDEO(name);
+  return v;
+}
+// Start downloading a film before it is needed (call it a scene early). Safe to call more than once.
+export function preloadCinematic(name) {
+  if (!name || preloaded.has(name)) return;
+  const v = filmVideo(name); v.load(); preloaded.set(name, v); captionsFor(name);
+}
 const VIDEO = name => new URL(`previews/${name}${CLEAN_VIDEO(name) ? '-hd' : ''}.mp4`, ANIMATION_ROOT).href;
 const POSTER = name => new URL(`previews/posters/${name}.jpg`, ANIMATION_ROOT).href;
 // What the loading screen calls each film.
@@ -109,7 +126,7 @@ export function playCinematic(name, { clip, world } = {}) {
     box.innerHTML = '<p class="cine-phase"></p><p class="cine-cap" aria-live="polite"></p><button type="button" class="cine-skip">Skip ›</button><p class="cine-load">Loading…</p>';
     document.body.append(box);
     const cap = box.querySelector('.cine-cap'), phase = box.querySelector('.cine-phase');
-    let done = false, video = null, videoPending = false, endLoader = null;
+    let done = false, video = null, videoPending = false, endLoader = null, stopRetry = null;
     box.insertAdjacentHTML('beforeend', '<p class="cine-buffer-badge" aria-live="polite">Buffering…</p>');
     const playVideo = async () => {
       if (done || video || videoPending) return;
@@ -118,16 +135,17 @@ export function playCinematic(name, { clip, world } = {}) {
       const range = clip ? videoCaps?.clips?.find(c => c.name === clip) : null;   // one clip of a longer film
       if (done) return;
       videoPending = false;
-      video = document.createElement('video'); video.className = 'cine-video';
-      Object.assign(video, { src: VIDEO(name), muted: true, playsInline: true, preload: 'auto' }); video.setAttribute('playsinline', '');
+      video = preloaded.get(name) || filmVideo(name); preloaded.delete(name);
       box.prepend(video); box.classList.add('cine-has-video'); cap.textContent = ''; phase.textContent = '';
       box.querySelector('.cine-load')?.remove();
-      const loader = filmLoader(box, name);
-      const onProgress = () => loader.progress(video);
+      // The loading card only appears if the film is not running after a moment (slow connection), never as a flash.
+      let loader = null;
+      const loaderTimer = setTimeout(() => { if (!done && !box.classList.contains('cine-playing')) { loader = filmLoader(box, name); loader.progress(video); if (video.readyState >= 3) loader.ready(); } }, 900);
+      const onProgress = () => loader?.progress(video);
       for (const ev of ['progress', 'loadedmetadata', 'durationchange']) video.addEventListener(ev, onProgress);
-      video.addEventListener('canplay', () => loader.ready(), { once: true });
-      video.addEventListener('playing', () => loader.done(), { once: true });
-      endLoader = () => loader.done(true);
+      video.addEventListener('canplay', () => loader?.ready());
+      video.addEventListener('playing', () => { clearTimeout(loaderTimer); box.classList.add('cine-playing'); loader?.done(true); preloadCinematic(FILM_NEXT[name]); });
+      endLoader = () => { clearTimeout(loaderTimer); loader?.done(true); };
       // a slow connection mid-film: a small buffering badge instead of a frozen picture
       video.addEventListener('waiting', () => { if (video.currentTime > .2) box.classList.add('cine-buffering'); });
       video.addEventListener('playing', () => box.classList.remove('cine-buffering'));
@@ -152,15 +170,18 @@ export function playCinematic(name, { clip, world } = {}) {
       if (to) video.addEventListener('timeupdate', () => { if (video.currentTime >= to - .05) end(true); });
       video.onended = () => end(true);
       video.onerror = () => { console.warn('Cutscene video unavailable:', name); end(false); };
-      video.play().catch(() => {                       // a browser that blocks autoplay: one tap starts it
-        if (done || !video || box.querySelector('.cine-play')) return;
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'cine-play'; b.textContent = '▶ Play';
-        b.onclick = () => { b.disabled = true; video.play().then(() => b.remove()).catch(() => { b.disabled = false; }); }; box.append(b);
-      });
+      // Play straight away, with no play button. Muted films are allowed to autoplay; if a browser still holds one back,
+      // keep asking as data arrives and on the player's next key press, click or tap anywhere.
+      const tryPlay = () => { if (!done && video?.paused && !video.ended) video.play()?.catch?.(() => {}); };
+      for (const ev of ['loadedmetadata', 'loadeddata', 'canplay']) video.addEventListener(ev, tryPlay);
+      for (const ev of ['pointerdown', 'keydown', 'touchstart']) addEventListener(ev, tryPlay, true);
+      const retry = setInterval(() => { if (done || box.classList.contains('cine-playing')) clearInterval(retry); else tryPlay(); }, 350);
+      stopRetry = () => { clearInterval(retry); for (const ev of ['pointerdown', 'keydown', 'touchstart']) removeEventListener(ev, tryPlay, true); };
+      tryPlay();
     };
     if (world) { world.cinematic = true; for (const k of Object.keys(world.keys || {})) world.keys[k] = false; }
     const end = played => {
-      if (done) return; done = true; video?.pause(); endLoader?.(); removeEventListener('keydown', key, true);
+      if (done) return; done = true; video?.pause(); endLoader?.(); stopRetry?.(); removeEventListener('keydown', key, true);
       box.classList.add('cine-out');
       setTimeout(() => box.remove(), 400);
       if (world) world.cinematic = false;
@@ -180,7 +201,7 @@ export function playCinematic(name, { clip, world } = {}) {
 export function loopCinematic(name, parent) {
   const holder = document.createElement('div'); holder.className = 'cine-loop'; parent.prepend(holder);
   const video = document.createElement('video');
-  Object.assign(video, { src: VIDEO(name), muted: true, playsInline: true, loop: true, preload: 'auto' });
+  Object.assign(video, { src: VIDEO(name), muted: true, defaultMuted: true, playsInline: true, loop: true, autoplay: true, preload: 'auto' }); video.setAttribute('muted', '');
   Object.assign(video.style, { width: '100%', height: '100%', objectFit: 'contain' });
   video.setAttribute('playsinline', ''); holder.append(video);
   let stopped = false;

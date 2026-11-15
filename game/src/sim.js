@@ -88,7 +88,7 @@ export class Outpost {
     this.o2 = d.o2;
     this.food = this.crew * 3;
     this.rations = d.food;
-    this.safetyChecks = { reserves:false, shelter:false }; this.emergencyKWh = 36;
+    this.safetyChecks = { reserves:false, shelter:false }; this.emergencyKWh = 36; this.habBuild = { step: 0, cleared: [], rockHits: {}, frames: [], pressure: 0 };   // a new crew builds its habitat first (habitat-build.js)
     this.powerStep = 0; this.baseConnected=false; this.chargerStep=0; this.roverCharged=false; this.soilStep=0; this.chargeReserve=0;
     this.harvestMeals = 0;
     this.parts = Math.max(0, d.parts + SITES[this.site].parts);

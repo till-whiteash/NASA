@@ -103,7 +103,7 @@ export class Construction {
   if(inside){camera=camera.clone();camera.position.add(room.scene.position);camera.updateMatrixWorld();}
   this.group.updateMatrixWorld(true);this.interior.scene.updateMatrixWorld(true);
   this.ray.setFromCamera(this.world.aimPoint||new THREE.Vector2(0,0),camera);
-  const objects=inside?(this.bench.visible?this.slots.filter(p=>p.visible):[]):[...this.sockets,...this.rubble,...this.ghosts,this.packGhost,this.chargerGhost].filter(p=>p.visible);
+  const objects=inside?(this.bench.visible?this.slots.filter(p=>p.visible):[]):[...this.sockets,...this.rubble,...this.ghosts,this.packGhost,this.chargerGhost,...(this.world.habBuild?.targets()||[])].filter(p=>p.visible);
   let hit=this.ray.intersectObjects(objects,true)[0];
   if(!inside&&this.colony().tool==='pickaxe'){const player=this.world.player.position;for(const sample of this.rockSamples){if(this.removedApplied.has(sample.id)||Math.hypot(sample.position.x-player.x,sample.position.z-player.z)>sample.radius+3.3)continue;this.rockProxy.matrixWorld.copy(sample.matrix);const rock=this.ray.intersectObject(this.rockProxy,false)[0];if(rock&&(!hit||rock.distance<hit.distance)){rock.object=this.world.rocks;rock.instanceId=sample.id;hit=rock;}}}
   if(hit&&hit.object!==this.world.rocks){while(!hit.object.userData.kind&&hit.object.parent)hit.object=hit.object.parent;}
@@ -121,6 +121,7 @@ export class Construction {
  use(){
   if(this.blocked||!this.hit)return false;
   const o=this.state(),s=buildState(o),mesh=this.hit.object,d=mesh.userData;
+  if(d.kind?.startsWith('hab-'))return this.world.habBuild?.use(mesh)??false;   // habitat construction (habitat-build.js)
   if(mesh===this.world.rocks||d.kind==='rubble'){
    if(this.colony().tool!=='pickaxe'){this.guide('Equip the pickaxe from your tool belt before breaking this rock.');return true;}
    if(mesh===this.world.rocks){const near=this.world.nearest();if(near&&['ore','ice','pod','panels','door'].includes(near.type)&&near.d<1.8)return false;}

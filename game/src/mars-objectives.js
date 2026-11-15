@@ -1,3 +1,4 @@
+import {habBuildObjective,habBuildLog} from './habitat-build-state.js';
 // Pure progression: saved simulation fields are the single source of truth.
 export const POWER_TASKS=[
  ['Collect the power kits','Go inside to the storage locker. Take the landed array and battery kits.','locker'],
@@ -8,6 +9,7 @@ export const POWER_TASKS=[
  ['Connect panels to battery','Select Solar OUT, then Battery controller IN. Press E / Action at each socket. R cancels the cable.','power']
 ];
 export function marsObjective(o,c){
+ const hab=habBuildObjective(o,o.habBuild?.modules);if(hab)return hab;
  if(o.safetyChecks&&!o.safetyChecks.reserves)return {id:"safety-reserves",title:"Check your emergency supplies",detail:"Go inside to the power console. Check stored air, meals and the finite emergency battery before building permanent power.",target:"console"};
  if(o.safetyChecks&&!o.safetyChecks.shelter)return {id:"safety-shelter",title:"Find the storm shelter",detail:"Go inside to the shelter bunks and press E / Action. Know where to shelter before your first construction trip.",target:"safety-shelter"};
  if(o.powerStep===2){const b=o.construction||{},cleared=b.cleared?.length||0,placed=b.placed?.field?.length||0;return {id:'power-2',title:cleared<4?'Clear the remote power site':'Place the solar panels',step:cleared<4?`${cleared}/4 rocks cleared · equip pickaxe from belt`:`${placed}/3 panels placed`,detail:cleared<4?'Walk to the marked field away from camp. Aim at each site rock and strike it with your pickaxe using E / Action.':'Aim at each highlighted panel footprint and press E / Action to place an assembled panel.',target:'power'};}
@@ -24,6 +26,7 @@ export function marsObjective(o,c){
  return {id:'explore',title:'Explore and send science',detail:'Optional jobs: collect samples, explore landmarks and upgrade your shelter. See the map and Information for more.',target:null};
 }
 export function missionLog(o,c){return [
+ ...habBuildLog(o,o.habBuild?.modules),
  {title:"Check emergency supplies",done:o.safetyChecks?.reserves!==false},
  {title:"Locate the storm shelter",done:o.safetyChecks?.shelter!==false},
  ...POWER_TASKS.map(([title],i)=>({title,done:o.powerStep>i})),

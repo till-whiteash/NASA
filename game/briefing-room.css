@@ -22,28 +22,25 @@
 @media (max-width: 640px) { .bw-ready { top: auto; bottom: max(26px, env(safe-area-inset-bottom)); transform: none; font-size: 16px; padding: 13px 40px 13px 16px; } .bw-ready:active { transform: translateY(1px); } }
 @media (prefers-reduced-motion: reduce) { .briefing-walk, .bw-tip, .bw-ready { transition: none; } }
 
-/* Video version of a film (src/cinematic.js plays it when the 3D version can't run): captions are in the video. */
-.cinematic { cursor: default; }
-.cinematic .cine-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
-.cinematic.cine-has-video .cine-cap, .cinematic.cine-has-video .cine-phase { display: none; }
-.cinematic .cine-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2; padding: 18px 30px; border: 0; border-radius: 14px; background: #ff7a2f; color: #1b0e07; font: 700 20px/1 Poppins, system-ui, sans-serif; cursor: pointer; }
-.cinematic .cine-skip { z-index: 3; }
-
-/* Full-HD clean briefing: reserve space for text, never crop the film or clamp words. */
-.cinematic.cine-clean-video { display: grid; grid-template-rows: minmax(0, 1fr) 100px; gap: 12px;
-  box-sizing: border-box; padding: max(42px, env(safe-area-inset-top)) 16px max(72px, calc(env(safe-area-inset-bottom) + 60px)); }
-.cinematic.cine-clean-video .cine-video { position: relative; inset: auto; min-height: 0; min-width: 0; object-fit: contain; grid-row: 1; }
-.cinematic.cine-clean-video .cine-cap { display: block; position: static; transform: none; grid-row: 2; justify-self: center; align-self: center;
-  width: min(960px, 100%); max-width: 100%; box-sizing: border-box; padding: 8px 12px;
-  font-size: clamp(14px, 2.2vw, 22px); line-height: 1.35; -webkit-line-clamp: unset; overflow: visible; text-wrap: balance; z-index: 2; }
+/* Films (src/cinematic.js): the movie fills the screen (never cropped), captions sit over the bottom of the picture,
+   Skip top right. Everything is sized from the viewport so nothing is cut off at any window shape. */
+.cinematic { cursor: default; width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; }
+.cinematic .cine-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; opacity: 0; transition: opacity .45s ease; }
+.cinematic.cine-playing .cine-video { opacity: 1; }
+.cinematic.cine-has-video:not(.cine-clean-video) .cine-cap, .cinematic.cine-has-video:not(.cine-clean-video) .cine-phase { display: none; }
+.cinematic .cine-skip { position: absolute; z-index: 3; top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); bottom: auto;
+  padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.25); background: rgba(8,10,14,.55); color: #fff; font: 600 14px/1 Poppins, system-ui, sans-serif; cursor: pointer; backdrop-filter: blur(6px); }
+.cinematic.cine-clean-video .cine-cap { display: block; position: absolute; z-index: 2; left: 50%; transform: translateX(-50%);
+  bottom: max(3.5vh, calc(env(safe-area-inset-bottom) + 12px)); width: max-content; max-width: min(92vw, 1100px); box-sizing: border-box;
+  margin: 0; padding: .5em 1em; border-radius: 12px; background: rgba(4, 6, 10, .62); color: #fff;
+  font: 600 clamp(15px, 1.9vw, 26px)/1.38 Poppins, system-ui, sans-serif; text-align: center; text-wrap: balance;
+  -webkit-line-clamp: unset; overflow: visible; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
 .cinematic.cine-clean-video .cine-cap:empty { display: none; }
-.cinematic.cine-clean-video .cine-phase { display: block; top: max(12px, env(safe-area-inset-top)); left: 16px; right: 16px; }
+.cinematic.cine-clean-video .cine-cap .cine-who { display: block; margin-bottom: .2em; color: #ff8a4c; font-size: .62em; letter-spacing: .16em; font-weight: 700; text-transform: uppercase; }
+.cinematic.cine-clean-video .cine-phase { display: block; position: absolute; z-index: 2; top: max(18px, calc(env(safe-area-inset-top) + 6px)); left: max(18px, env(safe-area-inset-left));
+  right: 130px; margin: 0; color: #ff8a4c; font: 600 clamp(11px, 1.1vw, 14px)/1.2 Poppins, system-ui, sans-serif; letter-spacing: .2em; text-transform: uppercase; text-shadow: 0 1px 4px #000; }
 .cinematic.cine-clean-video .cine-phase:empty { display: none; }
-@media (max-width: 480px) { .cinematic.cine-clean-video { grid-template-rows: minmax(0, 1fr) 120px; } }
-@media (max-height: 450px) { .cinematic.cine-clean-video { grid-template-rows: minmax(0, 1fr) 76px; padding-top: 30px; padding-bottom: 48px; gap: 4px; }
-  .cinematic.cine-clean-video .cine-cap { font-size: 14px; padding: 2px 8px; }
-  .cinematic.cine-clean-video .cine-who { font-size: 10px; margin-bottom: 2px; }
-  .cinematic.cine-clean-video .cine-skip { bottom: 6px; padding: 7px 12px; } }
+@media (max-height: 450px) { .cinematic.cine-clean-video .cine-cap { font-size: 14px; bottom: 8px; padding: 3px 10px; } .cinematic .cine-skip { padding: 6px 12px; font-size: 12px; } }
 
 /* Mission hints must not cover either movie captions or Ewan's landing camera. */
 body:has(.cinematic, .scene-cinematic) #zhetela-message { visibility: hidden; }

@@ -4,6 +4,9 @@ import {Outpost} from '../game/src/sim.js';
 import {marsObjective,missionLog} from '../game/src/mars-objectives.js';
 const facts=JSON.parse(readFileSync(new URL('../game/data/mars-facts.json',import.meta.url))).facts;
 const o=new Outpost('normal',facts),c={farmQuest:{rewarded:false}};
+// A new crew builds its habitat first (habitat-build-state.js), then the safety checks begin.
+for(let i=0;i<6;i++){o.habBuild.step=i;assert.equal(marsObjective(o,c).id,'hab-'+i);}
+o.habBuild.step=6;
 assert.equal(marsObjective(o,c).id,'safety-reserves');
 o.safetyChecks.reserves=true;assert.equal(marsObjective(o,c).id,'safety-shelter');
 o.safetyChecks.shelter=true;
@@ -29,7 +32,7 @@ console.log('Mars commissioning gates, objectives, charging energy budget, shiel
 const legacy=JSON.parse(JSON.stringify(o));delete legacy.safetyChecks;
 assert.equal(marsObjective(legacy,c).id,'explore');
 assert.ok(missionLog(legacy,c).every(t=>t.done));
-const partial=new Outpost('normal',facts);partial.safetyChecks.reserves=true;
+const partial=new Outpost('normal',facts);partial.habBuild.step=6;partial.safetyChecks.reserves=true;
 const loaded=JSON.parse(JSON.stringify(partial));
 assert.equal(marsObjective(loaded,c).id,'safety-shelter');
 console.log('Legacy saves and partially completed safety checks retain their progression.');

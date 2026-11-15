@@ -1,3 +1,5 @@
+import { HabitatBuild } from './habitat-build.js';
+import { habitatBuilt } from './habitat-build-state.js';
 import { extractWater, purifyWater } from './water-processing.js';
 import {AirlockRoom} from './airlock-room.js';
 import {AirlockCycle,canExitHabitat} from './airlock-state.js';
@@ -73,7 +75,7 @@ import { Coop, CoopHud, openCoopDialog } from './coop.js';
 import { RemotePlayers } from './remote-players.js';
 import { nightVote, canSleepAt, morningClock } from './night-vote.js';
 import { SCREEN_MODES, screenName, screenMode, setScreenMode, nextScreenMode, onLayout } from './layout.js';
-import { playCinematic } from './cinematic.js?v=blender-films-3';   // Blender movies in animation/previews/
+import { playCinematic, preloadCinematic } from './cinematic.js?v=films-autoplay-1';   // Blender movies in animation/previews/
 loadModel('sls.glb'); loadModel('mobile-launcher.glb');   // NASA's 3D models start downloading on the title screen
 
 // Phones and tablets: draw fewer pixels, and skip shadows on small screens, so the game stays smooth
@@ -261,7 +263,7 @@ async function resume(d) {
   if (world.lookouts) { world.lookouts.got = new Set(d.lookouts || []); world.lookouts.refresh(); }
   world.mapState?.load(d.map); world.mapState?.sync(true); world.mist?.snap(); placeLander(world);
   world.activeEntrance=world.settlement.entrances[d.entry??0];
-  Object.assign(outpost, { safetyChecks:{reserves:true,shelter:true}, emergencyKWh:0, powerStep: 6, rations: 0, baseConnected:true, chargerStep:0, roverCharged:false,soilStep:0,chargeReserve:0 }, d.outpost); outpost.d={...DIFFICULTY[d.difficulty]};outpost.today = outpost.forecast();
+  Object.assign(outpost, { habBuild:null, safetyChecks:{reserves:true,shelter:true}, emergencyKWh:0, powerStep: 6, rations: 0, baseConnected:true, chargerStep:0, roverCharged:false,soilStep:0,chargeReserve:0 }, d.outpost); outpost.d={...DIFFICULTY[d.difficulty]};outpost.today = outpost.forecast();world.habBuild?.apply(true);   // saves from before habitat building have habBuild null: base already built
   ({ solClock, suit, pending, tutorialStep, sunsetShown } = d);
   eva={equipped:true,checked:true,...d.eva};if(!d.inside)eva={equipped:true,checked:true};
   solClock = (solClock / (d.solSeconds || 37) % 1) * TUNED.solSeconds;
@@ -306,6 +308,8 @@ async function startNew() {
   state.phase = 'cruise';
   await arrive();
 }
+// Start downloading the opening briefing while the title screen is up, so it plays the moment you launch.
+(window.requestIdleCallback || setTimeout)(() => preloadCinematic('ares_vi_briefing'), { timeout: 2500 });
 $('#start').onclick = () => {
   const s = readSave();
   if (!s) return startNew();
@@ -342,6 +346,7 @@ function buildWorld() {
       return list;
     };
     construction = new Construction(world,interior,{state:()=>outpost,colony:()=>colony,save:saveGame,sync:syncPowerHardware,advance:advancePower,guide:zhetela});
+    world.habBuild = new HabitatBuild(world,{state:()=>outpost,colony:()=>colony,save:saveGame,guide:zhetela,notify:t=>toast(t,2500)});   // new crews build the habitat first
     setupMissionHud();syncPowerHardware();
     new Lookouts(world, { modal, onFirst: (spot, i, n) => { outpost.science += 4; if (n === 4 && earn('lookout')) toast('Patch earned: High ground', 5000); } });
     new DetailCull(world);   // skip drawing parts too small to see from the camera
@@ -440,8 +445,8 @@ async function arrive() {
   phoneTips();
   say('welcome');
   modal({ title: 'Welcome to Mars, junior astronaut!', html: `
-    <p><b>First job: get the power on.</b> Take the power kits from the habitat locker, then follow the arrow.</p>
-    <p>At an airlock, aim at the lit handle and ${keyWord('press E','tap Action')}.</p>
+    <p><b>First job: build your habitat.</b> Nothing is built yet, so your lander is your shelter. Follow the arrow to the habitat site, then the quest shows each step: clear the ground, raise the frames, fit the shells and pressurise.</p>
+    <p>To work on something, aim at it and ${keyWord('press E','tap Action')}. Rocks need the pickaxe (1).</p>
     <p>You landed at <b>${outpost.s.name}</b>. ${outpost.s.why}${outpost.site === 'gusev' ? '' : ' The ground you walk on is Gusev Crater, used for training.'}</p>`,
     choices: [{ label: "Let's go!", primary: true }] });
 }
@@ -1067,6 +1072,7 @@ function collect(n) {
 
   if (n.type === 'door' && outpost.leak) return modal({ title: '💨 Air leak at the walkway seal', html: '<p>The leak is right here. Patch it before going in?</p>',
     choices: [{ label: 'Patch it now', cost: 'Uses 1 part', primary: true, onPick: patchLeak }, { label: 'Go inside', onPick: () => startAirlock('in',()=>goInside(n.entrance)) }] });
+  if (n.type === 'door' && !habitatBuilt(outpost)) return zhetela('The habitat is not built and pressurised yet. Follow the quest to finish it; until then your lander is your shelter.');
   if (n.type === 'door') return startAirlock('in',()=>goInside(n.entrance));
   if (n.type === 'ship') return startAirlock('in',()=>goInShip());
   if (n.type === 'ghdoor') return startAirlock('in',()=>goInGreenhouse('out'));
@@ -1663,6 +1669,7 @@ renderer.setAnimationLoop(() => {
     if (inside && room === ghRoom) ghRoom.draw(colony.s.base, GREENHOUSE.tank, outpost.today.total*outpost.split.life>=1);
     if (!inside) { world.stormDust = outpost?.dustCover || 0; world.update(dt, !isModalOpen()); renderer.shadowMap.needsUpdate = world.shadowDirty(dt) && (adaptiveRes.scale >= 1 || (++shadowFrame & 1) === 0); }
     construction?.update(inside,room,isModalOpen()||world.cinematic);
+    if(!inside&&!isModalOpen())world.habBuild?.update(dt);
     if(!isModalOpen()&&room!==airlockRoom)updateMissionPower(dt);
     if (!paused && !outpost.over) {
       const step = dt * state.speed;
@@ -1814,6 +1821,7 @@ function activeMissionObjective(){
 }
 function missionTarget(kind){
   const m=world?.settlement;if(!m)return null;
+  if(kind==='hab')return world.habBuild?.target()||null;
   const socketId=nextWiringSocket(outpost,kind,construction?.wire);const socket=construction?.sockets.find(p=>p.userData.id===socketId);if(socket)return socket.position;
   if(['workbench','greenhouse','locker','water','console','safety-shelter','monitor'].includes(kind))return null; // The objective is the indoor station, never the stairs.
   if(kind==='ice'||kind==='seed-pod')return world.pickups.filter(p=>kind==='ice'?p.kind==='ice':p.kind==='pod'&&p.cargo?.seeds).sort((a,b)=>Math.hypot(a.x-world.player.position.x,a.z-world.player.position.z)-Math.hypot(b.x-world.player.position.x,b.z-world.player.position.z))[0]||null;
