@@ -2,3 +2,6 @@ game/assets/terrain/*.bin binary
 
 # Original NASA model archive; runtime models remain regular website assets.
 /pull/nasa-3d/** filter=lfs diff=lfs merge=lfs -text
+
+# Preserve the exact NASA source bytes used by provenance checks.
+game/assets/nasa/orion/source.gltf.json -text

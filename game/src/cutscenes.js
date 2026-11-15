@@ -6,6 +6,8 @@
 // With { manual: true } they return a handle ({ setTime, total, dispose }) so a test can step through the frames.
 import { holdAwards } from './patches.js';
 import * as THREE from 'three';
+import { effectiveQuality } from './device-profile.js';
+import { GRAPHICS_MODE } from './surface-detail.js';
 import { heightAt } from './world.js';
 
 const clamp01 = x => Math.max(0, Math.min(1, x)), smooth = x => (x = clamp01(x)) * x * (3 - 2 * x), lerp = (a, b, t) => a + (b - a) * t;
@@ -19,14 +21,15 @@ const STORM_T = 12.6, wallZ = t => -430 + 560 * Math.pow(t / STORM_T, 1.3);
 function createStorm(world) {
   const scene = world.scene, cam = world.camera, fog0 = scene.fog && { c: scene.fog.color.clone(), n: scene.fog.near, f: scene.fog.far }, r = seeded(31), gy = heightAt(0, 0);
   const tex = puffTexture(), puffs = [];
-  for (let i = 0; i < 320; i++) {
-    const front = i < 100, dz = front ? -r() * 26 : -Math.pow(r(), 1.5) * 190, hgt = front ? r() * r() * 85 : Math.pow(r(), 1.3) * 110;
+  const quality = effectiveQuality(GRAPHICS_MODE), count = quality === 'low' ? 96 : quality === 'high' ? 240 : 160;
+  for (let i = 0; i < count; i++) {
+    const front = i < Math.round(count * .3125), dz = front ? -r() * 26 : -Math.pow(r(), 1.5) * 190, hgt = front ? r() * r() * 85 : Math.pow(r(), 1.3) * 110;
     const mat = new THREE.SpriteMaterial({ map: tex, color: '#a8643a', transparent: true, depthWrite: false, fog: false, opacity: .6 });
     const sp = new THREE.Sprite(mat); sp.userData = { x: (r() - .5) * 900, dz, hgt, s: front ? 50 + r() * 50 : 55 + r() * 80 + hgt * .4, rot: r() * 6, spin: (r() - .5) * .3, ph: r() * 6, deep: -dz / 190, front };
     scene.add(sp); puffs.push(sp);
   }
   // wind-blown grit around the camera
-  const N = 2200, pp = new Float32Array(N * 3), seed = new Float32Array(N * 3); for (let i = 0; i < N * 3; i++) seed[i] = r();
+  const N = quality === 'low' ? 600 : 1200, pp = new Float32Array(N * 3), seed = new Float32Array(N * 3); for (let i = 0; i < N * 3; i++) seed[i] = r();
   const grit = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(pp, 3)), new THREE.PointsMaterial({ map: glowTexture(), color: '#e0a070', size: .55, alphaTest: .02, transparent: true, opacity: 0, depthWrite: false, sizeAttenuation: true, fog: false }));
   grit.frustumCulled = false; scene.add(grit);
   let tint = 0;
@@ -55,7 +58,7 @@ function createStorm(world) {
     grit.geometry.attributes.position.needsUpdate = true; if (shot === 1) grit.material.opacity *= .3;
     return tint;
   };
-  return { frame, dispose: () => { puffs.forEach(s => { scene.remove(s); s.material.dispose(); }); scene.remove(grit); grit.geometry.dispose(); scene.fog.color.copy(fog0.c); scene.fog.near = fog0.n; scene.fog.far = fog0.f; } };
+  return { frame, surfaceFocus: world.player.position.clone(), warmupTimes: [0, 4.3, 8], pixelBudget: quality === 'high' ? 1920 * 1080 : 1280 * 720, dispose: () => { puffs.forEach(s => { scene.remove(s); s.material.dispose(); }); scene.remove(grit); grit.geometry.dispose(); grit.material.dispose(); scene.fog.color.copy(fog0.c); scene.fog.near = fog0.n; scene.fog.far = fog0.f; } };
 }
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
@@ -119,15 +122,20 @@ function runScene(create, { world, total, caps, title, manual, fadeIn }) {
   setTime(0);
   if (manual) return { setTime, total, dispose, root };
   return new Promise(res => {
-    let done = false, raf, t0 = null;
+    let done = false, raf, lastTime = null, elapsed = 0;
     const finish = () => { if (done) return; done = true; cancelAnimationFrame(raf); removeEventListener('keydown', key, true); dispose(); res(); };
     const key = e => { if (['Space', 'Escape', 'Enter'].includes(e.code)) { e.preventDefault(); e.stopImmediatePropagation(); finish(); } };
     addEventListener('keydown', key, true); root.addEventListener('click', finish);
-    const loop = now => { t0 ??= now; const t = (now - t0) / 1000; if (t >= total) return finish(); setTime(t); raf = requestAnimationFrame(loop); };
+    const loop = now => {
+      if (lastTime !== null && !document.hidden) elapsed += Math.min(.1, (now - lastTime) / 1000);
+      lastTime = now;
+      if (elapsed >= total) return finish();
+      setTime(elapsed); raf = requestAnimationFrame(loop);
+    };
     const prepare = async () => {
       world.cutscenePreparing = true;
       blk.style.opacity = 1;
-      cap.textContent = scene.surfaceFocus ? 'Preparing landing…' : 'Preparing scene…'; cap.style.opacity = 1;
+      cap.textContent = create === createLanding ? 'Preparing landing…' : 'Preparing scene…'; cap.style.opacity = 1;
       try {
         // Warm the entry, parachute and surface variants; frame(0) alone hides the terrain and engines.
         for (const t of scene.warmupTimes || [0]) {

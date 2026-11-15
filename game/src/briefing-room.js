@@ -1,11 +1,15 @@
 import * as THREE from 'three';
+import { GRAPHICS_MODE } from './surface-detail.js';
+import { effectiveQuality } from './device-profile.js';
 import { loadModel } from './nasamodels.js';
-import { fillCrewSlots, LOOKS, BASE } from './cinematic.js?v=films-autoplay-1';
+import { fillCrewSlots, LOOKS, BASE } from './cinematic.js';
 
 // The Ares VI briefing room as a place you can walk around after Director Hale's briefing: get up from your seat,
 // look at the hologram and the mission screens, talk to the crew, then press "Ready for launch" (right side) to go
 // to the launch pad. Resolves when the player is ready. Same room, crew and lighting as the ares_vi_briefing film.
 // Controls: WASD / arrow keys to walk, Shift to hurry, drag to look; on touch, the pad bottom-left walks.
+let activeRooms = 0;
+export const isBriefingRoomActive = () => activeRooms > 0;
 const ROOM_R = 7.2, EYE = 1.62;
 const OBSTACLES = [
   { x: 0, z: 0, r: 1.45 },                                                     // hologram table
@@ -44,8 +48,11 @@ export function walkBriefingRoom({ destination = 'mars' } = {}) {
       <p class="bw-load">Loading the briefing room…</p>`;
     document.body.append(box);
     const canvas = box.querySelector('canvas'), tip = box.querySelector('.bw-tip');
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    const low = effectiveQuality(GRAPHICS_MODE) === 'low';
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: !low });
+    activeRooms++;
+    const budget = low ? 960 * 540 : 1920 * 1080;
+    renderer.setPixelRatio(Math.min(devicePixelRatio, low ? 1 : 1.5, Math.sqrt(budget / (innerWidth * innerHeight)))); renderer.toneMapping = THREE.ACESFilmicToneMapping;
     const look = LOOKS.room, scene = new THREE.Scene(); scene.background = new THREE.Color(look.bg);
     scene.add(new THREE.HemisphereLight(look.sky, look.ground, look.hemi + .25));
     const sun = new THREE.DirectionalLight('#ffffff', look.sunI); sun.position.set(-3, 6, 4); scene.add(sun);
@@ -60,7 +67,8 @@ export function walkBriefingRoom({ destination = 'mars' } = {}) {
       if (done || !gltf) return;
       const root = gltf.scene.clone(true); scene.add(root);
       root.traverse(o => { if (o.isCamera || /^tag_/.test(o.name)) o.visible = false; });   // name tags face the film camera; from behind they read backwards
-      await fillCrewSlots(root, mixers).catch(e => console.warn('Crew could not load:', e));
+      await fillCrewSlots(root, mixers, () => !done).catch(e => console.warn('Crew could not load:', e));
+      if (done) return;
       // you got up: your seat (YOU · ENGINEER 2, the chair at x = -0.8) is empty now
       root.updateMatrixWorld(true);
       root.traverse(o => { if (o.userData?.crew_char && /crew/.test(o.name)) { const p = o.getWorldPosition(new THREE.Vector3()); if (Math.abs(p.x + .8) < .5 && p.z > 1.5) o.visible = false; } });
@@ -97,6 +105,11 @@ export function walkBriefingRoom({ destination = 'mars' } = {}) {
     const finish = () => {
       if (done) return; done = true; cancelAnimationFrame(raf);
       removeEventListener('keydown', kd, true); removeEventListener('keyup', ku, true);
+      activeRooms--;
+      mixer?.stopAllAction(); if (mixer) mixer.uncacheRoot(mixer.getRoot());
+      for (const m of mixers) { m.stopAllAction(); m.uncacheRoot(m.getRoot()); }
+      scene.traverse(o => { if (o.userData.cinematicTint) o.material.dispose(); o.skeleton?.dispose(); });
+      scene.clear();
       renderer.dispose(); renderer.forceContextLoss?.();
       box.classList.add('bw-out'); setTimeout(() => box.remove(), 400);
       resolve(true);
@@ -108,7 +121,7 @@ export function walkBriefingRoom({ destination = 'mars' } = {}) {
       const d = Math.hypot(p.x, p.z); if (d > ROOM_R) { p.x *= ROOM_R / d; p.z *= ROOM_R / d; }
       for (const o of OBSTACLES) { const dx = p.x - o.x, dz = p.z - o.z, l = Math.hypot(dx, dz); if (l < o.r + .3) { const k = (o.r + .3) / (l || 1); p.x = o.x + dx * k; p.z = o.z + dz * k; } }
     };
-    let bob = 0, lastTip = '';
+    let bob = 0, lastTip = '', width = 0, height = 0;
     const tick = now => {
       const dt = Math.min(.05, (now - last) / 1000); last = now;
       let f = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) - pad.y;
@@ -126,7 +139,11 @@ export function walkBriefingRoom({ destination = 'mars' } = {}) {
       if (near !== lastTip) { lastTip = near; tip.textContent = near; tip.classList.toggle('on', !!near); }
       mixer?.update(dt); for (const m of mixers) m.update(dt);
       const w = box.clientWidth || innerWidth, h = box.clientHeight || innerHeight;
-      renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix();
+      if (w !== width || h !== height) {
+        width = w; height = h;
+        renderer.setPixelRatio(Math.min(devicePixelRatio, low ? 1 : 1.5, Math.sqrt(budget / (w * h))));
+        renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix();
+      }
       renderer.render(scene, cam);
       raf = requestAnimationFrame(tick);
     };

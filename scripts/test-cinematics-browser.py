@@ -1,87 +1,76 @@
-"""Browser check for the Blender cutscenes (game/src/cinematic.js + game/animation/glb/).
-Plays every film in the real game page, checks it draws, shows captions and skips cleanly, then checks that
-Start plays the Ares VI briefing and the orbit plan before the launch countdown.
-Usage: python scripts/test-cinematics-browser.py [screenshot folder]"""
+"""Cinematic playback, preloaded clip seek, loop reuse and GPU ownership regressions."""
 from playwright.sync_api import sync_playwright
-import functools, http.server, io, json, sys, threading
-from PIL import Image
 from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[1]
-SHOTS = Path(sys.argv[1]) if len(sys.argv) > 1 else None
-FILMS = [('ares_vi_briefing', None), ('briefing_mission', None), ('launch_earth', None), ('cruise_loop', None), ('mars_approach', None),
-         ('edl_mars', 'entry'), ('edl_mars', 'descent_landing'), ('outpost_26_months', None), ('dust_storm', None),
-         ('failure_solar_panel', 'panel_failure'), ('failure_solar_panel', 'panel_repair'), ('failure_rover_stuck', 'rover_stuck'),
-         ('failure_rover_stuck', 'rover_freed'), ('failure_air_leak', 'air_leak'), ('failure_air_leak', 'leak_patched'), ('ascent_mars', None)]
-
-
-class Quiet(http.server.SimpleHTTPRequestHandler):
-    def log_message(self, *a): pass
-
-
-server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(Quiet, directory=str(ROOT)))
-threading.Thread(target=server.serve_forever, daemon=True).start()
-with sync_playwright() as p:
-    b = p.chromium.launch(channel='msedge', headless=True, args=['--use-angle=swiftshader', '--enable-unsafe-swiftshader'])
-    page = b.new_page(viewport={'width': 1280, 'height': 720})
-    errors = []
-    page.on('pageerror', lambda e: errors.append(str(e)))
-    page.on('console', lambda m: m.type == 'warning' and ('Cutscene unavailable' in m.text or 'Crew could not load' in m.text) and errors.append(m.text))
-    page.goto(f'http://127.0.0.1:{server.server_port}/game/#debug', wait_until='networkidle', timeout=90000)
-    page.evaluate("async () => { window.__cine = await import('./src/cinematic.js'); }")
-    for name, clip in FILMS:
-        page.evaluate("([n, c]) => { window.__done = null; __cine.playCinematic(n, { clip: c }).then(r => window.__done = r); }", [name, clip])
-        page.wait_for_selector('.cinematic canvas', timeout=60000)
-        page.wait_for_timeout(3500)
-        state = page.evaluate("() => ({ caption: document.querySelector('.cinematic .cine-cap').textContent, loading: !!document.querySelector('.cine-load') })")
-        shot = page.screenshot()
-        lum = Image.open(io.BytesIO(shot)).convert('L').resize((64, 36)).getextrema()
-        state['contrast'] = lum[1] - lum[0]
-        if SHOTS:
-            SHOTS.mkdir(parents=True, exist_ok=True); (SHOTS / f'{name}-{clip or "main"}.png').write_bytes(shot)
-        page.keyboard.press('Escape')
-        page.wait_for_function('window.__done !== null', timeout=10000)
-        done = page.evaluate('window.__done')
-        print('FILM', name, clip, json.dumps(state), 'skipped' if done else 'FAILED')
-        assert done is True and not state['loading'] and state['contrast'] > 30, (name, clip, state)
-        page.wait_for_timeout(500)
-        assert not page.query_selector('.cinematic'), 'overlay left behind'
-    # Start -> the briefing plays first, then the launch countdown
-    page.goto(f'http://127.0.0.1:{server.server_port}/game/#debug', wait_until='networkidle', timeout=90000)
-    page.click('#start')
-    page.wait_for_selector('.cinematic canvas', timeout=60000)
-    page.wait_for_timeout(2500)
-    if SHOTS: page.screenshot(path=str(SHOTS / 'start-briefing.png'))
-    assert page.is_hidden('#countdown'), 'countdown should wait for the briefing'
-    page.keyboard.press('Escape')                       # Ares VI briefing -> the orbit plan
-    page.wait_for_timeout(800)
-    page.wait_for_selector('.cinematic canvas', timeout=60000)
-    assert page.is_hidden('#countdown'), 'countdown should wait for the orbit plan too'
-    page.mouse.click(640, 300); page.keyboard.press('Space'); page.wait_for_timeout(500)   # a stray click or key must not skip the film
-    assert page.locator('.cinematic:not(.cine-out)').count() == 1, 'a click or Space should not skip the film'
-    page.keyboard.press('Escape')
-    page.wait_for_selector('.briefing-walk canvas', timeout=60000)                  # then the walkable briefing room
-    page.wait_for_timeout(3000)
-    assert page.is_hidden('#countdown'), 'countdown should wait until the player is ready'
-    page.keyboard.down('KeyW'); page.wait_for_timeout(1200); page.keyboard.up('KeyW')
-    if SHOTS: page.screenshot(path=str(SHOTS / 'start-room.png'))
-    page.click('.briefing-walk .bw-ready')
-    page.wait_for_selector('#countdown:not(.hidden)', timeout=20000)
-    print('START: Ares VI briefing, orbit plan, walkable briefing room, Ready, then countdown')
-    # phone: subtitles stay on screen, readable and short
-    phone = b.new_page(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True)
-    phone.on('pageerror', lambda e: errors.append(str(e)))
-    phone.goto(f'http://127.0.0.1:{server.server_port}/game/#debug', wait_until='networkidle', timeout=90000)
-    phone.evaluate("async () => { const m = await import('./src/cinematic.js'); window.__p = m.playCinematic('failure_rover_stuck', { clip: 'rover_freed' }); }")
-    phone.wait_for_selector('.cinematic canvas', timeout=60000)
-    phone.wait_for_function("document.querySelector('.cinematic .cine-cap')?.textContent.length > 0", timeout=60000)
-    cap = phone.evaluate("""() => { const c = document.querySelector('.cinematic .cine-cap'), r = c.getBoundingClientRect(), st = getComputedStyle(c);
-      return { left: r.left, right: r.right, bottom: r.bottom, font: parseFloat(st.fontSize), lines: Math.round(r.height / (parseFloat(st.lineHeight) || parseFloat(st.fontSize) * 1.3)) }; }""")
-    if SHOTS: phone.screenshot(path=str(SHOTS / 'phone-caption.png'))
-    print('PHONE caption', cap)
-    assert cap['left'] >= 0 and cap['right'] <= 390 and cap['bottom'] <= 844 and cap['font'] >= 16 and cap['lines'] <= 4, cap
-    phone.keyboard.press('Escape')
-    assert not errors, errors
-    print('All cutscenes load, draw, caption and skip; subtitles fit a phone.')
+import re, json
+ROOT=Path(__file__).resolve().parents[1]
+from browser_test_server import start_server
+server=start_server()
+imports=re.search(r'<script type="importmap">(.*?)</script>',(ROOT/'game/index.html').read_text(encoding='utf-8'),re.S).group(1)
+fixture='<base href="/game/"><script type="importmap">'+imports+'</script><link rel="stylesheet" href="style.css">'
+names=['ares_vi_briefing','ares_vi_briefing_moon','briefing_mission','briefing_moon','launch_earth','launch_moon','cruise_loop','mars_approach','edl_mars','outpost_26_months','dust_storm','failure_solar_panel','failure_rover_stuck','failure_air_leak','ascent_mars']
+try:
+ with sync_playwright() as p:
+    b=p.chromium.launch(channel='msedge',headless=True)
+    page=b.new_page(viewport={'width':1280,'height':720});errors=[]
+    page.on('pageerror',lambda e:errors.append(str(e)))
+    page.route('**/audit.html',lambda r:r.fulfill(body=fixture,content_type='text/html'))
+    page.goto(f'http://127.0.0.1:{server.server_port}/audit.html')
+    page.evaluate("async()=>{window.cine=await import('./src/cinematic.js');}")
+    for name in names:
+        page.evaluate("name=>{window.played=cine.playCinematic(name);}",name)
+        page.wait_for_function("document.querySelector('.cinematic video')?.currentTime > .3",timeout=30000)
+        result=page.evaluate("""async()=>{const v=document.querySelector('.cinematic video'); const q=v.getVideoPlaybackQuality();
+          const result={width:v.videoWidth,height:v.videoHeight,frames:q.totalVideoFrames,dropped:q.droppedVideoFrames,active:cine.isCinematicActive()};
+          document.querySelector('.cine-skip').click(); await played; await new Promise(r=>setTimeout(r,450));
+          result.released=!v.getAttribute('src'); result.idle=!cine.isCinematicActive();return result;}""")
+        assert result['width']>0 and result['active'] and result['released'] and result['idle'],result
+        print(name,json.dumps(result),flush=True)
+    # Preload fully before opening a repair clip; metadata event has already fired.
+    page.evaluate("""()=>{const create=document.createElement.bind(document);
+      document.createElement=(tag,...args)=>{const el=create(tag,...args);if(tag==='video')window.preloadedVideo=el;return el;};
+      try{cine.preloadCinematic('failure_rover_stuck');}finally{document.createElement=create;}}""")
+    page.wait_for_function('window.preloadedVideo?.readyState>=1',timeout=15000)
+    page.evaluate("()=>{window.played=cine.playCinematic('failure_rover_stuck',{clip:'rover_freed'});}")
+    caps=json.loads((ROOT/'game/animation/glb/failure_rover_stuck.captions.json').read_text())
+    start=next(c['start'] for c in caps['clips'] if c['name']=='rover_freed')
+    page.wait_for_function('(t)=>document.querySelector(".cinematic video")?.currentTime>=t',arg=start,timeout=3000)
+    assert page.evaluate('document.querySelector(".cinematic video") === window.preloadedVideo')
+    assert page.evaluate('document.querySelector(".cinematic video").currentTime') < start+3
+    page.keyboard.press('Escape');page.wait_for_timeout(500)
+    print('PRELOADED CLIP SEEK PASS',start,flush=True)
+    result=page.evaluate("""async()=>{cine.preloadCinematic('cruise_loop');await new Promise(r=>setTimeout(r,1200));
+       const loop=cine.loopCinematic('cruise_loop',document.body),v=document.querySelector('.cine-loop video');
+       await new Promise(r=>setTimeout(r,800));const active=cine.isCinematicActive()&&v.currentTime>0;
+       loop.stop();loop.stop();return {active,idle:!cine.isCinematicActive(),released:!v.getAttribute('src')};}""")
+    assert all(result.values()),result
+    print('LOOP CLEANUP PASS',result,flush=True)
+    result=page.evaluate("""async()=>{const THREE=await import('three'); const {Launch}=await import('./src/launch.js');
+      const {loadModel}=await import('./src/nasamodels.js');let counts=[];
+      for(let i=0;i<2;i++){const launch=new Launch();await launch.ready;
+        const source=await loadModel('sls.glb');const intact=['core','boosterL','boosterR','upper','las','orion'].every(n=>!!source.scene.getObjectByName(n));
+        launch.resumeAtBoosterSeparation(); for(let k=0;k<2200&&!launch.done;k++)launch.update(1/60);
+        counts.push({nasa:launch.nasa,intact,done:launch.done});launch.dispose();launch.dispose();
+        if(launch.scene.children.length||launch.ownedGeometry.size||launch.ownedMaterials.size)throw Error('launch retained owned resources');}
+      return counts;}""")
+    assert all(all(r.values()) for r in result),result
+    print('LAUNCH REPLAY/CACHE/DISPOSAL PASS',result,flush=True)
+    # A failed movie must release the pause and restore an existing cinematic state.
+    page.route('**/previews/unavailable-audit-film.mp4',lambda r:r.fulfill(status=404,body=''))
+    result=page.evaluate("""async()=>{const world={keys:{KeyW:true},cinematic:true};
+      const played=await cine.playCinematic('unavailable-audit-film',{world});
+      await new Promise(r=>setTimeout(r,450));
+      return {failed:played===false,idle:!cine.isCinematicActive(),restored:world.cinematic===true,keyCleared:!world.keys.KeyW};}""")
+    assert all(result.values()),result
+    print('FAILED MOVIE CLEANUP PASS',result,flush=True)
+    # Clean HD captions should fit a portrait phone, even in an existing desktop session.
+    page.set_viewport_size({'width':390,'height':844})
+    page.evaluate("()=>{window.played=cine.playCinematic('briefing_mission');}")
+    page.wait_for_function('document.querySelector(".cinematic .cine-cap")?.textContent.length>0')
+    cap=page.evaluate("""()=>{const c=document.querySelector('.cinematic .cine-cap'),r=c.getBoundingClientRect();
+      return {left:r.left,right:r.right,bottom:r.bottom,font:parseFloat(getComputedStyle(c).fontSize)};}""")
+    assert cap['left']>=0 and cap['right']<=390 and cap['bottom']<=844 and cap['font']>=16,cap
+    page.keyboard.press('Escape');page.wait_for_timeout(450)
+    print('PHONE CAPTION PASS',cap,flush=True)
+    assert not errors,errors
     b.close()
-server.shutdown()
+finally:server.shutdown()

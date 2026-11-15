@@ -45,7 +45,11 @@ class H(http.server.SimpleHTTPRequestHandler):
             outputfile.write(block); remaining -= len(block)
 
     def log_message(self, *a): pass
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
-port = int(sys.argv[1]) if len(sys.argv) > 1 else 8778
-socketserver.TCPServer.allow_reuse_address = True
-with socketserver.ThreadingTCPServer(('127.0.0.1', port), H) as s: s.serve_forever()
+def main():
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8778
+    socketserver.TCPServer.allow_reuse_address = True
+    with socketserver.ThreadingTCPServer(('127.0.0.1', port), H) as s: s.serve_forever()
+
+if __name__ == '__main__':
+    main()

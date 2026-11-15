@@ -14,19 +14,20 @@ const crewLoader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const crewCache = new Map();
 const crewFile = f => { if (!crewCache.has(f)) crewCache.set(f, crewLoader.loadAsync('assets/crew/' + f)); return crewCache.get(f); };
 const norm = n => n.replace(/^mixamorig\d*:?/, '').replace(/_\d+$/, '');
-export async function fillCrewSlots(root, mixers) {
+export async function fillCrewSlots(root, mixers, isActive = () => true) {
   const slots = []; root.traverse(o => { if (o.userData?.crew_char) slots.push(o); });
   if (!slots.length) return;
   const clips = (await crewFile('crew-anims.glb')).animations;
   await Promise.all(slots.map(async slot => {
     const d = slot.userData, g = await crewFile(d.crew_char + '.glb');
     const { clone } = await import('three/addons/utils/SkeletonUtils.js');
+    if (!isActive()) return;
     const model = clone(g.scene);
     model.updateWorldMatrix(true, true);
     const h = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3()).y || 1;
     model.scale.multiplyScalar((d.crew_height || 1.7) / h);
     const tint = d.crew_tint && new THREE.Color(...d.crew_tint), match = d.crew_tint_match && new RegExp(d.crew_tint_match);
-    model.traverse(o => { if (o.isMesh) { o.frustumCulled = false; if (tint && match.test(o.name)) { o.material = o.material.clone(); o.material.color.multiply(tint); } } });
+    model.traverse(o => { if (o.isMesh) { o.frustumCulled = false; if (tint && match?.test(o.name)) { o.userData.cinematicTint = true; o.material = o.material.clone(); o.material.color.multiply(tint); } } });
     slot.add(model);
     const byName = {};
     model.traverse(o => { if (/^mixamorig/.test(o.name) && norm(o.parent?.name ?? '') !== norm(o.name)) (byName[norm(o.name)] ??= []).push(o.name); });
@@ -53,7 +54,10 @@ const HD_FILMS = new Set(['ares_vi_briefing', 'ares_vi_briefing_moon', 'launch_m
 const CLEAN_VIDEO = name => HD_FILMS.has(name);
 // The film that usually follows each one: it starts downloading while this one plays, so there is no wait between them.
 const FILM_NEXT = { ares_vi_briefing: 'briefing_mission', briefing_mission: 'launch_earth', launch_earth: 'cruise_loop',
-  ares_vi_briefing_moon: 'briefing_moon', briefing_moon: 'launch_moon', mars_approach: 'outpost_26_months' };
+  ares_vi_briefing_moon: 'briefing_moon', briefing_moon: 'launch_moon', mars_approach: null };
+// Includes transition fades and loading loops: the hidden game must not compete for GPU time.
+let activeFilms = 0;
+export const isCinematicActive = () => activeFilms > 0;
 const preloaded = new Map();
 let preloadExpiry;
 function releaseVideo(video) {
@@ -133,6 +137,7 @@ function captionsFor(name) {
 }
 
 export function playCinematic(name, { clip, world, onSkip } = {}) {
+  activeFilms++;
   return new Promise(resolve => {                    // plays even with reduced motion: the films carry the story
     const box = document.createElement('section'); box.className = 'cinematic'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Cutscene');
     box.innerHTML = '<p class="cine-phase"></p><p class="cine-cap" aria-live="polite"></p><button type="button" class="cine-skip">Skip ›</button><p class="cine-load">Loading…</p>';
@@ -178,7 +183,10 @@ export function playCinematic(name, { clip, world, onSkip } = {}) {
         updateCaptions();
       }
       const from = range?.start || 0, to = range?.end;
-      video.addEventListener('loadedmetadata', () => { if (from) video.currentTime = from; }, { once: true });
+      // A preloaded video has already emitted loadedmetadata. Seek it immediately too.
+      const seekStart = () => { if (from && !done) video.currentTime = from; };
+      if (video.readyState >= 1) seekStart();
+      else video.addEventListener('loadedmetadata', seekStart, { once: true });
       if (to) video.addEventListener('timeupdate', () => { if (video.currentTime >= to - .05) end(true); });
       video.onended = () => end(true);
       video.onerror = () => { console.warn('Cutscene video unavailable:', name); end(false); };
@@ -191,13 +199,13 @@ export function playCinematic(name, { clip, world, onSkip } = {}) {
       stopRetry = () => { clearInterval(retry); for (const ev of ['pointerdown', 'keydown', 'touchstart']) removeEventListener(ev, tryPlay, true); };
       tryPlay();
     };
-    const previousVideo = world?.cinematicVideo;
+    const previousVideo = world?.cinematicVideo, previousCinematic = world?.cinematic;
     if (world) { world.cinematicVideo = true; world.cinematic = true; for (const k of Object.keys(world.keys || {})) world.keys[k] = false; }
     const end = played => {
       if (done) return; done = true; video?.pause(); endLoader?.(); stopRetry?.(); removeEventListener('keydown', key, true);
       box.classList.add('cine-out');
-      setTimeout(() => { releaseVideo(video); box.remove(); }, 400);
-      if (world) { world.cinematic = false; world.cinematicVideo = previousVideo; }
+      setTimeout(() => { releaseVideo(video); box.remove(); activeFilms--; }, 400);
+      if (world) { world.cinematic = previousCinematic; world.cinematicVideo = previousVideo; }
       resolve(played);
     };
     const advance = () => { onSkip?.(); end(true); };
@@ -212,9 +220,10 @@ export function playCinematic(name, { clip, world, onSkip } = {}) {
 
 // Looping background (the loading screen during the trip). Captions show under it; stop() removes it.
 export function loopCinematic(name, parent) {
+  activeFilms++;
   const holder = document.createElement('div'); holder.className = 'cine-loop'; parent.prepend(holder);
-  const video = preloaded.get(name) || document.createElement('video'); preloaded.delete(name);
-  Object.assign(video, { src: VIDEO(name), muted: true, defaultMuted: true, playsInline: true, loop: true, autoplay: true, preload: 'auto' }); video.setAttribute('muted', '');
+  const video = preloaded.get(name) || filmVideo(name); preloaded.delete(name);
+  Object.assign(video, { muted: true, defaultMuted: true, playsInline: true, loop: true, autoplay: true, preload: 'auto' }); video.setAttribute('muted', '');
   Object.assign(video.style, { width: '100%', height: '100%', objectFit: 'contain' });
   video.setAttribute('playsinline', ''); holder.append(video);
   let stopped = false;
@@ -227,5 +236,5 @@ export function loopCinematic(name, parent) {
     });
   }
   video.play().catch(() => {});
-  return { stop() { stopped = true; video.pause(); video.removeAttribute('src'); video.load(); holder.remove(); } };
+  return { stop() { if (stopped) return; stopped = true; releaseVideo(video); holder.remove(); activeFilms--; } };
 }

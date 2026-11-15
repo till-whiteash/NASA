@@ -54,7 +54,7 @@ import { Mist } from './mist.js';
 import { Capsule } from './capsule.js';
 import { Greenhouse } from './greenhouse.js';
 import { showMissionPath } from './missionpath.js';
-import { walkBriefingRoom } from './briefing-room.js?v=blender-films-3';
+import { walkBriefingRoom, isBriefingRoomActive } from './briefing-room.js';
 import { showArrival } from './arrival.js';
 import { Survival } from './survival.js';
 import { playLanding, playStorm, placeLander } from './cutscenes.js';
@@ -75,7 +75,7 @@ import { Coop, CoopHud, openCoopDialog } from './coop.js';
 import { RemotePlayers } from './remote-players.js';
 import { nightVote, canSleepAt, morningClock } from './night-vote.js';
 import { SCREEN_MODES, screenName, screenMode, setScreenMode, nextScreenMode, onLayout } from './layout.js';
-import { playCinematic, preloadCinematic } from './cinematic.js?v=films-autoplay-1';   // Blender movies in animation/previews/
+import { playCinematic, preloadCinematic, isCinematicActive } from './cinematic.js';   // Blender movies in animation/previews/
 loadModel('sls.glb'); loadModel('mobile-launcher.glb');   // NASA's 3D models start downloading on the title screen
 
 // Phones and tablets: draw fewer pixels, and skip shadows on small screens, so the game stays smooth
@@ -429,6 +429,7 @@ function buildWorld() {
 // ---------------- after lift-off: how we get there, then arrival ----------------
 
 async function arrive() {
+  launch?.dispose(); launch = null;
   $('#countdown').classList.add('hidden'); $('#skip')?.remove(); $('#retry-launch')?.remove();
   // Clear launch captions before waiting for network-dependent base assets.
   const ready = await waitForBase(world.ready, { trip: true, minMs: 9000 });
@@ -1639,6 +1640,8 @@ function showStory() {
 }
 $('#loading').classList.add('hidden');
 renderer.setAnimationLoop(() => {
+  // Opening/arrival films have no world argument, but still cover the whole canvas.
+  if (isCinematicActive() || isBriefingRoomActive()) { clock.getDelta(); return; }
   adaptiveRes.tick();
   const dt = Math.min(clock.getDelta(), 0.05);
   // Shadows are redrawn only when something that casts them moved (you, the rover, the sun) and about ten times a

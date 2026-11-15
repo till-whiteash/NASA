@@ -39,6 +39,8 @@ function textSprite(text) {
 
 export class Launch {
   constructor() {
+    this.disposed = false;
+    this.ownedGeometry = new Set(); this.ownedMaterials = new Set(); this.ownedTextures = new Set();
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#7fb2e5');
     this.scene.fog = new THREE.Fog('#a9cdef', 120, 900);
@@ -73,17 +75,17 @@ export class Launch {
     // NASA's Vehicle Assembly Building (NASA 3D Resources) in the distance, where SLS is stacked before it rolls out.
     // Really about 5 km from the pad - moved closer so it shows through the haze. Its NASA logo becomes our badge.
     loadModel('vab.glb').then(async g => {
-      if (!g) return;
+      if (!g || this.disposed) return;
       const m = g.scene.clone(), size = new THREE.Box3().setFromObject(m).getSize(new THREE.Vector3());
       m.scale.setScalar(160 * (82 / 98) / size.y);                    // 160 m tall
       const b = new THREE.Box3().setFromObject(m); m.position.set(-420 - (b.min.x + b.max.x) / 2, -b.min.y, -380 - (b.min.z + b.max.z) / 2);
       m.rotation.y = 0.5;
-      const mats = []; m.traverse(o => { if (o.isMesh) mats.push(...[].concat(o.material)); });
+      const mats = []; m.traverse(o => { if (o.isMesh) { const copies = [].concat(o.material).map(mt => { const copy = mt.clone(); this.ownedMaterials.add(copy); return copy; }); o.material = Array.isArray(o.material) ? copies : copies[0]; mats.push(...copies); } });
       for (const mt of mats) {
         mt.transmission = 0; mt.metalness = 0; mt.roughness = 0.8;
-        if (mt.map?.image?.width >= 512) mt.map = await replaceLogos(mt.map, [{ x: 0.886, y: 0.933, r: 0.05 }]);
+        if (mt.map?.image?.width >= 512) { const original = mt.map; mt.map = await replaceLogos(original, [{ x: 0.886, y: 0.933, r: 0.05 }]); if (mt.map !== original) { if (this.disposed) mt.map.dispose(); else this.ownedTextures.add(mt.map); } }
       }
-      this.scene.add(m);
+      if (!this.disposed) this.scene.add(m);
     });
 
     // Simple mobile launcher tower - replaced by NASA's own 3D model as soon as it loads
@@ -161,6 +163,11 @@ export class Launch {
 
     this.t = 0; this.countFrom = 10; this.done = false;
     this.modelsReady=false;this.modelError=false;
+    // Own the procedural scenery, but never dispose geometry borrowed from the NASA cache.
+    this.scene.traverse(o => {
+      if (o.geometry) this.ownedGeometry.add(o.geometry);
+      for (const m of [].concat(o.material || [])) { this.ownedMaterials.add(m); for (const v of Object.values(m)) if (v?.isTexture) this.ownedTextures.add(v); }
+    });
     this.ready=this.useNasaModels();
   }
 
@@ -171,6 +178,7 @@ export class Launch {
       Promise.all([loadModel('sls.glb'),loadModel('mobile-launcher.glb')]),
       new Promise(resolve=>{timeout=setTimeout(()=>resolve([null,null]),30000);})
     ]).finally(()=>clearTimeout(timeout));
+    if (this.disposed) return;
     if(!sls||!ml){this.modelError=true;return;}
     if (this.lit) return;                    // arrived too late - don't swap parts mid-flight
     const K = 82 / 98;                       // game units per metre (SLS Block 1 is 98 m tall)
@@ -180,7 +188,7 @@ export class Launch {
       m.scale.setScalar(s); m.rotation.y = Math.PI / 2;   // long exhaust hole lines up with the boosters, tower behind
       m.position.set(0, this.padTop, 0);
       // NASA's file marks the steel as fully metallic, which looks black without reflections - make it painted grey steel
-      m.traverse(o => { if (o.isMesh) for (const mt of [].concat(o.material)) { mt.metalness = 0; mt.roughness = 0.85; mt.color?.multiplyScalar(1.6); } });
+      m.traverse(o => { if (o.isMesh) { const copies = [].concat(o.material).map(mt => { const copy = mt.clone(); copy.metalness = 0; copy.roughness = .85; copy.color?.multiplyScalar(1.6); this.ownedMaterials.add(copy); return copy; }); o.material = Array.isArray(o.material) ? copies : copies[0]; } });
       this.scene.add(m); this.tower.visible = false;
       this.baseY = this.padTop + 0.294 * s;  // the rocket stands on the launcher's deck (measured from the model)
       this.rocket.position.y = this.baseY;
@@ -190,7 +198,7 @@ export class Launch {
       for (const g of new Set(Object.values(groups)))
         g.children.forEach(ch => { if (ch.isMesh && !this.flames.includes(ch) && ch !== this.upperFlame) ch.visible = false; });
       for (const [name, g] of Object.entries(groups)) {
-        const part = sls.scene.getObjectByName(name); if (!part) continue;
+        const part = sls.scene.getObjectByName(name)?.clone(true); if (!part) continue;
         part.removeFromParent(); part.position.set(0, 0, 0); part.scale.setScalar(K);
         g.add(part);
       }
@@ -299,6 +307,16 @@ export class Launch {
       : lift < T.orbit ? ['CORE STAGE OFF', 'About 8 minutes: the orange core stage has used up its fuel and falls away']
       : ['ORBIT!', 'Orion now flies around Earth at about 28,000 km/h. Can you spot Mars? The planets are shown where they really are in the sky today.'];
     return { left: Math.ceil(left), lifted: lift > 0, title, caption, km, karman: km >= 100 && lift < T.tower, nearKarman: lift >= T.karman - 2.5 && km < 100 };
+  }
+
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.scene.clear(); this.dropped.length = 0; this.smoke.length = 0;
+    for (const g of this.ownedGeometry) g.dispose();
+    for (const m of this.ownedMaterials) m.dispose();
+    for (const t of this.ownedTextures) t.dispose();
+    this.ownedGeometry.clear(); this.ownedMaterials.clear(); this.ownedTextures.clear();
   }
 
   resize() { this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); }
