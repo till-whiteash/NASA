@@ -182,7 +182,7 @@ export function createEDL(world) {
   // landing-site props: pad, dust
   const pad = add(new THREE.Mesh(new THREE.CylinderGeometry(14, 14, 2, 40).translate(0, -1, 0), new THREE.MeshStandardMaterial({ color: '#5b4538', roughness: 1 }))); pad.position.set(LAND.x, gp + .1, LAND.z);
   const dust = [], tex = puffTexture();
-  for (let i = 0; i < 150; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color: '#c9966c', transparent: true, depthWrite: false, fog: false, opacity: 0 })); s.userData = { a: r() * 6.283, v: 8 + r() * 18, tb: 14.6 + r() * 3.4, rot: r() * 6, sz: 4 + r() * 6, lift: 1 + r() * 4 }; add(s); dust.push(s); }
+  for (let i = 0; i < 64; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color: '#c9966c', transparent: true, depthWrite: false, fog: false, opacity: 0 })); s.visible = false; s.userData = { a: r() * 6.283, v: 8 + r() * 18, tb: 14.6 + r() * 3.4, rot: r() * 6, sz: 4 + r() * 6, lift: 1 + r() * 4 }; add(s); dust.push(s); }
 
   // where the descent stage is (world coords) from t = 12.4 on
   const stagePos = t => {
@@ -258,11 +258,11 @@ export function createEDL(world) {
     stage.userData.fire(free ? burn * (t < PH.cut ? .85 + .15 * smooth((t - 15) / 1) : 1) : 0, t);
     // ---------- dust from the engines ----------
     const sA = stagePos(t).y - gp, gate = free ? smooth((60 - sA) / 40) : 0;
-    for (const s of dust) { const d = s.userData, age = t - d.tb; if (age < 0 || !real) { s.material.opacity = 0; continue; }
+    for (const s of dust) { const d = s.userData, age = t - d.tb; if (age < 0 || !real) { s.visible = false; s.material.opacity = 0; continue; }
       const rad = 4 + d.v * 1.5 * (1 - Math.exp(-age / 2.6)), grow = d.sz * .6 + age * 1.3;
       s.position.set(LAND.x + Math.cos(d.a) * rad, gp + 1.2 + d.lift * (1 - Math.exp(-age / 2.2)), LAND.z + Math.sin(d.a) * rad); s.scale.set(grow, grow * .65, 1); s.material.rotation = d.rot + age * .1;
       const lift = t > PH.cut ? 1 - smooth((t - PH.cut - .6) / 1.6) * .7 : 1;
-      s.material.opacity = .11 * Math.max(gate, .0) * smooth(age * 1.5) * Math.max(0, 1 - age / 7) * lift; const lit = .85 + .1 * Math.sin(d.a); s.material.color.setRGB(.5 * lit, .3 * lit, .18 * lit); }
+      s.material.opacity = (.11 * 150 / 64) * Math.max(gate, .0) * smooth(age * 1.5) * Math.max(0, 1 - age / 7) * lift; s.visible = s.material.opacity > .001; const lit = .85 + .1 * Math.sin(d.a); s.material.color.setRGB(.5 * lit, .3 * lit, .18 * lit); }
     // flash when the shield is thrown off
     const fl = Math.max(0, 1 - Math.abs(t - PH.shield - .08) / .18); flash.visible = fl > .01; flash.position.copy(veh.position).add(tmpC.set(0, 0, 0)); flash.scale.setScalar(14 * fl + .01); flash.material.opacity = fl * .9;
     // ---------- cameras ----------
@@ -276,9 +276,9 @@ export function createEDL(world) {
     else { const k = smooth((t - 18.8) / 1.2), sp_ = stagePos(t); cam.position.set(LAND.x + 20, heightAt(LAND.x + 20, LAND.z + 26) + 3.4, LAND.z + 28); tmpC.copy(sp_).lerp(tmpV.set(LAND.x, gp + 4, LAND.z), k); cam.lookAt(tmpC); cam.fov = 48; }
     return 0;
   };
-  return { frame, dispose: () => {
-    cam.far = saved.far; cam.updateProjectionMatrix(); scene.background = saved.bg; world.sky.visible = saved.skyV; world.terrain.visible = saved.terV;
-    frame(EDL_T); if (old) scene.remove(old);
+  return { frame, surfaceFocus: new THREE.Vector3(LAND.x, gp, LAND.z), warmupTimes: [0, 6, 10, 16, 19], dispose: () => {
+    frame(EDL_T);
+    cam.far = saved.far; cam.updateProjectionMatrix(); scene.background = saved.bg; world.sky.visible = saved.skyV; world.terrain.visible = saved.terV; if (old) scene.remove(old);
     lander.userData.setLegs(1);
     own.forEach(o => { if (o !== pad) scene.remove(o); }); payload.parent?.remove(payload);
     world.lander = { group: lander }; world.lander.group.parent !== scene && scene.add(lander); lander.position.set(LAND.x, gp, LAND.z);

@@ -179,12 +179,13 @@ export function playCinematic(name, { clip, world, onSkip } = {}) {
       stopRetry = () => { clearInterval(retry); for (const ev of ['pointerdown', 'keydown', 'touchstart']) removeEventListener(ev, tryPlay, true); };
       tryPlay();
     };
-    if (world) { world.cinematic = true; for (const k of Object.keys(world.keys || {})) world.keys[k] = false; }
+    const previousVideo = world?.cinematicVideo;
+    if (world) { world.cinematicVideo = true; world.cinematic = true; for (const k of Object.keys(world.keys || {})) world.keys[k] = false; }
     const end = played => {
       if (done) return; done = true; video?.pause(); endLoader?.(); stopRetry?.(); removeEventListener('keydown', key, true);
       box.classList.add('cine-out');
       setTimeout(() => box.remove(), 400);
-      if (world) world.cinematic = false;
+      if (world) { world.cinematic = false; world.cinematicVideo = previousVideo; }
       resolve(played);
     };
     const advance = () => { onSkip?.(); end(true); };

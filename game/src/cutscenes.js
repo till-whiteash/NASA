@@ -77,34 +77,42 @@ function runScene(create, { world, total, caps, title, manual, fadeIn }) {
   document.body.appendChild(root);
   const cap = root.querySelector('.cs-cap'), ttl = root.querySelector('.cs-title'), blk = root.querySelector('.cs-black'), tintEl = root.querySelector('.cs-tint');
   const cam = world.camera, fov0 = cam.fov, hud = document.getElementById('hud'), hudShow = hud?.style.visibility, pv = world.player.visible;
+  const cameraPos = cam.position.clone(), cameraRotation = cam.quaternion.clone();
   let scene; try { scene = create(world); } catch (e) { console.warn('cutscene failed', e); root.remove(); return manual ? null : Promise.resolve(); }
-  // build every shader the cutscene needs now, so the first frames of each shot don't stall while they compile
-  try { scene.frame(0); world.renderer?.compile?.(world.scene, cam); } catch (e) { /* not essential */ }
+  // Compilation is staged asynchronously below, before the film clock starts.
   holdAwards(true); const toastEl = document.getElementById('toast'), toastVis = toastEl?.style.visibility; if (toastEl) toastEl.style.visibility = 'hidden';
   if (hud) hud.style.visibility = 'hidden'; world.player.visible = false; const mg = world.mapState?.group, mg0 = mg?.visible; if (mg) mg.visible = false;
   const beams = [...world.pickups.map(p => p.group.children[1]), ...(world.lookouts?.beacons || []), ...(world.lookouts?.beacons || []).map(b => b.userData.halo)].filter(Boolean), beams0 = beams.map(b => b.visible); beams.forEach(b => (b.visible = false));
   const vs0 = world.viewSlot?.visible ?? true; if (world.viewSlot) world.viewSlot.visible = false;
-  const keep = world.player.position.clone(), cameraPos = cam.position.clone(), cameraRotation = cam.quaternion.clone(); let cur = 0, ended = false;
+  const keep = world.player.position.clone(); let cur = 0, ended = false;
+  const oldFocus = world.cinematicFocus, oldFrame = world.cutsceneFrame, oldPreparing = world.cutscenePreparing;
+  if (scene.surfaceFocus) world.cinematicFocus = scene.surfaceFocus;
+  ttl.innerHTML = title.html;
+  const barsEls = root.querySelectorAll('.cs-bar'), skipEl = root.querySelector('.cs-skip');
   world.cinematic = true; for (const key of Object.keys(world.keys)) world.keys[key] = false;   // the game pauses and the terrain streams around the camera
   const upd = world.update.bind(world);
   world.update = (dt, active) => {
-    upd(dt, false); if (ended) return;
+    if (ended) return;
+    if (!scene.surfaceFocus) upd(dt, false);
+    else { world.time += dt; world.frameDt = dt; }
     world.player.position.copy(keep); world.player.visible = false; if (world.viewSlot) world.viewSlot.visible = false;   // the tool in your hand stayed glued to the corner of every shot
-    const gp = cam.position.clone(), gq = cam.quaternion.clone(), gf = cam.fov;
+    const gp = scene.surfaceFocus ? cameraPos : cam.position.clone(), gq = scene.surfaceFocus ? cameraRotation : cam.quaternion.clone(), gf = fov0;
     tintEl.style.opacity = scene.frame(cur);
     const b = Math.max(fadeIn ? 0 : 1 - smooth(cur / 1.6), smooth((cur - (total - 1.8)) / 1.8));   // glide in from, and back to, the player's own view
     if (b > 0) { cam.position.lerp(gp, b); cam.quaternion.slerp(gq, b); cam.fov = lerp(cam.fov, gf, b); }
     cam.updateProjectionMatrix();
+    if (scene.surfaceFocus) world.placeSky?.(scene.surfaceFocus);
   };
+  world.cutsceneFrame = world.update;
   const setTime = t => {
     cur = t;
     const c = caps.find(c => t >= c.t0 && t < c.t1); cap.textContent = c ? c.text : ''; cap.style.opacity = c ? Math.min(1, (t - c.t0) / .4, (c.t1 - t) / .4) : 0;
-    const tt = clamp01((t - title.t) / .8) * (1 - smooth((t - (total - 1.6)) / .9)); ttl.innerHTML = title.html; ttl.style.opacity = tt; cap.style.opacity = cap.style.opacity * (1 - smooth((t - (total - 1.6)) / .6));
+    const tt = clamp01((t - title.t) / .8) * (1 - smooth((t - (total - 1.6)) / .9)); ttl.style.opacity = tt; cap.style.opacity = cap.style.opacity * (1 - smooth((t - (total - 1.6)) / .6));
     blk.style.opacity = fadeIn ? 1 - clamp01(t / .8) : 0;
-    const bars = smooth(t / 1) * (1 - smooth((t - (total - 1.2)) / 1.2)); root.querySelectorAll('.cs-bar').forEach(e => (e.style.height = 9 * bars + 'vh'));
-    root.querySelector('.cs-skip').style.opacity = .55 * bars;
+    const bars = smooth(t / 1) * (1 - smooth((t - (total - 1.2)) / 1.2)); barsEls.forEach(e => (e.style.height = 9 * bars + 'vh'));
+    skipEl.style.opacity = .55 * bars;
   };
-  const dispose = () => { if (ended) return; ended = true; world.cinematic = false; if (world.viewSlot) world.viewSlot.visible = vs0; world.player.position.copy(keep); cam.position.copy(cameraPos); cam.quaternion.copy(cameraRotation); for (const key of Object.keys(world.keys)) world.keys[key] = false; world.update = upd; scene.dispose(); cam.fov = fov0; cam.updateProjectionMatrix(); if (hud) { hud.style.visibility = hudShow || ''; hud.style.transition = 'none'; hud.style.opacity = 0; void hud.offsetWidth; hud.style.transition = 'opacity 1.2s'; hud.style.opacity = 1; setTimeout(() => { hud.style.transition = ''; hud.style.opacity = ''; }, 1400); } world.player.visible = pv; holdAwards(false); if (toastEl) toastEl.style.visibility = toastVis || ''; if (mg) mg.visible = mg0; beams.forEach((b, i) => (b.visible = beams0[i])); root.remove(); };
+  const dispose = () => { if (ended) return; ended = true; world.cinematic = false; if (world.viewSlot) world.viewSlot.visible = vs0; world.player.position.copy(keep); cam.position.copy(cameraPos); cam.quaternion.copy(cameraRotation); for (const key of Object.keys(world.keys)) world.keys[key] = false; world.update = upd; world.cutsceneFrame = oldFrame; world.cutscenePreparing = oldPreparing; world.cinematicFocus = oldFocus; scene.dispose(); cam.position.copy(cameraPos); cam.quaternion.copy(cameraRotation); cam.fov = fov0; cam.updateProjectionMatrix(); if (hud) { hud.style.visibility = hudShow || ''; hud.style.transition = 'none'; hud.style.opacity = 0; void hud.offsetWidth; hud.style.transition = 'opacity 1.2s'; hud.style.opacity = 1; setTimeout(() => { hud.style.transition = ''; hud.style.opacity = ''; }, 1400); } world.player.visible = pv; holdAwards(false); if (toastEl) toastEl.style.visibility = toastVis || ''; if (mg) mg.visible = mg0; beams.forEach((b, i) => (b.visible = beams0[i])); root.remove(); };
   setTime(0);
   if (manual) return { setTime, total, dispose, root };
   return new Promise(res => {
@@ -113,7 +121,27 @@ function runScene(create, { world, total, caps, title, manual, fadeIn }) {
     const key = e => { if (['Space', 'Escape', 'Enter'].includes(e.code)) { e.preventDefault(); e.stopImmediatePropagation(); finish(); } };
     addEventListener('keydown', key, true); root.addEventListener('click', finish);
     const loop = now => { t0 ??= now; const t = (now - t0) / 1000; if (t >= total) return finish(); setTime(t); raf = requestAnimationFrame(loop); };
-    raf = requestAnimationFrame(loop);
+    const prepare = async () => {
+      world.cutscenePreparing = true;
+      blk.style.opacity = 1;
+      cap.textContent = scene.surfaceFocus ? 'Preparing landing…' : 'Preparing scene…'; cap.style.opacity = 1;
+      try {
+        // Warm the entry, parachute and surface variants; frame(0) alone hides the terrain and engines.
+        for (const t of scene.warmupTimes || [0]) {
+          await new Promise(resolve => requestAnimationFrame(resolve));
+          if (done) return;
+          scene.frame(t);
+          const renderer = world.renderer;
+          if (renderer?.compileAsync) await renderer.compileAsync(world.scene, cam);
+          else renderer?.compile?.(world.scene, cam);
+        }
+      } catch (error) { console.warn('Cutscene shader preparation failed', error); }
+      if (done) return;
+      world.cutscenePreparing = false;
+      scene.frame(0); setTime(0);
+      raf = requestAnimationFrame(loop);
+    };
+    prepare();
   });
 }
 const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;

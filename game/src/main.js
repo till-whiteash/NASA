@@ -438,7 +438,7 @@ async function arrive() {
   let landingFilm = null;
   // Ewan's existing Mars landing owns the world camera and leaves its lander on the surface.
   const landFilm = async () => { state.phase = 'mars'; await playLanding(world); };
-  const selectedSite = await showArrival(F, outpost.delayMinutes(), {onDescent:()=>{landingFilm = landFilm();}});
+  const selectedSite = await showArrival(F, outpost.delayMinutes(), {onDescent:()=>{landingFilm = landFilm(); return landingFilm;}});
   if (!selectedSite) { location.reload(); return; }
   state.site = selectedSite;
   outpost.site = selectedSite;
@@ -1659,6 +1659,15 @@ renderer.setAnimationLoop(() => {
     if (lifted && !launch.logged) { launch.logged = true; [F.sls, F.mobileLauncher, F.boosters, F.ascent, F.orbitSpeed].forEach(logFact); }
     renderer.render(launch.scene, launch.camera);
     if (launch.done) { state.phase = 'cruise'; arrive(); }
+    return;
+  }
+  // Ewan's cutscene owns this frame: avoid player physics, rover contacts, HUD, farming and mission checks.
+  if (world?.cinematicVideo) return; // the opaque movie owns the screen; leave GPU time for video decoding
+  if (state.phase === 'mars' && world?.cutsceneFrame) {
+    if (world.cutscenePreparing) return;
+    world.cutsceneFrame(dt, false);
+    renderer.shadowMap.needsUpdate = (++shadowFrame & 1) === 0;
+    renderer.render(world.scene, world.camera);
     return;
   }
   if (state.phase === 'mars' && world) {

@@ -1123,7 +1123,7 @@ export class World {
 
   // Sun, glow, stars, sky and headlamp follow the camera; the sun's direction follows the time of day.
   placeSky(p) {
-    const focus=this.cinematic?this.camera.position:p;
+    const focus=this.cinematicFocus || (this.cinematic?this.camera.position:p);
     this.terrain.userData.update(focus);this.rockDisplay.userData.update(focus);
     const cam = this.camera.position, dir = this.sunDir || new THREE.Vector3(0.5, 0.8, 0.3);
     this.placeSun(p, dir);
