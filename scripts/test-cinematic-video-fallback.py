@@ -8,6 +8,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 class Q(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a): pass
+    def copyfile(self, source, outputfile):
+        try: super().copyfile(source, outputfile)
+        except (ConnectionResetError, BrokenPipeError): pass  # Skip cancels an in-flight download.
 srv = http.server.ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(Q, directory=str(ROOT)))
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 imports = re.search(r'<script type="importmap">(.*?)</script>', (ROOT/'game/index.html').read_text(encoding='utf-8'), re.S).group(1)
