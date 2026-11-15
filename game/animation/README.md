@@ -51,7 +51,7 @@ sun.intensity = baseSun * sunFactor.scale.x;
 ## Where each film plays in the game
 
 `src/cinematic.js` plays a GLB full screen through its own camera with its captions (`glb/<name>.captions.json`).
-Click, Space, Enter or Esc skips; with reduced motion, or if a file can't load, the game carries straight on.
+Use Skip or Esc to advance. The Mars and Moon 3D briefings advance to their rendered video, then continue to the orbit plan and walkable briefing room. Other films skip directly to the next step. Videos also provide a fallback when 3D playback is unavailable.
 
 | Moment | Film |
 |---|---|
@@ -63,7 +63,8 @@ Click, Space, Enter or Esc skips; with reduced motion, or if a file can't load, 
 | First dust storm | `dust_storm` film; later storms use the in-world storm in your own base |
 | Random failures (new) | `panel_failure`, `rover_stuck` or `air_leak`, then a pop-up. The fixes play `panel_repair` (press E at the solar panels, 1 part), `rover_freed` (press E at the rover) and `leak_patched` (patch from the pop-up or at an airlock door, 1 part). Unfixed panels and leaks get fixed by the rest of the crew after 8 and 5 sols. |
 | Winning the mission | `ascent_mars`, then the mission-complete screen |
-| Cutscenes menu | every film, to watch again |
+| Moon departure | `launch_earth` after Ready for launch, before the Moon page |
+| Cutscenes menu | every film, including all three repair animations, to watch again |
 
 ## Outpost layout (every Mars film)
 

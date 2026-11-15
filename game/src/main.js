@@ -73,7 +73,7 @@ import { Coop, CoopHud, openCoopDialog } from './coop.js';
 import { RemotePlayers } from './remote-players.js';
 import { nightVote, canSleepAt, morningClock } from './night-vote.js';
 import { SCREEN_MODES, screenName, screenMode, setScreenMode, nextScreenMode, onLayout } from './layout.js';
-import { playCinematic } from './cinematic.js';   // Blender-made sequences in animation/glb/
+import { playCinematic } from './cinematic.js?v=briefing-flow-2';   // Blender-made sequences in animation/glb/
 loadModel('sls.glb'); loadModel('mobile-launcher.glb');   // NASA's 3D models start downloading on the title screen
 
 // Phones and tablets: draw fewer pixels, and skip shadows on small screens, so the game stays smooth
@@ -1259,12 +1259,13 @@ onLayout((mode, used) => {
 });
 $('#cine-btn').onclick = () => {
   if (inside) return toast('Go outside to watch a cutscene.');
-  modal({ title: 'Cutscenes', html: '<p>Watch the big moments again. Click, Space or Esc skips them.</p>', choices: [
+  modal({ title: 'Cutscenes', html: '<p>Watch the big moments again. Use Skip or Esc to move on. Skipping the 3D briefing starts its video.</p>', choices: [
     { label: 'Mars landing (here)', primary: true, onPick: () => { playLanding(world).catch(() => {}); } },
     { label: 'Dust storm (here)', onPick: () => { playStorm(world).catch(() => {}); } },
     ...[['Ares VI briefing', 'ares_vi_briefing'], ['Mission plan', 'briefing_mission'], ['Moon briefing', 'ares_vi_briefing_moon'], ['Moon mission plan', 'briefing_moon'], ['Launch from Earth', 'launch_earth'], ['Trip to Mars', 'cruise_loop'], ['Arriving at Mars', 'mars_approach'],
       ['Crew landing', 'edl_mars', 'descent_landing'], ['26 months of building', 'outpost_26_months'], ['Dust storm film', 'dust_storm'],
       ['Solar panel failure', 'failure_solar_panel', 'panel_failure'], ['Rover stuck in sand', 'failure_rover_stuck', 'rover_stuck'], ['Air leak', 'failure_air_leak', 'air_leak'],
+      ['Solar panel repaired', 'failure_solar_panel', 'panel_repair'], ['Rover freed', 'failure_rover_stuck', 'rover_freed'], ['Air leak patched', 'failure_air_leak', 'leak_patched'],
       ['Leaving Mars', 'ascent_mars']].map(([label, name, clip]) => ({ label, onPick: () => { playCinematic(name, { clip, world }); } })),
     { label: 'Close' }] });
 };
@@ -1798,6 +1799,7 @@ $("#moon-mission").onclick=async()=>{
   saveGame(); startSound(); $('#title').classList.add('hidden');
   await playCinematic('ares_vi_briefing_moon'); await playCinematic('briefing_moon');
   await walkBriefingRoom({ destination: 'moon' });
+  await playCinematic('launch_earth');   // departure before the lunar flight and surface mission
   location.assign(new URL("moon/",location.href).href);
 };
 

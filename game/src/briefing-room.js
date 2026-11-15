@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { loadModel } from './nasamodels.js';
-import { fillCrewSlots, LOOKS, BASE } from './cinematic.js';
+import { fillCrewSlots, LOOKS, BASE } from './cinematic.js?v=briefing-flow-2';
 
 // The Ares VI briefing room as a place you can walk around after Director Hale's briefing: get up from your seat,
 // look at the hologram and the mission screens, talk to the crew, then press "Ready for launch" (right side) to go
