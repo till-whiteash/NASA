@@ -1,4 +1,4 @@
-# Mission sequences (Blender → GLB)
+# Mission sequences (Blender films and GLB sources)
 
 Twelve animated sequences for the game's flow, built in Blender 5.3 from the game's own 3D models. Each one is
 a `.blend` file, a web GLB with named animation clips that three.js can play with `AnimationMixer`, and a preview
@@ -9,7 +9,7 @@ video with captions.
 | `scripts/` | One Python script per sequence (`seq_*.py`) plus the shared `common.py` and `mars_kit.py`. The scripts are the source: every `.blend` and GLB is rebuilt from them. |
 | `blend/` | The Blender scenes, opened with Blender 5.3 or newer. |
 | `glb/` | The web files: meshes, materials, one camera and the animation clips. |
-| `previews/` | 960×540 MP4s with captions, for watching. The captions are not in the GLBs. |
+| `previews/` | Playback MP4s: clean 1920×1080 HD films with browser captions, plus legacy 960×540 films with baked captions. |
 | `viewer.html` | Dev viewer: serve `game/` (`python serve.py`) and open `/animation/viewer.html` to play any clip through its own camera, or with a free orbit camera. |
 
 ## The clips
@@ -50,20 +50,20 @@ sun.intensity = baseSun * sunFactor.scale.x;
 
 ## Where each film plays in the game
 
-`src/cinematic.js` plays a GLB full screen through its own camera with its captions (`glb/<name>.captions.json`).
-Use Skip or Esc to advance. The Mars and Moon 3D briefings advance to their rendered video, then continue to the orbit plan and walkable briefing room. Other films skip directly to the next step. Videos also provide a fallback when 3D playback is unavailable.
+`src/cinematic.js` plays the authored Blender MP4 movies. It no longer substitutes the simplified GLB exports for cutscenes.
+Use Skip or Esc to advance. The briefing movie leads to the orbit-plan movie and walkable briefing room. Cutscenes play once; there is no duplicate 3D preview. Clean HD movies use responsive HTML captions from `glb/<name>.captions.json`; legacy movies retain their baked captions.
 
 | Moment | Film |
 |---|---|
-| Start a new game | `ares_vi_briefing`, then `briefing_mission`, then the live launch countdown (`src/launch.js`, unchanged) |
+| Start a new game | `ares_vi_briefing`, then `briefing_mission`, then the walkable room and Blender launch movie |
 | After launch, and when you continue a saved game | the loading screen plays `cruise_loop` behind it (at least 9 s after launch, 4 s for a save) |
 | Reaching Mars | `mars_approach`, then the landing-site picker |
-| Landing | `edl_mars` (`entry` then `descent_landing`), replacing the old sky-crane film for the crew lander |
+| Landing | Ewan's existing `playLanding(world)` sequence (`src/cutscenes.js` / `src/edl.js`), explicitly retained at the user's request |
 | Right after landing (new game) | `outpost_26_months`: the goal |
 | First dust storm | `dust_storm` film; later storms use the in-world storm in your own base |
 | Random failures (new) | `panel_failure`, `rover_stuck` or `air_leak`, then a pop-up. The fixes play `panel_repair` (press E at the solar panels, 1 part), `rover_freed` (press E at the rover) and `leak_patched` (patch from the pop-up or at an airlock door, 1 part). Unfixed panels and leaks get fixed by the rest of the crew after 8 and 5 sols. |
 | Winning the mission | `ascent_mars`, then the mission-complete screen |
-| Moon departure | `launch_moon`: separate historical Saturn V model and real-time ascent after Ready for launch, before the Moon page (no MP4 fallback) |
+| Moon departure | `launch_moon`: Blender-rendered historical Saturn V model using the original launch set and camera animation after Ready for launch, before the Moon page |
 | Cutscenes menu | every film, including all three repair animations, to watch again |
 
 ## Outpost layout (every Mars film)
@@ -145,8 +145,8 @@ again, unchanged, flips the limbs in three.js). So the briefing GLB does not con
 **crew slot** per person - an empty named `crewslot_<name>` with extras `crew_char`, `crew_clip`, `crew_offset`,
 `crew_speed`, `crew_height` and an optional clothing tint - plus Director Hale's movement. `src/cinematic.js` loads
 the real character at each slot and retargets the clip exactly like `src/hab-crew.js` does in the hab.
-Limitation: Hale's pointing and talking gestures and the crew's nods and glances are in the preview video (Blender)
-but not yet in the game version, which plays the base idle/sit clips.
+The briefing movies preserve Hale's pointing and talking gestures and the crew's nods and glances.
+The separate walkable room uses the base idle/sit clips.
 
 The Z-2 astronauts are rigged in Blender itself and export correctly (checked in three.js r0.160).
 
@@ -194,7 +194,7 @@ For quick checks, run one script with stills, or build it in an open Blender thr
 `blender -b --factory-startup -P seq_storm.py -- --stills 60,200,320 --scale 40` (PNGs go to `stills/`, which is
 not committed).
 
-## Moon mission films and the video fallback
+## Moon mission films
 
 - `ares_vi_briefing_moon` (`seq_ares_briefing_moon.py`, which runs `seq_ares_briefing.py` with `BRIEF=moon`): the same
   room, shots and crew with the Moon mission's dialogue, a Moon hologram with south-pole sites and NASA Moon photos.
@@ -202,6 +202,41 @@ not committed).
   ellipse (Kepler's equation; the Moon moves ~53 degrees meanwhile), then lunar orbit insertion and capture.
 - "Explore the Moon" plays both, then the walkable briefing room with Moon talk (`src/briefing-room.js`), then the
   Moon mission. "Launch to Mars" plays the Mars versions, the room with Mars talk, then the countdown.
-- Every film also plays as its MP4 in `previews/` (captions burned in) when the device has no WebGL, the 3D version
-  fails or is slow to load (12 s), or it runs under ~11 fps (`src/cinematic.js`; `scripts/test-cinematic-video-fallback.py`).
+- Cutscenes always play their authored MP4 in `previews/`; simplified GLB previews are available only in the development viewer. Ewan's Mars landing remains the live 3D exception.
 - Only the Skip button or Esc skips a film.
+
+
+## Full-HD briefing repair
+
+Both briefings use `previews/ares_vi_briefing-hd.mp4` and `previews/ares_vi_briefing_moon-hd.mp4`. Resolution is 1920x1080 at 24 fps.
+They are rendered from their original `blend/ares_vi_briefing*.blend` files, preserving the cameras,
+crew animation and timing. `scripts/render_briefing_hd.py` separates pictures from frame
+faces, disables unstable screen-space reflections and removes floating name labels.
+The movie is clean: `src/cinematic.js` displays the existing caption JSON as responsive
+HTML, synchronized with video playback and seeks. The player reserves space below the
+complete, aspect-preserved image, so neither words nor picture edges are cropped.
+
+Rebuild from the game directory (replace Blender with your executable path):
+
+```powershell
+blender --background animation/blend/ares_vi_briefing.blend --python animation/scripts/render_briefing_hd.py -- animation/build/briefing-hd --stills
+blender --background animation/blend/ares_vi_briefing.blend --python animation/scripts/render_briefing_hd.py -- animation/build/briefing-hd
+ffmpeg -i animation/build/briefing-hd/ares_vi_briefing-hd.mp4 -c copy -movflags +faststart animation/previews/ares_vi_briefing-hd.mp4
+```
+
+Inspect the test frames before the full render. The original `.blend` is not overwritten;
+the repaired editable copy is saved in the chosen output directory as `briefing-hd.blend`.
+
+
+## Other HD films and Moon launch
+
+`render_film_hd.py` renders the existing orbit-plan, cruise and Mars-approach `.blend`
+files at 1080p without baked captions, preserving authored models, motion and cameras.
+`render_moon_launch.py` uses `launch_earth.blend` as its set and camera rig, replaces SLS
+with `assets/nasa/saturn-v-history.glb`, adds five animated F-1 exhaust plumes, and writes
+`launch_moon-hd.mp4` plus `launch_moon.captions.json`. This is labeled an Apollo-style
+historical launch, not an exact reconstruction of a modern lunar mission.
+
+The local `serve.py` supports MP4 byte-range requests so repair clips can seek directly
+to their start times. New movies should be remuxed with `ffmpeg -c copy -movflags +faststart`
+before publishing. All clean HD film names are listed in `CLEAN_VIDEO` in `src/cinematic.js`.

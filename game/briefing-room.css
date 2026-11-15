@@ -28,3 +28,22 @@
 .cinematic.cine-has-video .cine-cap, .cinematic.cine-has-video .cine-phase { display: none; }
 .cinematic .cine-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2; padding: 18px 30px; border: 0; border-radius: 14px; background: #ff7a2f; color: #1b0e07; font: 700 20px/1 Poppins, system-ui, sans-serif; cursor: pointer; }
 .cinematic .cine-skip { z-index: 3; }
+
+/* Full-HD clean briefing: reserve space for text, never crop the film or clamp words. */
+.cinematic.cine-clean-video { display: grid; grid-template-rows: minmax(0, 1fr) 100px; gap: 12px;
+  box-sizing: border-box; padding: max(42px, env(safe-area-inset-top)) 16px max(72px, calc(env(safe-area-inset-bottom) + 60px)); }
+.cinematic.cine-clean-video .cine-video { position: relative; inset: auto; min-height: 0; min-width: 0; object-fit: contain; grid-row: 1; }
+.cinematic.cine-clean-video .cine-cap { display: block; position: static; transform: none; grid-row: 2; justify-self: center; align-self: center;
+  width: min(960px, 100%); max-width: 100%; box-sizing: border-box; padding: 8px 12px;
+  font-size: clamp(14px, 2.2vw, 22px); line-height: 1.35; -webkit-line-clamp: unset; overflow: visible; text-wrap: balance; z-index: 2; }
+.cinematic.cine-clean-video .cine-cap:empty { display: none; }
+.cinematic.cine-clean-video .cine-phase { display: block; top: max(12px, env(safe-area-inset-top)); left: 16px; right: 16px; }
+.cinematic.cine-clean-video .cine-phase:empty { display: none; }
+@media (max-width: 480px) { .cinematic.cine-clean-video { grid-template-rows: minmax(0, 1fr) 120px; } }
+@media (max-height: 450px) { .cinematic.cine-clean-video { grid-template-rows: minmax(0, 1fr) 76px; padding-top: 30px; padding-bottom: 48px; gap: 4px; }
+  .cinematic.cine-clean-video .cine-cap { font-size: 14px; padding: 2px 8px; }
+  .cinematic.cine-clean-video .cine-who { font-size: 10px; margin-bottom: 2px; }
+  .cinematic.cine-clean-video .cine-skip { bottom: 6px; padding: 7px 12px; } }
+
+/* Mission hints must not cover either movie captions or Ewan's landing camera. */
+body:has(.cinematic, .scene-cinematic) #zhetela-message { visibility: hidden; }

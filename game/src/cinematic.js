@@ -1,13 +1,10 @@
-// Full-screen player for the Blender-made sequences in animation/glb/ (see animation/README.md).
-// Each GLB carries its own camera and named clips; captions come from <name>.captions.json next to it.
+// Full-screen playback of the authored Blender movies in animation/previews/.
+// Clip ranges and responsive captions come from animation/glb/<name>.captions.json.
 //   playCinematic('briefing_mission')                        -> Promise that resolves when it ends or is skipped
 //   playCinematic('failure_solar_panel', { clip: 'panel_failure', world })   (pauses the game while it plays)
 //   const loop = loopCinematic('cruise_loop', parentElement)  -> { stop() }  (loading-screen background)
-// Only the Skip button or Esc skips (a stray click or key press no longer ends the film). With reduced motion, or if the file can't load, it resolves at once so the
-// game always carries on.
+// Only Skip or Esc advances. Films keep their authored motion and do not depend on WebGL rendering.
 import * as THREE from 'three';
-import { moonLaunchStage } from './moon-launch.js';
-import { loadModel } from './nasamodels.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
@@ -41,7 +38,8 @@ export async function fillCrewSlots(root, mixers) {
   }));
 }
 
-export const BASE = '../animation/glb/';                     // loadModel() prefixes 'assets/'
+const ANIMATION_ROOT = new URL('../animation/', import.meta.url);
+export const BASE = new URL('glb/', ANIMATION_ROOT).href;
 export const LOOKS = {                                        // background, hemisphere sky/ground, sun colour
   space: { bg: '#000', sky: '#9fb3ff', ground: '#000', sun: '#fff6ea', hemi: .35, sunI: 3.2 },
   room: { bg: '#05070d', sky: '#8fb4ff', ground: '#201008', hemi: .9, sunI: 1.6, glow: true, bars: true },   // the briefing room
@@ -49,60 +47,13 @@ export const LOOKS = {                                        // background, hem
   earth: { bg: '#9db8dc', sky: '#cfe2ff', ground: '#5d6b45', sun: '#fff4e2', hemi: 1.2, sunI: 3.0 },
   mars: { bg: '#c49a78', sky: '#f2d2b4', ground: '#6b3d26', sun: '#ffe6c8', hemi: 1.1, sunI: 2.6, fog: [160, 1400] },
 };
-const LOOK_OF = { ares_vi_briefing: 'room', ares_vi_briefing_moon: 'room', briefing_mission: 'solar', briefing_moon: 'space', launch_earth: 'earth', cruise_loop: 'space', mars_approach: 'space' };
-// Every film also exists as a pre-rendered MP4 (animation/previews, captions burned in). It plays instead when the
-// device has no WebGL, the 3D version fails or is slow to load, or it runs too slowly - so the film always plays.
-const VIDEO = name => `animation/previews/${name}.mp4`;
-const hasWebGL = () => { try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch { return false; } };
-const reduced = () => matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+// Newly rendered clean movies use responsive captions; legacy movies retain baked captions.
+const CLEAN_VIDEO = name => ['ares_vi_briefing', 'ares_vi_briefing_moon', 'launch_moon', 'briefing_mission', 'briefing_moon', 'cruise_loop', 'mars_approach'].includes(name);
+const VIDEO = name => new URL(`previews/${name}${CLEAN_VIDEO(name) ? '-hd' : ''}.mp4`, ANIMATION_ROOT).href;
 const captionsCache = new Map();
 function captionsFor(name) {
-  if (!captionsCache.has(name)) captionsCache.set(name, fetch(`animation/glb/${name}.captions.json`).then(r => r.ok ? r.json() : null).catch(() => null));
+  if (!captionsCache.has(name)) captionsCache.set(name, fetch(new URL(`glb/${name}.captions.json`, ANIMATION_ROOT), { signal: AbortSignal.timeout(5000) }).then(r => r.ok ? r.json() : null).catch(() => null));
   return captionsCache.get(name);
-}
-
-// One stage: its own canvas and renderer, so the game's renderer and scene are never touched.
-async function stage(name, parent, { clip, loop = false } = {}) {
-  if (name === 'launch_moon') return moonLaunchStage(parent);
-  const [gltf, caps] = await Promise.all([loadModel(BASE + name + '.glb'), captionsFor(name)]);
-  if (!gltf) throw new Error('could not load ' + name);
-  const look = LOOKS[LOOK_OF[name] || 'mars'];
-  const canvas = document.createElement('canvas'); canvas.className = 'cine-canvas';
-  parent.prepend(canvas);
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  const scene = new THREE.Scene(); scene.background = new THREE.Color(look.bg);
-  if (look.fog) scene.fog = new THREE.Fog(look.bg, ...look.fog);
-  scene.add(new THREE.HemisphereLight(look.sky, look.ground, look.hemi));
-  const sun = look.point ? new THREE.PointLight(look.sun, look.sunI, 0, 0) : new THREE.DirectionalLight(look.sun, look.sunI);
-  if (!look.point) sun.position.set(-300, 500, 260);
-  scene.add(sun);
-  if (look.glow) { const g = new THREE.PointLight('#ff7a3d', 6, 9, 1.5); g.position.set(0, 1.6, 0); scene.add(g);
-    const key = new THREE.SpotLight('#ffffff', 40, 20, .8, .5, 1.5); key.position.set(0, 6, 3); scene.add(key); }
-  const root = gltf.scene.clone(true); scene.add(root);    // loadModel caches the file; play a fresh copy
-  const cams = []; root.traverse(o => { if (o.isCamera) cams.push(o); });
-  const cam = cams[0] || new THREE.PerspectiveCamera(40, 1, .5, 60000);
-  const clips = gltf.animations;
-  const c = (clip && THREE.AnimationClip.findByName(clips, clip)) || clips[0];
-  const crewMixers = [];
-  await fillCrewSlots(root, crewMixers).catch(e => console.warn('Crew could not load:', e));
-  const mixer = new THREE.AnimationMixer(root);
-  const action = mixer.clipAction(c); action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity); action.clampWhenFinished = true; action.play();
-  const info = caps?.clips?.find(x => x.name === c.name) || { start: 0 };
-  const lines = (caps?.captions || []).map(l => ({ ...l, t0: l.t0 - info.start, t1: l.t1 - info.start })).filter(l => l.t1 > 0.05 && l.t0 < c.duration - 0.05);   // ignore rounding overlaps with the next clip
-  const sunFactor = root.getObjectByName('sun_factor');
-  return {
-    duration: c.duration, lines, bars: !!look.bars,
-    frame(dt) {
-      mixer.update(dt); for (const m of crewMixers) m.update(dt);
-      if (sunFactor) sun.intensity = look.sunI * sunFactor.scale.x;
-      const w = parent.clientWidth || innerWidth, h = parent.clientHeight || innerHeight;
-      renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix();
-      renderer.render(scene, cam);
-      return action.time;
-    },
-    dispose() { renderer.dispose(); renderer.forceContextLoss?.(); canvas.remove(); root.traverse(o => { o.geometry?.dispose?.(); }); },
-  };
 }
 
 export function playCinematic(name, { clip, world } = {}) {
@@ -111,85 +62,81 @@ export function playCinematic(name, { clip, world } = {}) {
     box.innerHTML = '<p class="cine-phase"></p><p class="cine-cap" aria-live="polite"></p><button type="button" class="cine-skip">Skip ›</button><p class="cine-load">Loading…</p>';
     document.body.append(box);
     const cap = box.querySelector('.cine-cap'), phase = box.querySelector('.cine-phase');
-    let st = null, raf = 0, done = false, last = performance.now(), video = null, slow = 0;
-    const perf = { n: 0, sum: 0 };
-    const playVideo = async (why, at = 0) => {
-      if (done || video) return;
-      // This real-time Moon sequence has no pre-rendered movie yet.
-      if (name === 'launch_moon') { end(false); return; }
-      console.warn(`Playing the video version of ${name}: ${why}`);
-      clearTimeout(slow); cancelAnimationFrame(raf); st?.dispose(); st = null;
-      const range = clip ? (await captionsFor(name))?.clips?.find(c => c.name === clip) : null;   // one clip of a longer film
+    let done = false, video = null, videoPending = false;
+    const playVideo = async () => {
+      if (done || video || videoPending) return;
+      videoPending = true;
+      const videoCaps = (clip || CLEAN_VIDEO(name)) ? await captionsFor(name) : null;
+      const range = clip ? videoCaps?.clips?.find(c => c.name === clip) : null;   // one clip of a longer film
       if (done) return;
+      videoPending = false;
       video = document.createElement('video'); video.className = 'cine-video';
       Object.assign(video, { src: VIDEO(name), muted: true, playsInline: true, preload: 'auto' }); video.setAttribute('playsinline', '');
       box.prepend(video); box.classList.add('cine-has-video'); cap.textContent = ''; phase.textContent = '';
-      box.querySelector('.cine-load')?.remove();
-      const from = (range?.start || 0) + at, to = range?.end;
+      const loading = box.querySelector('.cine-load');
+      if (loading) loading.textContent = 'Loading movie…';
+      video.addEventListener('loadeddata', () => loading?.remove(), { once: true });
+      if (CLEAN_VIDEO(name)) {
+        box.classList.remove('cine-bars'); box.classList.add('cine-clean-video');
+        delete cap.dataset.key;
+        const updateCaptions = () => {
+          const line = videoCaps?.captions?.find(l => video.currentTime >= l.t0 && video.currentTime < l.t1);
+          const id = line ? String(line.t0) : '';
+          if (cap.dataset.key === id) return;
+          cap.dataset.key = id; cap.textContent = ''; phase.textContent = line?.phase || '';
+          if (line?.who) { const who = document.createElement('b'); who.className = 'cine-who'; who.textContent = line.who; cap.append(who); }
+          if (line) cap.append(line.text);
+        };
+        video.addEventListener('timeupdate', updateCaptions);
+        video.addEventListener('seeked', updateCaptions);
+        video.addEventListener('loadedmetadata', updateCaptions);
+        updateCaptions();
+      }
+      const from = range?.start || 0, to = range?.end;
       video.addEventListener('loadedmetadata', () => { if (from) video.currentTime = from; }, { once: true });
       if (to) video.addEventListener('timeupdate', () => { if (video.currentTime >= to - .05) end(true); });
       video.onended = () => end(true);
-      video.onerror = () => { console.warn('Video unavailable too:', name); end(false); };
+      video.onerror = () => { console.warn('Cutscene video unavailable:', name); end(false); };
       video.play().catch(() => {                       // a browser that blocks autoplay: one tap starts it
+        if (done || !video || box.querySelector('.cine-play')) return;
         const b = document.createElement('button'); b.type = 'button'; b.className = 'cine-play'; b.textContent = '▶ Play';
-        b.onclick = () => { b.remove(); video.play(); }; box.append(b);
+        b.onclick = () => { b.disabled = true; video.play().then(() => b.remove()).catch(() => { b.disabled = false; }); }; box.append(b);
       });
     };
     if (world) { world.cinematic = true; for (const k of Object.keys(world.keys || {})) world.keys[k] = false; }
     const end = played => {
-      if (done) return; done = true; cancelAnimationFrame(raf); clearTimeout(slow); video?.pause(); removeEventListener('keydown', key, true);
-      st?.dispose(); box.classList.add('cine-out');
+      if (done) return; done = true; video?.pause(); removeEventListener('keydown', key, true);
+      box.classList.add('cine-out');
       setTimeout(() => box.remove(), 400);
       if (world) world.cinematic = false;
       resolve(played);
     };
-    const isBriefing = name === 'ares_vi_briefing' || name === 'ares_vi_briefing_moon';
-    const advance = () => isBriefing && !video ? playVideo('3D briefing complete') : end(true);
+    const advance = () => end(true);
     const key = e => { if (e.code === 'Escape') { e.preventDefault(); e.stopPropagation(); advance(); } else if (['Space', 'Enter'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); } };
     addEventListener('keydown', key, true);
-    // Finish or skip the 3D briefing, then watch the rendered film.
+    // Skip exits this film; the caller advances the mission.
     box.querySelector('.cine-skip').onclick = advance;
-    if (!hasWebGL()) playVideo('no WebGL on this device');
-    else slow = setTimeout(() => { if (!st) playVideo('the 3D version is slow to load'); }, 12000);
-    stage(name, box, { clip }).then(s => {
-      clearTimeout(slow);
-      if (done || video) { s.dispose(); return; }
-      st = s; box.querySelector('.cine-load').remove(); last = performance.now();
-      box.classList.toggle('cine-bars', st.bars);
-      const tick = now => {
-        const dt = Math.min(.1, (now - last) / 1000); last = now;
-        const t = st.frame(dt);
-        if (++perf.n > 20 && perf.n <= 140) { perf.sum += dt; if (name !== 'launch_moon' && perf.n === 140 && perf.sum / 120 > .09) return playVideo('the 3D version runs too slowly here', t); }   // under ~11 fps
-        const l = st.lines.find(l => t >= l.t0 && t < l.t1), key = l ? l.t0 + l.text : '';
-        if (cap.dataset.key !== key) {              // speaker on its own line, then the words
-          cap.dataset.key = key; cap.textContent = '';
-          if (l?.who) { const w = document.createElement('b'); w.className = 'cine-who'; w.textContent = l.who; cap.append(w); }
-          if (l) cap.append(l.text);
-          phase.textContent = l?.phase || '';
-        }
-        if (t >= st.duration - 1e-3) return advance();
-        raf = requestAnimationFrame(tick);
-      };
-      raf = requestAnimationFrame(tick);
-    }).catch(err => { clearTimeout(slow); console.warn('3D cutscene unavailable:', name, err); playVideo('the 3D version failed to load'); });
+    // Cinematics use the authored Blender film, never the simplified GLB preview.
+    playVideo();
   });
 }
 
 // Looping background (the loading screen during the trip). Captions show under it; stop() removes it.
 export function loopCinematic(name, parent) {
-  let st = null, raf = 0, stopped = false, last = performance.now();
   const holder = document.createElement('div'); holder.className = 'cine-loop'; parent.prepend(holder);
-  const cap = document.createElement('p'); cap.className = 'cine-cap'; holder.append(cap);
-  if (!reduced()) stage(name, holder, { loop: true }).then(s => {
-    if (stopped) return s.dispose();
-    st = s;
-    const tick = now => {
-      const dt = Math.min(.1, (now - last) / 1000); last = now;
-      const t = st.frame(dt) % st.duration;
-      cap.textContent = st.lines.find(l => t >= l.t0 && t < l.t1)?.text || '';
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-  }).catch(err => console.warn('Loading-screen animation unavailable:', err));
-  return { stop() { stopped = true; cancelAnimationFrame(raf); st?.dispose(); holder.remove(); } };
+  const video = document.createElement('video');
+  Object.assign(video, { src: VIDEO(name), muted: true, playsInline: true, loop: true, preload: 'auto' });
+  Object.assign(video.style, { width: '100%', height: '100%', objectFit: 'contain' });
+  video.setAttribute('playsinline', ''); holder.append(video);
+  let stopped = false;
+  if (CLEAN_VIDEO(name)) {
+    const caption = document.createElement('p'); caption.className = 'cine-cap'; holder.append(caption);
+    captionsFor(name).then(data => {
+      if (stopped) return;
+      const update = () => { const line = data?.captions?.find(l => video.currentTime >= l.t0 && video.currentTime < l.t1); if (caption.textContent !== (line?.text || '')) caption.textContent = line?.text || ''; };
+      video.addEventListener('timeupdate', update); update();
+    });
+  }
+  video.play().catch(() => {});
+  return { stop() { stopped = true; video.pause(); video.removeAttribute('src'); video.load(); holder.remove(); } };
 }

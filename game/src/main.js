@@ -52,7 +52,7 @@ import { Mist } from './mist.js';
 import { Capsule } from './capsule.js';
 import { Greenhouse } from './greenhouse.js';
 import { showMissionPath } from './missionpath.js';
-import { walkBriefingRoom } from './briefing-room.js';
+import { walkBriefingRoom } from './briefing-room.js?v=blender-films-2';
 import { showArrival } from './arrival.js';
 import { Survival } from './survival.js';
 import { playLanding, playStorm, placeLander } from './cutscenes.js';
@@ -73,7 +73,7 @@ import { Coop, CoopHud, openCoopDialog } from './coop.js';
 import { RemotePlayers } from './remote-players.js';
 import { nightVote, canSleepAt, morningClock } from './night-vote.js';
 import { SCREEN_MODES, screenName, screenMode, setScreenMode, nextScreenMode, onLayout } from './layout.js';
-import { playCinematic } from './cinematic.js?v=moon-launch-1';   // Blender-made sequences in animation/glb/
+import { playCinematic } from './cinematic.js?v=blender-films-2';   // Blender movies in animation/previews/
 loadModel('sls.glb'); loadModel('mobile-launcher.glb');   // NASA's 3D models start downloading on the title screen
 
 // Phones and tablets: draw fewer pixels, and skip shadows on small screens, so the game stays smooth
@@ -299,17 +299,12 @@ async function startNew() {
   await playCinematic('ares_vi_briefing'); await playCinematic('briefing_mission');   // Director Hale's briefing, then the orbit plan
   await walkBriefingRoom({ destination: 'mars' });             // walk around the briefing room, then Ready for launch
   setSound({ scene: 'launch', thrust: 0 });
-  state.phase = 'launch';
-  launch = new Launch();
-  say('countdown');
-  $('#countdown').classList.remove('hidden');
-  const skip = document.createElement('button'); skip.textContent = 'Skip launch ›'; skip.id = 'skip';
-  Object.assign(skip.style, { position: 'fixed', right: '16px', bottom: '16px', zIndex: 5 });
-  skip.onclick = () => (launch.done = true); document.body.appendChild(skip);
-  const retry=document.createElement('button');retry.id='retry-launch';retry.textContent='Retry model download';retry.hidden=true;
-  Object.assign(retry.style,{position:'fixed',left:'16px',bottom:'16px',zIndex:5});retry.onclick=()=>location.reload();document.body.appendChild(retry);
-  buildWorld(); // start building Mars in the background during the countdown
-  loadMarsMap(); loadRoverPhotos(); loadEarthToday();   // and start fetching the real NASA pictures
+  state.phase = 'launch-film';
+  buildWorld(); // build Mars while the Blender launch movie plays
+  loadMarsMap(); loadRoverPhotos(); loadEarthToday();
+  await playCinematic('launch_earth');
+  state.phase = 'cruise';
+  await arrive();
 }
 $('#start').onclick = () => {
   const s = readSave();
@@ -425,8 +420,8 @@ async function arrive() {
   setSound({ scene: 'arrival' });
   await playCinematic('mars_approach');          // orbit insertion, then the landing pod undocks
   let landingFilm = null;
-  // A crew lander is too heavy for a parachute: the film shows supersonic retropropulsion (animation/README.md)
-  const landFilm = async () => { await playCinematic('edl_mars', { clip: 'entry' }); await playCinematic('edl_mars', { clip: 'descent_landing' }); placeLander(world); };
+  // Ewan's existing Mars landing owns the world camera and leaves its lander on the surface.
+  const landFilm = async () => { state.phase = 'mars'; await playLanding(world); };
   const selectedSite = await showArrival(F, outpost.delayMinutes(), {onDescent:()=>{landingFilm = landFilm();}});
   if (!selectedSite) { location.reload(); return; }
   state.site = selectedSite;
@@ -1259,11 +1254,11 @@ onLayout((mode, used) => {
 });
 $('#cine-btn').onclick = () => {
   if (inside) return toast('Go outside to watch a cutscene.');
-  modal({ title: 'Cutscenes', html: '<p>Watch the big moments again. Use Skip or Esc to move on. Skipping the 3D briefing starts its video.</p>', choices: [
+  modal({ title: 'Cutscenes', html: '<p>Watch the big moments again. Use Skip or Esc to move on.</p>', choices: [
     { label: 'Mars landing (here)', primary: true, onPick: () => { playLanding(world).catch(() => {}); } },
     { label: 'Dust storm (here)', onPick: () => { playStorm(world).catch(() => {}); } },
     ...[['Ares VI briefing', 'ares_vi_briefing'], ['Mission plan', 'briefing_mission'], ['Moon briefing', 'ares_vi_briefing_moon'], ['Moon mission plan', 'briefing_moon'], ['Launch from Earth', 'launch_earth'], ['Moon launch', 'launch_moon'], ['Trip to Mars', 'cruise_loop'], ['Arriving at Mars', 'mars_approach'],
-      ['Crew landing', 'edl_mars', 'descent_landing'], ['26 months of building', 'outpost_26_months'], ['Dust storm film', 'dust_storm'],
+      ['26 months of building', 'outpost_26_months'], ['Dust storm film', 'dust_storm'],
       ['Solar panel failure', 'failure_solar_panel', 'panel_failure'], ['Rover stuck in sand', 'failure_rover_stuck', 'rover_stuck'], ['Air leak', 'failure_air_leak', 'air_leak'],
       ['Solar panel repaired', 'failure_solar_panel', 'panel_repair'], ['Rover freed', 'failure_rover_stuck', 'rover_freed'], ['Air leak patched', 'failure_air_leak', 'leak_patched'],
       ['Leaving Mars', 'ascent_mars']].map(([label, name, clip]) => ({ label, onPick: () => { playCinematic(name, { clip, world }); } })),

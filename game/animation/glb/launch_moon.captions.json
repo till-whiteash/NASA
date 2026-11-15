@@ -1,0 +1,29 @@
+{
+  "clips": [
+    {
+      "name": "launch_moon",
+      "start": 0,
+      "end": 20.875
+    }
+  ],
+  "captions": [
+    {
+      "t0": 0,
+      "t1": 4,
+      "phase": "APOLLO-STYLE MOON LAUNCH",
+      "text": "Saturn V: the historic Apollo Moon rocket."
+    },
+    {
+      "t0": 4,
+      "t1": 10,
+      "phase": "LIFTOFF",
+      "text": "Five first-stage engines lift the lunar spacecraft from the pad."
+    },
+    {
+      "t0": 10,
+      "t1": 20.875,
+      "phase": "ASCENT",
+      "text": "Climb toward Earth orbit, before the journey to the Moon."
+    }
+  ]
+}

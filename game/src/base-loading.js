@@ -1,7 +1,7 @@
 // A slow download is still allowed to finish. Only actual failures stop arrival.
-// trip: the journey to Mars doubles as the loading screen: the cruise animation (animation/glb/cruise_loop.glb)
+// trip: the journey to Mars doubles as the loading screen: the Blender cruise movie (animation/previews/cruise_loop-hd.mp4)
 // plays behind the panel, and it stays up at least minMs so the trip is seen even when everything loads at once.
-import { loopCinematic } from './cinematic.js?v=moon-launch-1';
+import { loopCinematic } from './cinematic.js?v=blender-films-2';
 export async function waitForBase(ready, { slowAfter = 60000, trip = false, minMs = 0, title } = {}) {
   const panel = document.createElement('section'); panel.id = 'base-loading';
   panel.setAttribute('role', 'status'); panel.setAttribute('aria-live', 'polite');
