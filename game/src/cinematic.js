@@ -55,6 +55,7 @@ const CLEAN_VIDEO = name => HD_FILMS.has(name);
 const FILM_NEXT = { ares_vi_briefing: 'briefing_mission', briefing_mission: 'launch_earth', launch_earth: 'cruise_loop',
   ares_vi_briefing_moon: 'briefing_moon', briefing_moon: 'launch_moon', mars_approach: 'outpost_26_months' };
 const preloaded = new Map();
+let preloadExpiry;
 function releaseVideo(video) {
   if (!video) return;
   video.pause(); video.onended = null; video.onerror = null;
@@ -71,8 +72,11 @@ function filmVideo(name) {
 export function preloadCinematic(name) {
   if (!name || preloaded.has(name)) return;
   for (const video of preloaded.values()) releaseVideo(video);
-  preloaded.clear(); // one upcoming film, not an accumulating set of decoders
+  preloaded.clear(); clearTimeout(preloadExpiry); // at most one upcoming film
   const v = filmVideo(name); v.load(); preloaded.set(name, v); captionsFor(name);
+  preloadExpiry = setTimeout(() => {
+    if (preloaded.get(name) === v) { preloaded.delete(name); releaseVideo(v); }
+  }, 60000); // release unused look-ahead buffers during long gameplay sessions
 }
 const VIDEO = name => new URL(`previews/${name}${CLEAN_VIDEO(name) ? '-hd' : ''}.mp4`, ANIMATION_ROOT).href;
 const POSTER = name => new URL(`previews/posters/${name}.jpg`, ANIMATION_ROOT).href;
@@ -152,7 +156,7 @@ export function playCinematic(name, { clip, world, onSkip } = {}) {
       const onProgress = () => loader?.progress(video);
       for (const ev of ['progress', 'loadedmetadata', 'durationchange']) video.addEventListener(ev, onProgress);
       video.addEventListener('canplay', () => loader?.ready());
-      video.addEventListener('playing', () => { clearTimeout(loaderTimer); box.classList.add('cine-playing'); loader?.done(true); preloadCinematic(FILM_NEXT[name]); });
+      video.addEventListener('playing', () => { clearTimeout(loaderTimer); box.classList.add('cine-playing'); loader?.done(true); preloadCinematic(FILM_NEXT[name]); }, { once: true });
       endLoader = () => { clearTimeout(loaderTimer); loader?.done(true); };
       // a slow connection mid-film: a small buffering badge instead of a frozen picture
       video.addEventListener('waiting', () => { if (video.currentTime > .2) box.classList.add('cine-buffering'); });
