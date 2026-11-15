@@ -1483,7 +1483,28 @@ function setDevTime(name) {
   if(!Object.hasOwn(phases,name))throw new Error('time dawn|noon|evening|night|day|toggle');
   solClock=phases[name]*TUNED.solSeconds;world.setTime(phases[name]);return 'Time: '+name;
 }
-devConsole({
+let devRelayPlaying = false;
+async function previewRelay(destination = 'earth') {
+  if (!['earth','mars'].includes(destination)) throw new Error('relay earth|mars');
+  if (devRelayPlaying || isCinematicActive() || isBriefingRoomActive() || world?.cinematic) throw new Error('Finish the current cutscene first.');
+  if (state.phase === 'dead') throw new Error('Start a new mission first.');
+  const sceneWorld = world, previous = sceneWorld?.cinematic;
+  devRelayPlaying = true;
+  developerConsole.toggle(false);
+  if (sceneWorld) sceneWorld.cinematic = true;
+  try {
+    const { playRelayCinematic } = await import('./relay-cine.js');
+    await playRelayCinematic({ destination });
+    return 'Relay cutscene finished.';
+  } finally {
+    if (sceneWorld) sceneWorld.cinematic = previous;
+    devRelayPlaying = false;
+    releaseControls();
+  }
+}
+const developerConsole = devConsole({
+  starlink: { help: 'play the Earth satellite / relay cutscene', run: () => previewRelay('earth') },
+  relay: { help: 'relay earth|mars — play the communications cutscene', run: previewRelay },
   time: {help:'time dawn|noon|evening|night|day|toggle',run:setDevTime},
   ...Object.fromEntries(['day','night','dawn','noon','evening'].map(name=>[name,{help:'set time to '+name,run:()=>setDevTime(name)}])),
   'daynight': {help:'toggle day and night',run:()=>setDevTime('toggle')},
@@ -1682,7 +1703,7 @@ function showStory() {
 }
 $('#loading').classList.add('hidden');
 renderer.setAnimationLoop(() => {
-  if(document.hidden||renderHealth.failed||state.phase==='dead'){clock.getDelta();return;}
+  if(document.hidden||renderHealth.failed||devRelayPlaying||state.phase==='dead'){clock.getDelta();return;}
   // Opening/arrival films have no world argument, but still cover the whole canvas.
   if (isCinematicActive() || isBriefingRoomActive()) { clock.getDelta(); return; }
   adaptiveRes.tick();
